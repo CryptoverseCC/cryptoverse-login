@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ params.client_id.0 }} - Login with Ethereum Wallet</title>
+    <script
+      id="sentry"
+      async
+      src="/login/sentry.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      sentry.addEventListener("load", function () {
+        Sentry.init({
+          dsn: "{{ sentry_dsn }}",
+          release: "{{ version }}",
+        });
+      });
+    </script>
+    <script
+      async
+      src="/login/static/js/embed.js"
+      crossorigin="anonymous"
+    ></script>
+    <style>
+      body {
+        margin: 0;
+      }
+
+      #loader {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 1;
+        width: 120px;
+        height: 120px;
+        margin: -76px 0 0 -76px;
+        border: 16px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 16px solid #3366cc;
+        -webkit-animation: spin 2s linear infinite;
+        animation: spin 2s linear infinite;
+      }
+
+      @-webkit-keyframes spin {
+        0% {
+          -webkit-transform: rotate(0deg);
+        }
+        100% {
+          -webkit-transform: rotate(360deg);
+        }
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      #auth {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loader"></div>
+    <iframe id="auth" src=""></iframe>
+    <script>
+      params = new URLSearchParams(window.location.search);
+      if (params.get("loaded")) {
+        window.addEventListener("load", async (event) => {
+          await window.ready; // Wait for Comlink exposing this context
+          const iframe = document.getElementById("auth");
+          iframe.src = "{{ url }}";
+        });
+      } else {
+        var url = new URL(window.location.href);
+        url.searchParams.append("loaded", "yes");
+        window.open(url, "_top");
+      }
+    </script>
+  </body>
+</html>

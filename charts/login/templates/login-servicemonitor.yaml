@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "login.fullname" . }}-login
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "login.labels" . | indent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "login.fullname" . }}-login
+  endpoints:
+  - port: http
+    path: /---/metrics
+    interval: 15s

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login with Ethereum Wallet - Final</title>
+    <script
+      id="sentry"
+      async
+      src="/login/sentry.min.js"
+      integrity="sha256-lUNQ3Xc8M5FRiBcVg3K4A9K59mVrBsQhB7WUmUMuHX8="
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      sentry.addEventListener("load", function () {
+        Sentry.init({
+          dsn: "{{ sentry_dsn }}",
+          release: "{{ version }}",
+        });
+      });
+    </script>
+    <script>
+      var redirectUrl = "{{ url|safe }}";
+    </script>
+    <script
+      async
+      src="/login/static/js/final.js"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body></body>
+</html>

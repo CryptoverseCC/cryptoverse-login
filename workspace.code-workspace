@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.analysis.extraPaths": [
+			"/home/grzegorz/Workspace/CryptoVerseCC/products/cryptoverse-login/tests/.venv/lib/python3.8/site-packages"
+		],
+		"go.alternateTools": { "go": "/snap/bin/go" }
+	},
+
+}

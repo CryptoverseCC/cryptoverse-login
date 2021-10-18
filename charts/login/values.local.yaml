@@ -1,0 +1,12 @@
+sentryDSN: https://???@???.ingest.sentry.io/???
+
+db:
+  host: "postgres-postgresql.default.svc.cluster.local"
+  port: "5432"
+  name: "cryptoverse-login"
+  user: "cryptoverse"
+  pass: "cryptopass"
+
+secretsSystem: localsecret # pragma: allowlist secret
+secretsCookie: localsecret # pragma: allowlist secret
+djangoSecrets: "localsecret" # pragma: allowlist secret

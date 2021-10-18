@@ -1,0 +1,15 @@
+---
+services:
+  gateway:
+    build: login/gateway
+    image: "${REGISTRY}/${PROJECT}/gateway:${TAG}"
+  login:
+    build: login/login
+    image: "${REGISTRY}/${PROJECT}/login:${TAG}"
+  register:
+    build: login/register
+    image: "${REGISTRY}/${PROJECT}/register:${TAG}"
+  wrapper:
+    build: login/wrapper
+    image: "${REGISTRY}/${PROJECT}/wrapper:${TAG}"
+version: "3.7"

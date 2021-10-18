@@ -1,0 +1,14 @@
+syntax="proto3";
+package restrictions;
+
+service Verifier {
+    rpc verify (VerifyRequest) returns (VerifyReply);
+}
+
+message VerifyRequest {
+    string signature = 1;
+}
+
+message VerifyReply {
+    bool allowed = 1;
+}

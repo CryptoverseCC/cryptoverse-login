@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "login.fullname" . }}-wrapper
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "login.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.wrapper.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "login.fullname" . }}-wrapper
+  template:
+    metadata:
+      labels:
+        app: {{ include "login.fullname" . }}-wrapper
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      containers:
+        - env:
+            - name: PORT
+              value: {{ .Values.wrapper.deployment.port | quote }}
+            - name: VERSION
+              value: {{ .Values.version | quote }}
+            - name: SENTRY_DSN
+              value: {{ .Values.sentryDSN }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registry }}/{{ .Values.wrapper.image.repository }}:{{ .Values.version }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          name: wrapper
+          resources: {}
+          ports:
+            - name: http
+              containerPort: {{ .Values.wrapper.deployment.port }}

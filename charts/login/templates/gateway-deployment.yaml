@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "login.fullname" . }}-gateway
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "login.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "login.fullname" . }}-gateway
+  template:
+    metadata:
+      labels:
+        app: {{ include "login.fullname" . }}-gateway
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      containers:
+        - securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registry }}/{{ .Values.gateway.image.repository }}:{{ .Values.version }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          name: gateway
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.deployment.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.gateway.deployment.port }}"
+            - name: LOGIN_SERVICE
+              value: "{{ include "login.fullname" . }}-login:{{ .Values.login.service.port }}"
+            - name: WRAPPER_SERVICE
+              value: "{{ include "login.fullname" . }}-wrapper:{{ .Values.wrapper.service.port }}"
+            - name: REGISTER_SERVICE
+              value: "{{ include "login.fullname" . }}-register:{{ .Values.register.service.port }}"
+            - name: HYDRA_PUBLIC_SERVICE
+              value: "{{ include "login.fullname" . }}-hydra-public:{{ .Values.hydra.hydra.config.serve.public.port }}"
+            - name: HYDRA_ADMIN_SERVICE
+              value: "{{ include "login.fullname" . }}-hydra-admin:{{ .Values.hydra.hydra.config.serve.admin.port }}"
+            - name: DOMAIN
+              value: "{{ .Values.domain }}"
+            - name: NAMESPACE
+              value: "{{ .Release.Namespace }}"
+            - name: INTROSPECT_ACCESS
+              value: "{{ .Values.introspectAccess }}"

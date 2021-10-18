@@ -1,0 +1,111 @@
+domain: login.cryptoverse.cc
+version: 1.2.160
+sentryDSN: "..."
+registry: registry.digitalocean.com/cryptoverse
+
+db:
+  host: "db-host"
+  port: "5432"
+  name: "db-name"
+  user: "db-user"
+  pass: "db-pass"
+
+secretsSystem: []
+
+djangoSecrets: "!!! CHANGE THIS !!!"
+
+hydra:
+  hydra: # Overrride `hydra` subchart values
+    autoMigrate: true
+    existingSecret: "cryptoverse-login-hydra" # pragma: allowlist secret
+    config:
+      log:
+        level: debug
+      serve:
+        public:
+          port: 4444
+        admin:
+          port: 4445
+        tls:
+          allow_termination_from:
+            - 10.0.0.0/8
+            - 127.0.0.0/24
+      webfinger:
+        oidc_discovery:
+          client_registration_url: https://login.cryptoverse.cc/register
+      oidc:
+        subject_identifiers:
+          supported_types:
+            - public
+          pairwise:
+            salt: "!!! CHANGE THIS !!!"
+        dynamic_client_registration:
+          default_scope:
+            - openid
+      urls:
+        login: https://login.cryptoverse.cc/login
+        consent: https://login.cryptoverse.cc/consent
+        self:
+          issuer: https://login.cryptoverse.cc/
+
+introspectAccess: "user [!!! CHANGE THIS !!!] password [!!! CHANGE THIS !!!]"
+infuraApiKey: "!!! CHANGE THIS !!!"
+alchemyApiKey: "!!! CHANGE THIS !!!"
+
+gateway:
+  replicaCount: 1
+  deployment:
+    port: 8000
+  service:
+    port: 8000
+  image:
+    repository: cryptoverse-login/gateway
+
+login:
+  replicaCount: 1
+  deployment:
+    port: 3000
+  service:
+    port: 80
+  image:
+    repository: cryptoverse-login/login
+  hydraAdminUrl: http://cryptoverse-login-hydra-admin:4445
+  mailserverDomain: ethmail.cc
+
+register:
+  replicaCount: 1
+  deployment:
+    port: 3000
+  service:
+    port: 80
+  image:
+    repository: cryptoverse-login/register
+
+wrapper:
+  replicaCount: 1
+  deployment:
+    port: 3000
+  service:
+    port: 80
+  image:
+    repository: cryptoverse-login/wrapper
+
+# Default values for help.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000

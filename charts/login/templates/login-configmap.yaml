@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "login.fullname" . }}-login
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "login.labels" . | indent 4 }}
+data:
+  restrictions.json: |
+    {
+      "flynnjamm.cryptoverse.cc": [
+        {
+          "tokenAddress": "0x56687cf29ac9751ce2a4e764680b6ad7e668942e",
+          "condition": "balanceOf >= 1000"
+        }
+      ],
+      "fwb.cryptoverse.cc": [
+        {
+          "tokenAddress": "0x7d91e637589EC3Bb54D8213a9e92Dc6E8D12da91",
+          "condition": "balanceOf >= 100"
+        }
+      ]
+    }

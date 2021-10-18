@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "login.fullname" . }}-login
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "login.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.login.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "login.fullname" . }}-login
+  template:
+    metadata:
+      labels:
+        app: {{ include "login.fullname" . }}-login
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - env:
+            - name: HYDRA_ADMIN_URL
+              value: {{ .Values.login.hydraAdminUrl }}
+            - name: MAILSERVER_DOMAIN
+              value: {{ .Values.login.mailserverDomain }}
+            - name: PORT
+              value: {{ .Values.login.deployment.port | quote}}
+            - name: VERSION
+              value: {{ .Values.version | quote }}
+            - name: SENTRY_DSN
+              value: {{ .Values.sentryDSN }}
+            - name: INFURA_API_KEY
+              value: {{ .Values.infuraApiKey }}
+            - name: ALCHEMY_API_KEY
+              value: {{ .Values.alchemyApiKey }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registry }}/{{ .Values.login.image.repository }}:{{ .Values.version }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          name: login
+          resources: {}
+          volumeMounts:
+            - mountPath: /app/secrets
+              name: secrets
+            - mountPath: /config
+              name: config
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: {{ .Values.login.deployment.port }}
+      restartPolicy: Always
+      volumes:
+        - name: secrets
+          secret:
+            secretName: {{ include "login.fullname" . }}-login
+        - name: config
+          configMap:
+            name: {{ include "login.fullname" . }}-login
