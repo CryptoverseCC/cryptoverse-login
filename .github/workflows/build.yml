@@ -26,4 +26,4 @@ jobs:
       - name: Log in to DO Container Registry
         run: doctl registry login --expiry-seconds 1200
       - name: Build
-        run: ./docker-build ${{ github.head_ref }}-${{ github.sha }}
+        run: ./docker-build ${{ github.sha }}
