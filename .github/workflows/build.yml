@@ -34,7 +34,9 @@ jobs:
         uses: azure/setup-helm@v1
         with:
           version: v3.4.0
+      - name: Create namespace
+        run: kubectl create namespace cryptoverse-login
       - name: Helm install
-        run: helm install ./charts/login/ --name cryptoverse-login --namespace cryptoverse-login -f ./charts/login/values.ci.yaml
+        run: helm install cryptoverse-login ./charts/login/ --namespace cryptoverse-login -f ./charts/login/values.ci.yaml
       - name: Helm verify
         run: helm list --all-namespaces
