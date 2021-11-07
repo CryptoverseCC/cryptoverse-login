@@ -27,9 +27,12 @@ jobs:
         run: doctl registry login --expiry-seconds 1200
       - name: Build
         run: ./docker-build ${{ github.sha }}
-      - name: Start minikube
-        id: minikube
-        uses: medyagh/setup-minikube@master
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v2.4.2
+        with:
+          minikube version: "v1.24.0"
+          kubernetes version: "v1.22.0"
+          github token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Helm
         uses: azure/setup-helm@v1
         with:
