@@ -34,6 +34,11 @@ jobs:
         uses: azure/setup-helm@v1
         with:
           version: v3.4.0
+      - name: Install Dependencies
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm install prometheus       bitnami/kube-prometheus
+          helm install nginx-controller bitnami/nginx-ingress-controller
       - name: Create namespace
         run: kubectl create namespace cryptoverse-login
       - name: Helm install
