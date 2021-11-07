@@ -36,9 +36,9 @@ jobs:
           version: v3.4.0
       - name: Install Dependencies
         run: |
+          minikube addons enable ingress
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm install nginx-controller bitnami/nginx-ingress-controller
-          helm install prometheus       bitnami/kube-prometheus
+          helm install prometheus bitnami/kube-prometheus
       - name: Create namespace
         run: kubectl create namespace cryptoverse-login
       - name: Helm install
