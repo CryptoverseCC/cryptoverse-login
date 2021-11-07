@@ -37,8 +37,8 @@ jobs:
       - name: Install Dependencies
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm install prometheus       bitnami/kube-prometheus
           helm install nginx-controller bitnami/nginx-ingress-controller
+          helm install prometheus       bitnami/kube-prometheus
       - name: Create namespace
         run: kubectl create namespace cryptoverse-login
       - name: Helm install
