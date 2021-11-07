@@ -1,5 +1,0 @@
-0000000000000000000000000000000000000000 b4bb7c9cec90ca9c980d5eda7d62427cd07c04ef Grzegorz Kapkowski <grzegorz.kapkowski@gmail.com> 1624000949 +0200	commit (initial): Init
-b4bb7c9cec90ca9c980d5eda7d62427cd07c04ef 2e77abed793ee330caa03fcc268776bd86a1c961 Grzegorz Kapkowski <grzegorz.kapkowski@gmail.com> 1624001467 +0200	commit (amend): Init
-2e77abed793ee330caa03fcc268776bd86a1c961 f13e59098f9b349faff9e598ff84c30b799bfaa7 Grzegorz Kapkowski <grzegorz.kapkowski@gmail.com> 1624943478 +0200	commit: v1.2.155
-f13e59098f9b349faff9e598ff84c30b799bfaa7 f13e59098f9b349faff9e598ff84c30b799bfaa7 Grzegorz Kapkowski <grzegorz.kapkowski@gmail.com> 1624943529 +0200	Branch: renamed refs/heads/main to refs/heads/master
-f13e59098f9b349faff9e598ff84c30b799bfaa7 00f7efe90107614210eff5ebbf6fe7baacbabd7f Grzegorz Kapkowski <grzegorz.kapkowski@gmail.com> 1625033677 +0200	commit: v1.2.157
