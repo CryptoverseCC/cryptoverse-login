@@ -15,6 +15,8 @@ secretsSystem: []
 djangoSecrets: "!!! CHANGE THIS !!!"
 
 hydra:
+  hydra-maester:
+    forwardedProto: https
   hydra: # Overrride `hydra` subchart values
     autoMigrate: true
     existingSecret: "cryptoverse-login-hydra" # pragma: allowlist secret
