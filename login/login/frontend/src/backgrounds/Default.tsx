@@ -12,7 +12,7 @@ import Typography from "@material-ui/core/Typography";
 import LockOutlinedIcon from "@material-ui/icons/LockOutlined";
 import { App } from "../App";
 import { ProviderList } from "../components/ConnectWalletPage";
-import { ILoginProvider } from "../services/loginProvider";
+import {ILoginProvider, TEthereumAddress, TProviderName} from "../services/loginProvider";
 
 function Info() {
   return (
@@ -67,16 +67,25 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
 }));
 
+type TLoginHistoryItem = {
+  wallet: TProviderName,
+  address: TEthereumAddress,
+}
+
+type TLoginHistory = Array<TLoginHistoryItem>
+
 export interface BackgroundProps {
   AppComponent: typeof App;
   loginProvider: ILoginProvider;
   walletProviders: ProviderList;
+  loginHistory: TLoginHistory
 }
 
 export const Background: React.FC<BackgroundProps> = ({
   AppComponent,
   loginProvider,
   walletProviders,
+  loginHistory
 }) => {
   const classes = useStyles();
   const [open, setOpen] = useState(false);
@@ -113,6 +122,21 @@ export const Background: React.FC<BackgroundProps> = ({
                 with:
               </Typography>
               <div className={classes.form}>
+                {loginHistory.map((login) => {
+                  const {address} = login;
+                  return <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    className={classes.submit}
+                    key={address}
+                    onClick={() => loginProvider.login({
+                      address
+                    })}
+                  >
+                    { address }
+                  </Button>
+                })}
                 <Button
                   fullWidth
                   variant="contained"
