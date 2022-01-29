@@ -10,8 +10,9 @@ metadata:
   labels:
 {{ include "login.labels" . | indent 4 }}
 spec:
+  ingressClassName: nginx
   rules:
-  - host: login.cryptoverse.cc
+  - host: {{ .Values.domain }}
     http:
       paths:
       - path: /
@@ -24,4 +25,4 @@ spec:
   tls:
     - secretName: cryptoverse-login # pragma: allowlist secret
       hosts:
-        - login.cryptoverse.cc
+        - {{ .Values.domain }}

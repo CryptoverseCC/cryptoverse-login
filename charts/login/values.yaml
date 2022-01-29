@@ -1,5 +1,5 @@
 domain: login.cryptoverse.cc
-version: 1.2.160
+version: 1.2.165
 sentryDSN: "..."
 registry: registry.digitalocean.com/cryptoverse
 
@@ -15,6 +15,8 @@ secretsSystem: []
 djangoSecrets: "!!! CHANGE THIS !!!"
 
 hydra:
+  image:
+    tag: v1.11.0
   hydra-maester:
     forwardedProto: https
   hydra: # Overrride `hydra` subchart values
@@ -42,6 +44,7 @@ hydra:
           pairwise:
             salt: "!!! CHANGE THIS !!!"
         dynamic_client_registration:
+          enabled: true
           default_scope:
             - openid
       urls:
@@ -50,7 +53,9 @@ hydra:
         self:
           issuer: https://login.cryptoverse.cc/
 
-introspectAccess: "user [!!! CHANGE THIS !!!] password [!!! CHANGE THIS !!!]"
+introspectAccess:
+  user: "!!! CHANGE THIS !!!"
+  pass: "!!! CHANGE THIS !!!"
 infuraApiKey: "!!! CHANGE THIS !!!"
 alchemyApiKey: "!!! CHANGE THIS !!!"
 

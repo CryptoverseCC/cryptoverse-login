@@ -50,5 +50,7 @@ spec:
               value: "{{ .Values.domain }}"
             - name: NAMESPACE
               value: "{{ .Release.Namespace }}"
-            - name: INTROSPECT_ACCESS
-              value: "{{ .Values.introspectAccess }}"
+            - name: INTROSPECT_ACCESS_USER
+              value: "{{ .Values.introspectAccess.user }}"
+            - name: INTROSPECT_ACCESS_PASS
+              value: "{{ .Values.introspectAccess.pass }}"
