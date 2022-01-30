@@ -6,9 +6,12 @@ hydra:
   hydra:
     config:
       dsn: "postgres://cryptoverse:cryptopass@postgres-postgresql.default.svc.cluster.local:5432/cryptoverse-login" # pragma: allowlist secret
+    secrets:
+      cookie:
+        - localsecretttttt # pragma: allowlist secret
+      system:
+        - localsecretttttt # pragma: allowlist secret
 
-secretsSystem: localsecretttttt # pragma: allowlist secret
-secretsCookie: localsecretttttt # pragma: allowlist secret
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
 introspectAccess:

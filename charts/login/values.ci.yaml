@@ -6,9 +6,12 @@ hydra:
   hydra:
     config:
       dsn: "memory"
+    secrets:
+      cookie:
+        - localsecretttttt # pragma: allowlist secret
+      system:
+        - localsecretttttt # pragma: allowlist secret
 
-secretsSystem: localsecretttttt # pragma: allowlist secret
-secretsCookie: localsecretttttt # pragma: allowlist secret
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
 introspectAccess:
