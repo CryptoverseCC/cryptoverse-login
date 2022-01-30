@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@ory/hydra-client": "^1.9.2",
+    "@ory/hydra-client": "^1.10.6",
     "@sentry/node": "^6.2.5",
     "@types/csurf": "^1.11.0",
     "@types/mathjs": "^6.0.11",

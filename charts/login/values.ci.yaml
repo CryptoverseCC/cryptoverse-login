@@ -1,12 +1,21 @@
 sentryDSN: https://???@???.ingest.sentry.io/???
 
 db:
-  host: "postgres-postgresql.default.svc.cluster.local"
-  port: "5432"
-  name: "cryptoverse-login"
-  user: "cryptoverse"
-  pass: "cryptopass"
+  host: "x"
+  port: "1"
+  name: "x"
+  user: "x"
+  pass: "x"
+
+hydra:
+  hydra:
+    config:
+      dsn: "memory"
 
 secretsSystem: localsecret # pragma: allowlist secret
 secretsCookie: localsecret # pragma: allowlist secret
 djangoSecrets: "localsecret" # pragma: allowlist secret
+
+introspectAccess:
+  user: "localuser" # pragma: allowlist secret
+  pass: "$5$8kkgRZ7KA7$wYpOtm2YBFDcp.uP8nKMcp1Y9BInU.T9GMpUer.hUE." # pragma: allowlist secret

@@ -1,5 +1,5 @@
 domain: login.cryptoverse.cc
-version: 1.2.165
+version: 1.2.168
 sentryDSN: "..."
 registry: registry.digitalocean.com/cryptoverse
 
@@ -25,11 +25,16 @@ hydra:
     config:
       log:
         level: debug
+        leak_sensitive_values: true
       serve:
         public:
           port: 4444
+          access_log:
+            disable_for_health: true
         admin:
           port: 4445
+          access_log:
+            disable_for_health: true
         tls:
           allow_termination_from:
             - 10.0.0.0/8

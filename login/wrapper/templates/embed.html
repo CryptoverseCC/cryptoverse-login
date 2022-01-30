@@ -86,7 +86,7 @@
         window.addEventListener("load", async (event) => {
           await window.ready; // Wait for Comlink exposing this context
           const iframe = document.getElementById("auth");
-          iframe.src = "{{ url }}";
+          iframe.src = "{{ url|safe }}";
         });
       } else {
         var url = new URL(window.location.href);
