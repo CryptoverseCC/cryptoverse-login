@@ -47,7 +47,7 @@ jobs:
       - name: Helm install
         run: |
           helm upgrade --install \
-          cryptoverse-login \
+          cryptoverse-login-${{ github.sha }} \
           ./charts/login/ \
           --namespace cryptoverse-login-${{ github.sha }} \
           -f ./charts/login/values.ci.yaml \

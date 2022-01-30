@@ -1,19 +1,14 @@
 sentryDSN: https://???@???.ingest.sentry.io/???
 
-db:
-  host: "x"
-  port: "1"
-  name: "x"
-  user: "x"
-  pass: "x"
+domain: login.cryptoverse.dev
 
 hydra:
   hydra:
     config:
       dsn: "memory"
 
-secretsSystem: localsecret # pragma: allowlist secret
-secretsCookie: localsecret # pragma: allowlist secret
+secretsSystem: localsecretttttt # pragma: allowlist secret
+secretsCookie: localsecretttttt # pragma: allowlist secret
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
 introspectAccess:

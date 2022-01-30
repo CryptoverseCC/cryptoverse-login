@@ -2,13 +2,6 @@ sentryDSN: https://???@???.ingest.sentry.io/???
 
 domain: login.cryptoverse.dev
 
-db:
-  host: "postgres-postgresql.default.svc.cluster.local"
-  port: "5432"
-  name: "cryptoverse-login"
-  user: "cryptoverse"
-  pass: "cryptopass"
-
 hydra:
   hydra:
     config:
