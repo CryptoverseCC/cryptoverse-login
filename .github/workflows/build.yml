@@ -63,11 +63,17 @@ jobs:
           kubectl describe deployment cryptoverse-login-login --namespace cryptoverse-login-${{ github.sha }}
           kubectl get events --namespace=cryptoverse-login-${{ github.sha }}
           kubectl describe pods --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
-      - name: Logs
+      - name: Logs Gateway
         run: |
           sleep 2m
           kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-gateway
+      - name: Logs Login
+        run: |
+          sleep 2m
           kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
+      - name: Logs Wrapper
+        run: |
+          sleep 2m
           kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-wrapper
       - name: Install Selenium Grid
         run: |
