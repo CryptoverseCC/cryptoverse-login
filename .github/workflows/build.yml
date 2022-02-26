@@ -37,7 +37,7 @@ jobs:
       - uses: balchua/microk8s-actions@v0.2.1
         with:
           channel: "latest/stable"
-          addons: '["dns", "registry", "prometheus", "ingress"]'
+          addons: '["dns", "prometheus", "ingress"]'
       - name: Set up Helm
         uses: azure/setup-helm@v1
         with:
@@ -58,6 +58,7 @@ jobs:
         run: |
           sleep 1m
           kubectl get pods -o wide --namespace cryptoverse-login-${{ github.sha }}
+          kubectl describe deployment cryptoverse-login-login -o yaml --namespace cryptoverse-login-${{ github.sha }}
       - name: Logs
         run: kubectl logs -n cryptoverse-login-${{ github.sha }} -l app.kubernetes.io/name=cryptoverse-login -f
       - name: Install Selenium Grid
