@@ -36,16 +36,16 @@ jobs:
         with:
           channel: "latest/stable"
           addons: '["dns", "prometheus", "ingress"]'
+      - name: Create namespace
+        run: kubectl create namespace cryptoverse-login-${{ github.sha }}
       - name: Log in to DO Container Registry
         run: |
           doctl registry login --expiry-seconds 1200
-          doctl registry kubernetes-manifest | kubectl apply -f -
+          doctl registry kubernetes-manifest --namespace cryptoverse-login-${{ github.sha }} | kubectl apply -f -
       - name: Set up Helm
         uses: azure/setup-helm@v1
         with:
           version: v3.4.0
-      - name: Create namespace
-        run: kubectl create namespace cryptoverse-login-${{ github.sha }}
       - name: Helm install
         run: |
           helm upgrade --install \
