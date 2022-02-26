@@ -74,6 +74,7 @@ jobs:
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
+          sleep 2m
           helm upgrade --install --wait --timeout 10m \
             selenium-grid \
             docker-selenium/chart/selenium-grid/.
