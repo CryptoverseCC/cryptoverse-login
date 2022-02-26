@@ -46,7 +46,7 @@ jobs:
         run: kubectl create namespace cryptoverse-login-${{ github.sha }}
       - name: Helm install
         run: |
-          helm upgrade --install --wait \
+          helm upgrade --install --wait --timeout 15m --debug\
             cryptoverse-login \
             ./charts/login/ \
             --namespace cryptoverse-login-${{ github.sha }} \
@@ -57,7 +57,7 @@ jobs:
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
-          helm upgrade --install --wait \
+          helm upgrade --install --wait --timeout 15m --debug \
             selenium-grid \
             docker-selenium/chart/selenium-grid/.
       - name: Helm verify \#2
