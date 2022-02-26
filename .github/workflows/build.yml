@@ -55,7 +55,7 @@ jobs:
       - name: Helm verify
         run: helm list --all-namespaces
       - name: Logs
-        run: microk8s kubectl logs -n cryptoverse-login-${{ github.sha }} -l app.kubernetes.io/name=cryptoverse-login -f
+        run: kubectl logs -n cryptoverse-login-${{ github.sha }} -l app.kubernetes.io/name=cryptoverse-login -f
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
