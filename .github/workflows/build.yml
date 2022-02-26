@@ -33,7 +33,9 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Log in to DO Container Registry
-        run: doctl registry login --expiry-seconds 1200
+        run: |
+          doctl registry login --expiry-seconds 1200
+          doctl registry kubernetes-manifest | kubectl apply --namespace cryptoverse-login-${{ github.sha }} -f -
       - uses: balchua/microk8s-actions@v0.2.1
         with:
           channel: "latest/stable"

@@ -1,6 +1,8 @@
 sentryDSN: https://???@???.ingest.sentry.io/???
-
 domain: login.cryptoverse.dev
+
+imagePullSecrets:
+  - name: registry-cryptoverse
 
 hydra:
   hydra:
