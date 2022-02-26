@@ -64,7 +64,11 @@ jobs:
           kubectl get events --namespace=cryptoverse-login-${{ github.sha }}
           kubectl describe pods --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
       - name: Logs
-        run: kubectl logs -n cryptoverse-login-${{ github.sha }} -l app.kubernetes.io/name=cryptoverse-login -f
+        run: |
+          sleep 2m
+          kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-gateway
+          kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
+          kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-wrapper
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
