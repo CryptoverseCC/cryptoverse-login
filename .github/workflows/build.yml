@@ -83,7 +83,7 @@ jobs:
             docker-selenium/chart/selenium-grid/.
       - name: Helm verify \#2
         run: helm list --all-namespaces
-      - name: Logs Wrapper
+      - name: Services
         run: |
           sleep 1m
-          kubectl get service ingress-nginx-controller --namespace ingress-nginx
+          kubectl get service --all-namespaces
