@@ -54,6 +54,10 @@ jobs:
             --set version=${{ github.sha }}
       - name: Helm verify
         run: helm list --all-namespaces
+      - name: Pods
+        run: |
+          sleep 1m
+          kubectl get pods -o wide --namespace cryptoverse-login-${{ github.sha }}
       - name: Logs
         run: kubectl logs -n cryptoverse-login-${{ github.sha }} -l app.kubernetes.io/name=cryptoverse-login -f
       - name: Install Selenium Grid
