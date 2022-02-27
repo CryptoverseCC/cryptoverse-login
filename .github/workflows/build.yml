@@ -89,7 +89,7 @@ jobs:
           kubectl get service --all-namespaces
       - name: Resolve login.cryptoverse.dev to localhost
         run: |
-          echo "127.0.0.1 login.cryptoverse.dev" >> /etc/hosts
+          echo "127.0.0.1 login.cryptoverse.dev" | sudo tee -a /etc/hosts
       - name: Verify connectivity
         run: |
           curl https://login.cryptovorse.dev/ -v
