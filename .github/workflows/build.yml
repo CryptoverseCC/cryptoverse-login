@@ -37,7 +37,9 @@ jobs:
           channel: "latest/stable"
           addons: '["dns", "prometheus", "ingress"]'
       - name: Create namespace
-        run: kubectl create namespace cryptoverse-login-${{ github.sha }}
+        run: |
+          kubectl create namespace cryptoverse-login-${{ github.sha }}
+          kubectl create namespace selenium-grid
       - name: Log in to DO Container Registry
         run: |
           doctl registry login --expiry-seconds 1200
@@ -70,6 +72,7 @@ jobs:
           git clone https://github.com/seleniumhq/docker-selenium.git
           sleep 2m
           helm upgrade --install \
+            --namespace selenium-grid \
             selenium-grid \
             docker-selenium/chart/selenium-grid/.
       - name: Helm verify \#2
