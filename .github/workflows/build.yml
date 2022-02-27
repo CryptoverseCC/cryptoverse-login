@@ -71,7 +71,7 @@ jobs:
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
           sleep 2m
-          helm upgrade --install \
+          helm upgrade --install --wait --timeout 10m \
             --namespace selenium-grid \
             selenium-grid \
             docker-selenium/chart/selenium-grid/. \
@@ -87,3 +87,9 @@ jobs:
       - name: Services
         run: |
           kubectl get service --all-namespaces
+      - name: Resolve login.cryptoverse.dev to localhost
+        run: |
+          echo "127.0.0.1 login.cryptoverse.dev" >> /etc/hosts
+      - name: Verify connectivity
+        run: |
+          curl https://login.cryptovorse.dev/ -v
