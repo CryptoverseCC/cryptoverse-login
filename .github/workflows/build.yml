@@ -56,12 +56,6 @@ jobs:
             --set version=${{ github.sha }}
       - name: Helm verify
         run: helm list --all-namespaces
-      - name: Pods
-        run: |
-          kubectl get pods -o wide --namespace cryptoverse-login-${{ github.sha }}
-          kubectl describe deployment cryptoverse-login-login --namespace cryptoverse-login-${{ github.sha }}
-          kubectl get events --namespace=cryptoverse-login-${{ github.sha }}
-          kubectl describe pods --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
       - name: Logs Gateway
         run: |
           kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-gateway
@@ -75,11 +69,18 @@ jobs:
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
           sleep 2m
-          helm upgrade --install --wait --timeout 10m \
+          helm upgrade --install \
             selenium-grid \
             docker-selenium/chart/selenium-grid/.
       - name: Helm verify \#2
         run: helm list --all-namespaces
+      - name: Pods
+        run: |
+          sleep 2m
+          kubectl get pods -o wide --namespace selenium-grid
+          kubectl describe deployment cryptoverse-login-login --namespace selenium-grid
+          kubectl get events --namespace selenium-grid
+          kubectl describe pods --namespace selenium-grid -l app.kubernetes.io/component=selenium-grid-4.1.2-20220217
       - name: Services
         run: |
           kubectl get service --all-namespaces
