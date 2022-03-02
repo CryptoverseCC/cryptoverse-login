@@ -9,6 +9,10 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+env:
+  # Needs to match "domain" value in values.ci.yaml
+  DOMAIN: login.cryptoverse.local
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -90,6 +94,19 @@ jobs:
       - name: Resolve login.cryptoverse.dev to localhost
         run: |
           echo "127.0.0.1 login.cryptoverse.dev" | sudo tee -a /etc/hosts
+      - name: Certs
+        run: |
+          openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+            -out local.crt \
+            -keyout local.key \
+            -subj "/CN=${DOMAIN}/O=Cryptoverse OU"
+          sudo cp local.crt /usr/local/share/ca-certificates
+          sudo update-ca-certificate
+          kubectl create secret tls cryptoverse-login \
+            --namespace default \
+            --key local.key \
+            --cert local.crt
+          sleep 10s
       - name: Verify connectivity
         run: |
           curl https://login.cryptoverse.dev/ -v
