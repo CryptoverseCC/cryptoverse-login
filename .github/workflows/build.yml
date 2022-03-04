@@ -101,7 +101,7 @@ jobs:
             -keyout local.key \
             -subj "/CN=${DOMAIN}/O=Cryptoverse OU"
           sudo cp local.crt /usr/local/share/ca-certificates
-          sudo update-ca-certificate
+          sudo update-ca-certificates
           kubectl create secret tls cryptoverse-login \
             --namespace default \
             --key local.key \
