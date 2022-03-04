@@ -91,9 +91,9 @@ jobs:
       - name: Services
         run: |
           kubectl get service --all-namespaces
-      - name: Resolve login.cryptoverse.dev to localhost
+      - name: Resolve ${DOMAIN} to localhost
         run: |
-          echo "127.0.0.1 login.cryptoverse.dev" | sudo tee -a /etc/hosts
+          echo "127.0.0.1 ${DOMAIN}" | sudo tee -a /etc/hosts
       - name: Certs
         run: |
           openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
@@ -109,4 +109,4 @@ jobs:
           sleep 10s
       - name: Verify connectivity
         run: |
-          curl https://login.cryptoverse.dev/ -v
+          curl https://${DOMAIN}/ -v
