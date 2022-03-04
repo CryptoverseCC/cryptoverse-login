@@ -1,5 +1,5 @@
 sentryDSN: https://???@???.ingest.sentry.io/???
-domain: login.cryptoverse.dev
+domain: login.cryptoverse.local
 
 imagePullSecrets:
   - name: registry-cryptoverse

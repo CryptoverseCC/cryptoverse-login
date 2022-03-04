@@ -71,6 +71,11 @@ jobs:
       - name: Logs Wrapper
         run: |
           kubectl logs -n cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-wrapper
+      - name: Ingress
+        run: |
+          sleep 1m
+          kubectl get ingress -o wide -n cryptoverse-login-${{ github.sha }}
+          kubectl describe ingress -n cryptoverse-login-${{ github.sha }}
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
