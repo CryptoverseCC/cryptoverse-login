@@ -109,4 +109,4 @@ jobs:
           sleep 10s
       - name: Verify connectivity
         run: |
-          curl https://${DOMAIN}/ -vk
+          curl https://${DOMAIN}/.well-known/openid-configuration -vk
