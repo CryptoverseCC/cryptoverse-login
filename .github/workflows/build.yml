@@ -108,6 +108,8 @@ jobs:
         run: |
           kubectl get ingress --all-namespaces
           kubectl describe ingress --all-namespaces
+          kubectl describe pod -l name=nginx-ingress-microk8s -n nginx
+          kubectl logs -l name=nginx-ingress-microk8s -n nginx
       - name: Services
         run: |
           kubectl get service --all-namespaces
