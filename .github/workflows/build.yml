@@ -130,13 +130,12 @@ jobs:
           version: v3.4.0
       - name: Helm install
         run: |
-          helm upgrade --install\
+          helm upgrade --install --wait --timeout 10m \
             cryptoverse-login \
             ./charts/login/ \
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
             --set version=${{ github.sha }}
-          sleep 1m
       - name: Helm verify
         run: helm list --all-namespaces
       - name: Ingress
