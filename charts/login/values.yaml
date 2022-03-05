@@ -39,9 +39,6 @@ hydra:
           allow_termination_from:
             - 10.0.0.0/8
             - 127.0.0.0/24
-      webfinger:
-        oidc_discovery:
-          client_registration_url: https://login.cryptoverse.cc/register
       oidc:
         subject_identifiers:
           supported_types:
@@ -83,15 +80,6 @@ login:
     repository: cryptoverse-login/login
   hydraAdminUrl: http://cryptoverse-login-hydra-admin:4445
   mailserverDomain: ethmail.cc
-
-register:
-  replicaCount: 1
-  deployment:
-    port: 3000
-  service:
-    port: 80
-  image:
-    repository: cryptoverse-login/register
 
 wrapper:
   replicaCount: 1

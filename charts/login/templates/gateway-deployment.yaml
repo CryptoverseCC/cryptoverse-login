@@ -40,8 +40,6 @@ spec:
               value: "{{ include "login.fullname" . }}-login:{{ .Values.login.service.port }}"
             - name: WRAPPER_SERVICE
               value: "{{ include "login.fullname" . }}-wrapper:{{ .Values.wrapper.service.port }}"
-            - name: REGISTER_SERVICE
-              value: "{{ include "login.fullname" . }}-register:{{ .Values.register.service.port }}"
             - name: HYDRA_PUBLIC_SERVICE
               value: "{{ include "login.fullname" . }}-hydra-public:{{ .Values.hydra.hydra.config.serve.public.port }}"
             - name: HYDRA_ADMIN_SERVICE
