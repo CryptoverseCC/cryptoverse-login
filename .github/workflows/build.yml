@@ -159,4 +159,5 @@ jobs:
         run: |
           cd tests
           pip install -r requirements.txt
+          export HUB_PORT=$(kubectl get svc selenium-hub -o=jsonpath='{.spec.ports[?(@.port==4444)].nodePort}')
           python browser.py -k TestFirefox
