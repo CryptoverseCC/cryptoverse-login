@@ -1,19 +1,24 @@
+import logging
 import os
+import profile
 import time
 import unittest
-import logging
-import metamask
 from urllib.parse import urlparse
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.chrome.options import Options as ChromeOptions
-
+from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
+import metamask
+
 logging.basicConfig(level=logging.INFO)
+
+DRIVER_URL = "https://localhost:4444/wd/hub"
+
+
+def get_driver(options):
+    return webdriver.Remote(command_executor=DRIVER_URL, options=options)
 
 
 class Utils:
@@ -82,18 +87,17 @@ class TestFirefox(Base, unittest.TestCase):
         from selenium.webdriver.firefox.options import Options
 
         currentdir = os.path.dirname(os.path.abspath(__file__))
-        driverpath = os.path.join(currentdir, "tools/geckodriver")
         metamask_path = os.path.join(currentdir, "extensions/metamask-firefox-9.1.0")
         logging.info(metamask_path)
 
-        profile = FirefoxProfile()
+        profile = webdriver.FirefoxProfile()
         profile.add_extension(metamask_path)
 
-        options = FirefoxOptions()
+        options = webdriver.FirefoxOptions()
+        options.profile = profile
 
-        self.driver = webdriver.Firefox(
-            executable_path=driverpath, firefox_profile=profile, options=options
-        )
+        self.driver = get_driver(options)
+        self.driver.install_addon(metamask_path)
         self.driver.implicitly_wait(10)
 
         metamask.init(self.driver)
@@ -102,13 +106,12 @@ class TestFirefox(Base, unittest.TestCase):
 class TestChrome(Base, unittest.TestCase):
     def setUp(self):
         currentdir = os.path.dirname(__file__)
-        driverpath = os.path.join(currentdir, "tools/chromedriver")
         metamask_path = os.path.join(currentdir, "extensions/metamask-chrome-9.1.0.zip")
 
         options = ChromeOptions()
         options.add_extension(extension=metamask_path)
 
-        self.driver = webdriver.Chrome(executable_path=driverpath, options=options)
+        self.driver = get_driver(options)
         self.driver.implicitly_wait(10)
 
         metamask.init(self.driver)
