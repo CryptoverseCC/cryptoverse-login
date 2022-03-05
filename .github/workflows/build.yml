@@ -142,6 +142,7 @@ jobs:
       - name: Pods
         run: |
           kubectl get pods --all-namespaces -o wide --show-labels
+          kubectl logs -l app=cryptoverse-login-login
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
