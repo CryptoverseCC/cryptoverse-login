@@ -82,14 +82,12 @@ jobs:
         run: |
           kubectl get ingress --all-namespaces
           kubectl describe ingress --all-namespaces
-          kubectl logs -n ingress -l app.kubernetes.io/name=ingress-nginx
       - name: Services
         run: |
           kubectl get service --all-namespaces
       - name: Pods
         run: |
-          kubectl get pods --all-namespaces
-          kubectl get pods --all-namespaces
+          kubectl get pods --all-namespaces -o wide
       - name: Install Selenium Grid
         run: |
           git clone https://github.com/seleniumhq/docker-selenium.git
