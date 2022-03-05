@@ -6,9 +6,6 @@ services:
   login:
     build: login/login
     image: "${REGISTRY}/${PROJECT}/login:${TAG}"
-  register:
-    build: login/register
-    image: "${REGISTRY}/${PROJECT}/register:${TAG}"
   wrapper:
     build: login/wrapper
     image: "${REGISTRY}/${PROJECT}/wrapper:${TAG}"
