@@ -14,6 +14,8 @@ secretsSystem: []
 
 djangoSecrets: "!!! CHANGE THIS !!!"
 
+ingressClassName: nginx
+
 hydra:
   image:
     tag: v1.11.0
