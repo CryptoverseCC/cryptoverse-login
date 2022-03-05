@@ -19,3 +19,6 @@ djangoSecrets: "localsecret" # pragma: allowlist secret
 introspectAccess:
   user: "localuser" # pragma: allowlist secret
   pass: "$5$8kkgRZ7KA7$wYpOtm2YBFDcp.uP8nKMcp1Y9BInU.T9GMpUer.hUE." # pragma: allowlist secret
+
+monitoring:
+  enabled: false

@@ -39,7 +39,7 @@ jobs:
       - uses: balchua/microk8s-actions@v0.2.2
         with:
           channel: "latest/stable"
-          addons: '["dns", "prometheus", "ingress"]'
+          addons: '["dns", "ingress"]'
       - name: Create namespace
         run: |
           kubectl create namespace cryptoverse-login-${{ github.sha }}
