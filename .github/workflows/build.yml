@@ -157,3 +157,8 @@ jobs:
       - name: Verify connectivity
         run: |
           curl https://${DOMAIN}/.well-known/openid-configuration -vk
+      - name: Selenium Tests
+        run: |
+          cd tests
+          pip install -r requirements.txt
+          python browser.py -k TestFirefox

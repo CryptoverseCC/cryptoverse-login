@@ -1,2 +1,3 @@
 # PyCharm
- .idea/
+.idea/
+*.code-workspace
