@@ -14,7 +14,8 @@ import metamask
 
 logging.basicConfig(level=logging.INFO)
 
-DRIVER_URL = "https://localhost:4444/wd/hub"
+HUB_PORT = os.getenv("HUB_PORT")
+DRIVER_URL = f"https://localhost:{HUB_PORT}/wd/hub"
 
 
 def get_driver(options):
