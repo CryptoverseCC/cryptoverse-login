@@ -12,9 +12,11 @@ on:
 env:
   # Needs to match "domain" value in values.ci.yaml
   DOMAIN: login.cryptoverse.local
+  PROJECT: cryptoverse-login
+  REGISTRY: registry.digitalocean.com/cryptoverse
 
 jobs:
-  build:
+  build-gateway:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -24,12 +26,70 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Log in to DO Container Registry
         run: doctl registry login --expiry-seconds 1200
-      - name: Build
-        run: ./docker-build ${{ github.sha }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: login/gateway
+          push: true
+          tags: "${{ env.REGISTRY }}/${{ env.PROJECT }}/gateway:${{ github.sha }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  build-login:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Log in to DO Container Registry
+        run: doctl registry login --expiry-seconds 1200
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: login/login
+          push: true
+          tags: "${{ env.REGISTRY }}/${{ env.PROJECT }}/login:${{ github.sha }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: login/wrapper
+          push: true
+          tags: "${{ env.REGISTRY }}/${{ env.PROJECT }}/wrapper:${{ github.sha }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  build-wrapper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Log in to DO Container Registry
+        run: doctl registry login --expiry-seconds 1200
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: login/wrapper
+          push: true
+          tags: "${{ env.REGISTRY }}/${{ env.PROJECT }}/wrapper:${{ github.sha }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
   test:
     runs-on: ubuntu-latest
     needs:
-      - build
+      - build-gateway
+      - build-login
+      - build-wrapper
     steps:
       - uses: actions/checkout@v2
       - name: Install doctl
@@ -70,12 +130,13 @@ jobs:
           version: v3.4.0
       - name: Helm install
         run: |
-          helm upgrade --install --wait --timeout 10m \
+          helm upgrade --install\
             cryptoverse-login \
             ./charts/login/ \
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
             --set version=${{ github.sha }}
+          sleep 1m
       - name: Helm verify
         run: helm list --all-namespaces
       - name: Ingress
