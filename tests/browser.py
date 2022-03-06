@@ -89,7 +89,7 @@ class TestFirefox(Base, unittest.TestCase):
 
         options = Options()
         options.set_capability("se:recordVideo", True)
-        # options.headless = True
+        options.headless = True
 
         self.driver = webdriver.Firefox(
             service=FirefoxService(driverpath), options=options
