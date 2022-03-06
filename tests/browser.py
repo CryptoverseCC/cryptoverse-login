@@ -1,25 +1,18 @@
-import logging
 import os
-import profile
 import time
 import unittest
+import logging
+import metamask
 from urllib.parse import urlparse
 
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.firefox.webdriver import Service as FirefoxService
+from selenium.webdriver.chrome.webdriver import Service as ChromeService
 from selenium.webdriver.common.by import By
+
 from selenium.webdriver.remote.webelement import WebElement
 
-import metamask
-
 logging.basicConfig(level=logging.INFO)
-
-HUB_PORT = os.getenv("HUB_PORT")
-DRIVER_URL = f"http://localhost:{HUB_PORT}/wd/hub"
-
-
-def get_driver(options):
-    return webdriver.Remote(command_executor=DRIVER_URL, options=options)
 
 
 class Utils:
@@ -88,17 +81,20 @@ class TestFirefox(Base, unittest.TestCase):
         from selenium.webdriver.firefox.options import Options
 
         currentdir = os.path.dirname(os.path.abspath(__file__))
-        metamask_path = os.path.join(currentdir, "extensions/metamask-firefox-9.1.0")
+        driverpath = os.path.join(currentdir, "tools/geckodriver")
+        metamask_path = os.path.join(
+            currentdir, "extensions/metamask-firefox-9.1.0.zip"
+        )
         logging.info(metamask_path)
 
-        profile = webdriver.FirefoxProfile()
-        profile.add_extension(metamask_path)
+        options = Options()
+        options.set_capability("se:recordVideo", True)
+        # options.headless = True
 
-        options = webdriver.FirefoxOptions()
-        options.profile = profile
-
-        self.driver = get_driver(options)
-        self.driver.install_addon(metamask_path)
+        self.driver = webdriver.Firefox(
+            service=FirefoxService(driverpath), options=options
+        )
+        self.driver.install_addon(metamask_path, temporary=True)
         self.driver.implicitly_wait(10)
 
         metamask.init(self.driver)
@@ -107,12 +103,11 @@ class TestFirefox(Base, unittest.TestCase):
 class TestChrome(Base, unittest.TestCase):
     def setUp(self):
         currentdir = os.path.dirname(__file__)
+        driverpath = os.path.join(currentdir, "tools/chromedriver")
         metamask_path = os.path.join(currentdir, "extensions/metamask-chrome-9.1.0.zip")
 
-        options = ChromeOptions()
-        options.add_extension(extension=metamask_path)
-
-        self.driver = get_driver(options)
+        self.driver = webdriver.Chrome(service=ChromeService(driverpath))
+        self.driver.install_addon(metamask_path, temporary=True)
         self.driver.implicitly_wait(10)
 
         metamask.init(self.driver)
