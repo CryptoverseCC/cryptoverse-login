@@ -128,17 +128,6 @@ jobs:
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
             --set version=${{ github.sha }}
-      - name: Install Selenium Grid
-        run: |
-          git clone https://github.com/seleniumhq/docker-selenium.git
-          sleep 2m
-          helm upgrade --install --wait --timeout 10m \
-            --namespace selenium-grid \
-            selenium-grid \
-            docker-selenium/chart/selenium-grid/. \
-            --set chromeNode.enabled=false,edgeNode.enabled=false
-      - name: Helm verify
-        run: helm list --all-namespaces
       - name: Ingress
         run: |
           kubectl get ingress --all-namespaces
@@ -159,5 +148,4 @@ jobs:
         run: |
           cd tests
           pip install -r requirements.txt
-          export HUB_PORT=$(kubectl get svc selenium-hub -o=jsonpath='{.spec.ports[?(@.port==4444)].nodePort}')
           python browser.py -k TestFirefox
