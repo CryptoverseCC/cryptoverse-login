@@ -101,7 +101,7 @@ class TestFirefox(Base, unittest.TestCase):
         options.set_capability("se:recordVideo", True)
         options.set_capability("moz:debuggerAddress", True)
         options.log.level = "debug"
-        # options.headless = True
+        options.headless = True
 
         self.driver = webdriver.Firefox(
             service=FirefoxService(driverpath), options=options
