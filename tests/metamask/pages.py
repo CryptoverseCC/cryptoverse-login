@@ -27,7 +27,9 @@ class WalletChoice(BasePage):
 
 class ToS(BasePage):
     def next(self):
+        time.sleep(10)
         self.click("I Agree")
+        time.sleep(10)
 
 
 class ImportForm(BasePage):
@@ -37,6 +39,8 @@ class ImportForm(BasePage):
 
     def next(self):
         pas = "selenium_tests"
+
+        self.driver.save_screenshot("password.png")
 
         self.fill_field(
             By.XPATH,
