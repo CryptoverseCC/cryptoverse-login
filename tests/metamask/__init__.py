@@ -1,3 +1,4 @@
+from select import select
 import time
 
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -24,7 +25,9 @@ def init(driver):
     start(driver)
     GetStarted(driver).next()
     WalletChoice(driver).import_wallet()
+    time.sleep(10)
     ToS(driver).next()
+    time.sleep(10)
     ImportForm(driver).next()
     AllDone(driver).next()
     finish(driver)

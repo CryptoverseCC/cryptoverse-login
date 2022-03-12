@@ -23,6 +23,7 @@ class Utils:
     def switch_to(self, title):
         for handle in self.driver.window_handles:
             self.driver.switch_to.window(handle)
+            print(self.driver.title)
             if self.driver.title == title:
                 break
 
@@ -33,6 +34,7 @@ class Utils:
     def click(self, xpath):
         button: WebElement = self.driver.find_element(by=By.XPATH, value=xpath)
         button.click()
+        time.sleep(2)
 
 
 class Base(Utils):
@@ -46,9 +48,11 @@ class Base(Utils):
         auth_frame = self.driver.find_element_by_css_selector("body>iframe")
         self.driver.switch_to.frame(auth_frame)
 
-        self.click('//*[text()="MetaMask"]')
+        self.driver.save_screenshot("ala.kota.png")
 
-        time.sleep(0.1)
+        self.click('//*[text()="Ethereum Wallet"]')
+
+        self.click('//*[text()="MetaMask"]')
 
         self.switch_to("MetaMask Notification")
 
@@ -56,10 +60,16 @@ class Base(Utils):
 
         self.click('//button[text()="Connect"]')
 
-        self.switch_to("Cryptoverse Login")
+        time.sleep(5)
+
+        self.switch_to("login-demo.cryptoverse.cc - Login with Ethereum Wallet")
+
+        time.sleep(5)
 
         auth_frame = self.driver.find_element_by_css_selector("body>iframe")
         self.driver.switch_to.frame(auth_frame)
+
+        time.sleep(5)
 
         self.click('//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
 
@@ -67,7 +77,7 @@ class Base(Utils):
 
         self.click('//button[text()="Sign"]')
 
-        self.switch_to("Cryptoverse Login")
+        self.switch_to("login-demo.cryptoverse.cc - Login with Ethereum Wallet")
 
         # Check if we logged in successfully
         self.driver.find_element(
@@ -89,7 +99,9 @@ class TestFirefox(Base, unittest.TestCase):
 
         options = Options()
         options.set_capability("se:recordVideo", True)
-        options.headless = True
+        options.set_capability("moz:debuggerAddress", True)
+        options.log.level = "debug"
+        # options.headless = True
 
         self.driver = webdriver.Firefox(
             service=FirefoxService(driverpath), options=options
