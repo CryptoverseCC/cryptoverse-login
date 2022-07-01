@@ -99,7 +99,7 @@ test("App renders wallet if found", async () => {
   expect(screen.getByRole("progressbar")).toBeInTheDocument();
 
   await act(async () => {
-    await sleep(1100); // wait *just* a little longer than the timeout in the component
+    await sleep(2100); // wait *just* a little longer than the timeout in the component
   });
 
   expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
@@ -123,7 +123,7 @@ test("App renders missing wallet", async () => {
   expect(screen.getByRole("progressbar")).toBeInTheDocument();
 
   await act(async () => {
-    await sleep(1100); // wait *just* a little longer than the timeout in the component
+    await sleep(2100); // wait *just* a little longer than the timeout in the component
   });
 
   expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
@@ -144,7 +144,7 @@ test("App is able to login", async () => {
   });
 
   await act(async () => {
-    await sleep(1100); // wait *just* a little longer than the timeout in the component
+    await sleep(2100); // wait *just* a little longer than the timeout in the component
   });
 
   const Opera = screen.getByText(/Opera/i);
@@ -163,3 +163,42 @@ test("App is able to login", async () => {
     LoginCardText.click();
   });
 });
+
+test("App is able to login - remembers login data", async () => {
+  const loginProvider = OperaLoginProvider;
+  function sleep(period: number) {
+    return new Promise((resolve) => setTimeout(resolve, period));
+  }
+
+  act(() => {
+    render(<App loginProvider={loginProvider} walletProviders={[]} />);
+  });
+
+  await act(async () => {
+    await sleep(2100); // wait *just* a little longer than the timeout in the component
+  });
+
+  const Opera = screen.getByText(/Opera/i);
+
+  await act(async () => {
+    Opera.click();
+  });
+
+  const BreadcrumbsOpera = screen.getByText(/Login with Opera/i);
+  expect(BreadcrumbsOpera).toBeInTheDocument();
+
+  const LoginCardText = screen.getByText(OperaETHAddress);
+  expect(LoginCardText).toBeInTheDocument();
+
+  await act(async () => {
+    LoginCardText.click();
+  });
+
+  const loginHistory = JSON.parse(localStorage.getItem("loginHistory")!);
+
+  expect(loginHistory).toEqual([{
+    address: OperaETHAddress,
+    wallet: "Opera",
+  }])
+});
+

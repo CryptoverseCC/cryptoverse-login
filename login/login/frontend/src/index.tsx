@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useEffect} from "react";
 import ReactDOM from "react-dom";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import { ThemeProvider } from "@material-ui/core/styles";
@@ -28,6 +28,16 @@ const Background: React.FC<BackgroundProps> = ({
   walletProviders,
 }) => {
   console.log(loginData.clientId);
+
+  let loginHistory;
+
+  try {
+    const result = localStorage.getItem("loginHistory")
+    loginHistory = result ? JSON.parse(result) : [];
+  } catch (e) {
+    loginHistory = [];
+  }
+
   switch (loginData.clientId) {
     case "fwb.cryptoverse.cc":
       return (
@@ -43,6 +53,7 @@ const Background: React.FC<BackgroundProps> = ({
           AppComponent={App}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
+          loginHistory={loginHistory}
         />
       );
   }

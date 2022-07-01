@@ -91,6 +91,11 @@ export const App: React.FC<AppProps> = ({
     try {
       let { signature, csrf, challenge, address } = resp;
 
+      localStorage.setItem("loginHistory", JSON.stringify([{
+        address,
+        wallet: currentProvider!.name
+      }]));
+
       const addInput = (form: HTMLFormElement, name: string, value: string) => {
         const input = document.createElement("input");
         input.value = value;
@@ -151,6 +156,7 @@ export const App: React.FC<AppProps> = ({
     }
 
     try {
+      debugger
       setIdentities(response.identities);
       setCurrentProvider(getProviderInfoByName(request.name));
 

@@ -96,6 +96,7 @@ let channel = {
 } as CommunicationChannel;
 
 function init(request: TInitRequest) {
+  console.log('aaaaaaaa')
   return channel.loginProvider.init(request);
 }
 
