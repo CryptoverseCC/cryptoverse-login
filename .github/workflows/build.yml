@@ -117,7 +117,6 @@ jobs:
       - name: Log in to DO Container Registry
         run: |
           doctl registry login --expiry-seconds 1200
-          doctl registry kubernetes-manifest --namespace cryptoverse-login-${{ github.sha }} | kubectl apply -f -
       - name: Create Namespace For "Cryptoverse Login"
         run: |
           kubectl create namespace cryptoverse-login-${{ github.sha }}
