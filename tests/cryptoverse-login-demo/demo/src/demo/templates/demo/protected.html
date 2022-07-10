@@ -1,0 +1,51 @@
+<html>
+  <head>
+    <title>Cryptoverse Login - Demo - Success</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/purecss@1.0.0/build/pure-min.css"
+    />
+    <!--[if lte IE 8]>
+      <link
+        rel="stylesheet"
+        href="https://unpkg.com/purecss@1.0.0/build/grids-responsive-old-ie-min.css"
+      />
+    <![endif]-->
+    <!--[if gt IE 8]><!-->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/purecss@1.0.0/build/grids-responsive-min.css"
+    />
+    <!--<![endif]-->
+
+    <style>
+      .body {
+        word-wrap: break-word;
+      }
+
+      .pure-g {
+        margin: auto;
+        width: 600px;
+        padding-top: 30px;
+      }
+
+      @media (max-width: 600px) {
+        .pure-g {
+          width: 100%;
+        }
+      }
+
+      textarea {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="pure-g">
+      <div class="pure-u-1">
+        <h2>Success! You are logged in as:</h2>
+        <pre>{{user}}</pre>
+      </div>
+    </div>
+  </body>
+</html>

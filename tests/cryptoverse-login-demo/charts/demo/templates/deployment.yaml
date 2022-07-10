@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "demo.fullname" . }}
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "demo.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.demo.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "demo.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "demo.fullname" . }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - env:
+            - name: DOMAIN
+              value: {{ .Values.domain }}
+            - name: OIDC_OP_AUTHORIZATION_ENDPOINT
+              value: {{ .Values.demo.oidc.authEndpoint }}
+            - name: OIDC_OP_JWKS_ENDPOINT
+              value: {{ .Values.demo.oidc.jwksEndpoint }}
+            - name: OIDC_OP_TOKEN_ENDPOINT
+              value: {{ .Values.demo.oidc.tokenEndpoint }}
+            - name: OIDC_OP_USER_ENDPOINT
+              value: {{ .Values.demo.oidc.userEndpoint }}
+            - name: PORT
+              value: {{ .Values.demo.deployment.port | quote }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registry }}/{{ .Values.demo.image.repository }}:{{ .Values.version }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          name: demo-migrate
+          command: ["/app/manage.py"]
+          args: ["migrate"]
+          volumeMounts:
+            - name: secrets
+              mountPath: /app/secrets/demo
+            - name: oidc
+              mountPath: /app/secrets/oidc
+      containers:
+        - env:
+            - name: DOMAIN
+              value: {{ .Values.domain }}
+            - name: OIDC_OP_AUTHORIZATION_ENDPOINT
+              value: {{ .Values.demo.oidc.authEndpoint }}
+            - name: OIDC_OP_JWKS_ENDPOINT
+              value: {{ .Values.demo.oidc.jwksEndpoint }}
+            - name: OIDC_OP_TOKEN_ENDPOINT
+              value: {{ .Values.demo.oidc.tokenEndpoint }}
+            - name: OIDC_OP_USER_ENDPOINT
+              value: {{ .Values.demo.oidc.userEndpoint }}
+            - name: PORT
+              value: {{ .Values.demo.deployment.port | quote }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registry }}/{{ .Values.demo.image.repository }}:{{ .Values.version }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          name: demo
+          ports:
+            - name: http
+              containerPort: {{ .Values.demo.deployment.port }}
+          volumeMounts:
+            - name: secrets
+              mountPath: /app/secrets/demo
+            - name: oidc
+              mountPath: /app/secrets/oidc
+      volumes:
+        - name: secrets
+          secret:
+            secretName: {{ include "demo.fullname" . }}
+        - name: oidc
+          secret:
+            secretName: {{ include "demo.fullname" . }}-oauth2client

@@ -1,0 +1,26 @@
+domain: login-demo.cryptoverse.cc
+version: ---TAG---
+registry: registry.digitalocean.com/cryptoverse
+
+demo:
+  oidcRedirectUrl: https://login-demo.cryptoverse.cc/oidc/callback/
+  logoutRedirectUrl: https://login-demo.cryptoverse.cc/
+  oidc:
+    authEndpoint: https://login.cryptoverse.cc/oauth2/auth
+    jwksEndpoint: https://login.cryptoverse.cc/.well-known/jwks.json
+    tokenEndpoint: https://login.cryptoverse.cc/oauth2/token
+    userEndpoint: https://login.cryptoverse.cc/userinfo
+  replicaCount: 1
+  deployment:
+    port: 3000
+  service:
+    port: 80
+  image:
+    repository: cryptoverse-login/demo-python-django
+
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+podSecurityContext: {}
+securityContext: {}
+
+restrictions: []

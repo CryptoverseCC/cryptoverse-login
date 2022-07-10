@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "demo.fullname" . }}
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  annotations:
+    cert-manager.io/cluster-issuer: cryptoverse-common
+  labels:
+{{ include "demo.labels" . | indent 4 }}
+spec:
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "demo.fullname" . }}
+            port:
+              number: 80
+  tls:
+    - secretName: cryptoverse-login-demo-python-ingress-tls # pragma: allowlist secret
+      hosts:
+        - {{ .Values.domain }}
