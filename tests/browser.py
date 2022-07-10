@@ -45,7 +45,7 @@ class Base(Utils):
 
         assert self.get_current_domain() == "login.cryptoverse.cc"
 
-        auth_frame = self.driver.find_element("body>iframe", By.CSS_SELECTOR)
+        auth_frame = self.driver.find_element("body>iframe", By.XPATH)
         self.driver.switch_to.frame(auth_frame)
 
         self.driver.save_screenshot("ala.kota.png")
