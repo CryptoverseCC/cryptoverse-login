@@ -191,13 +191,14 @@ jobs:
           sleep 10s
       - name: Install Cryptoverse Login Demo App (Python+Django)
         run: |
-          helm upgrade --install --wait --timeout 10m \
+          helm upgrade --install \
             cryptoverse-login-demo \
             ./tests/cryptoverse-login-demo/charts/demo/ \
             --namespace cryptoverse-login-demo-${{ github.sha }} \
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }}
             --debug
+          sleep 1m
       - name: Ingress
         run: |
           kubectl get ingress --all-namespaces
