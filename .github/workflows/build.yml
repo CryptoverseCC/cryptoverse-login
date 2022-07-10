@@ -195,7 +195,7 @@ jobs:
             cryptoverse-login-demo \
             ./tests/cryptoverse-login-demo/charts/demo/ \
             --namespace cryptoverse-login-demo-${{ github.sha }} \
-            -f ./charts/demo/values.ci.yaml \
+            -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }}
             --set demo.secret=SOME_SECRET_HERE
       - name: Ingress
