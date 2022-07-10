@@ -18,6 +18,8 @@ demo:
   image:
     repository: cryptoverse-login/demo-python-django
 
+monitoring: true
+
 imagePullPolicy: IfNotPresent
 imagePullSecrets: []
 podSecurityContext: {}

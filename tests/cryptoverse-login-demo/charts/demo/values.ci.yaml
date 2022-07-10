@@ -12,3 +12,5 @@ demo:
 # restrictions:
 #   - tokenAddress: "0x1dAD862095d40d43c2109370121cf087632874dB"
 #     condition: "balanceOf > 0"
+
+monitoring: false
