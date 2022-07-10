@@ -197,7 +197,7 @@ jobs:
             --namespace cryptoverse-login-demo-${{ github.sha }} \
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }}
-            --set demo.secret=SOME_SECRET_HERE
+            --debug
       - name: Ingress
         run: |
           kubectl get ingress --all-namespaces
