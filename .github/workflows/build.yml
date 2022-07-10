@@ -103,6 +103,7 @@ jobs:
       - build-gateway
       - build-login
       - build-wrapper
+      - build-demo
     steps:
       - uses: actions/checkout@v2
       - name: Install doctl
