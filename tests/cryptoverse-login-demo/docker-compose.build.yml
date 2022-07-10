@@ -1,6 +1,0 @@
----
-services:
-  demo:
-    build: demo
-    image: "${REGISTRY}/${PROJECT}:${TAG}"
-version: "3.7"
