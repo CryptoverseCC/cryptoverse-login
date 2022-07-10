@@ -184,8 +184,8 @@ jobs:
             -subj "/CN=${DOMAIN_DEMO}/O=Cryptoverse OU"
           sudo cp local-demo.crt /etc/ssl/certs/
           sudo update-ca-certificates
-          kubectl create secret tls cryptoverse-login-demo-python-ingress-tls \
-            --namespace default \
+          kubectl create secret tls login-demo-tls \
+            --namespace cryptoverse-login-demo-${{ github.sha }} \
             --key local-demo.key \
             --cert local-demo.crt
           sleep 10s
@@ -197,6 +197,7 @@ jobs:
             --namespace cryptoverse-login-demo-${{ github.sha }} \
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }} \
+            --set tlsSecretName=cryptoverse-login-demo-${{ github.sha }}/login-demo-tls \
             --debug
           sleep 1m
       - name: Ingress
@@ -211,7 +212,7 @@ jobs:
       - name: Pods
         run: |
           kubectl get pods --all-namespaces -o wide --show-labels
-          kubectl logs -l app=cryptoverse-login-login
+          kubectl describe pod -l app=cryptoverse-login-demo --all-namespaces
       # TODO: Test dynamic client registration
       #######################
       # Test using Demo App #
