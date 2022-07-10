@@ -121,6 +121,7 @@ jobs:
       - name: Create Namespace For "Cryptoverse Login"
         run: |
           kubectl create namespace cryptoverse-login-${{ github.sha }}
+          doctl registry kubernetes-manifest --namespace cryptoverse-login-${{ github.sha }} | kubectl apply -f -
       - name: Resolve domain to localhost #TODO resolve to cluster ip
         run: |
           echo "127.0.0.1 ${DOMAIN}" | sudo tee -a /etc/hosts
@@ -172,6 +173,7 @@ jobs:
       - name: Create Namespace For "Cryptoverse Login" Demo App
         run: |
           kubectl create namespace cryptoverse-login-demo-${{ github.sha }}
+          doctl registry kubernetes-manifest --namespace cryptoverse-login-demo-${{ github.sha }} | kubectl apply -f -
       - name: Resolve demo app domain to localhost #TODO resolve to cluster ip
         run: |
           echo "127.0.0.1 ${DOMAIN_DEMO}" | sudo tee -a /etc/hosts
