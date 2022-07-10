@@ -42,11 +42,15 @@ class Utils:
 
 
 class Base(Utils):
+    AUTH_DOMAIN = None
+    DEMO_APP_DOMAIN = None
+
     def test_initial(self):
-        self.auth_domain = os.getenv("DOMAIN")
+        assert self.AUTH_DOMAIN is not None
+        assert self.DEMO_APP_DOMAIN is not None
 
         self.driver.get(
-            "https://login-demo.cryptoverse.cc?domain={}".format(self.auth_domain)
+            "https://{}?auth_domain={}".format(self.DEMO_APP_DOMAIN, self.AUTH_DOMAIN)
         )
 
         self.click('//*[text()="Login with Ethereum Wallet"]')
@@ -132,4 +136,13 @@ class TestChrome(Base, unittest.TestCase):
 
 
 if __name__ == "__main__":
+    auth_domain = os.getenv("DOMAIN", "login.cryptoverse.cc")
+    demo_app_domain = os.getenv("DEMO_APP_DOMAIN", "login-demo.cryptoverse.cc")
+
+    TestChrome.DEMO_APP_DOMAIN = demo_app_domain
+    TestChrome.AUTH_DOMAIN = auth_domain
+
+    TestFirefox.DEMO_APP_DOMAIN = demo_app_domain
+    TestFirefox.AUTH_DOMAIN = auth_domain
+
     unittest.main()

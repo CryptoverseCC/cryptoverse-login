@@ -1,0 +1,40 @@
+# WARNING: This file is used only by Cryptoauth system deployed on Cryptoverse K8s cluster
+# It's used to deploy demos using single command
+
+apiVersion: hydra.ory.sh/v1alpha1
+kind: OAuth2Client
+metadata:
+  name: {{ include "demo.fullname" . }}
+  {{- if .Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+{{ include "demo.labels" . | indent 4 }}
+spec:
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - id_token
+    - code
+    - token
+  scope: "openid email profile"
+  secretName: {{ include "demo.fullname" . }}-oauth2client
+  # these are optional
+  redirectUris:
+    - {{ .Values.demo.oidcRedirectUrl }}
+  postLogoutRedirectUris:
+    - {{ .Values.demo.logoutRedirectUrl }}
+  audience:
+    - audience-a
+  hydraAdmin:
+    # if hydraAdmin is specified, all of these fields are requried,
+    # but they can be empty/0
+    url: http://cryptoverse-login-hydra-admin
+    port: 4445
+    endpoint: /clients
+    forwardedProto: https
+  tokenEndpointAuthMethod: client_secret_post
+  metadata:
+    app: {{ .Values.domain }}
+    restrictions: {{ .Values.restrictions | toJson }}

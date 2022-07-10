@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+set -o xtrace
+
+export COMPOSE_DOCKER_CLI_BUILD=1
+export DOCKER_BUILDKIT=1
+
+source .env
+
+(
+    export TAG="$1"
+
+    docker-compose -f docker-compose.build.yml build --pull #--parallel
+    docker-compose -f docker-compose.build.yml push
+
+    sed -i "s/---TAG---/${TAG}/g" charts/demo/values.yaml
+    sed -i "s/---TAG---/${TAG}/g" charts/demo/Chart.yaml
+)
