@@ -27,6 +27,10 @@ class Utils:
             if self.driver.title == title:
                 break
 
+    def switch_to_auth_frame(self):
+        auth_frame = self.driver.find_element(by=By.XPATH, value="//body/iframe")
+        self.driver.switch_to.frame(auth_frame)
+
     def get_current_domain(self) -> str:
         url = self.driver.current_url
         return urlparse(url).netloc
@@ -39,7 +43,7 @@ class Utils:
 
 class Base(Utils):
     def test_initial(self):
-        self.auth_domain - os.getenv("DOMAIN")
+        self.auth_domain = os.getenv("DOMAIN")
 
         self.driver.get(
             "https://login-demo.cryptoverse.cc?domain={}".format(self.auth_domain)
@@ -49,10 +53,9 @@ class Base(Utils):
 
         assert self.get_current_domain() == "login.cryptoverse.cc"
 
-        auth_frame = self.driver.find_element("body>iframe", By.XPATH)
-        self.driver.switch_to.frame(auth_frame)
+        self.switch_to_auth_frame()
 
-        self.driver.save_screenshot("ala.kota.png")
+        self.driver.save_screenshot("screenshots/ala.kota.png")
 
         self.click('//*[text()="Ethereum Wallet"]')
 
@@ -70,8 +73,7 @@ class Base(Utils):
 
         time.sleep(5)
 
-        auth_frame = self.driver.find_element("body>iframe", By.CSS_SELECTOR)
-        self.driver.switch_to.frame(auth_frame)
+        self.switch_to_auth_frame()
 
         time.sleep(5)
 
