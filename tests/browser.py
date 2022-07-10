@@ -39,7 +39,11 @@ class Utils:
 
 class Base(Utils):
     def test_initial(self):
-        self.driver.get("https://login-demo.cryptoverse.cc")
+        self.auth_domain - os.getenv("DOMAIN")
+
+        self.driver.get(
+            "https://login-demo.cryptoverse.cc?domain={}".format(self.auth_domain)
+        )
 
         self.click('//*[text()="Login with Ethereum Wallet"]')
 
