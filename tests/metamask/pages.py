@@ -40,7 +40,7 @@ class ImportForm(BasePage):
     def next(self):
         pas = "selenium_tests"
 
-        self.driver.save_screenshot("password.png")
+        self.driver.save_screenshot("screenshots/password.png")
 
         self.fill_field(
             By.XPATH,
