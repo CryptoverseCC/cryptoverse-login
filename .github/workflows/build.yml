@@ -151,19 +151,6 @@ jobs:
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
             --set version=${{ github.sha }}
-      # - name: Ingress
-      #   run: |
-      #     kubectl get ingress --all-namespaces
-      #     kubectl describe ingress --all-namespaces
-      #     kubectl describe pod -l name=nginx-ingress-microk8s -n ingress
-      #     kubectl logs -l name=nginx-ingress-microk8s -n ingress
-      # - name: Services
-      #   run: |
-      #     kubectl get service --all-namespaces
-      # - name: Pods
-      #   run: |
-      #     kubectl get pods --all-namespaces -o wide --show-labels
-      #     kubectl logs -l app=cryptoverse-login-login
       - name: Verify connectivity
         run: |
           curl https://${DOMAIN}/.well-known/openid-configuration -vk
@@ -194,15 +181,17 @@ jobs:
           sleep 2s
       - name: Install Cryptoverse Login Demo App (Python+Django)
         run: |
-          helm upgrade --install \
+          helm upgrade --install --wait --timeout 10m \
             cryptoverse-login-demo \
             ./tests/cryptoverse-login-demo/charts/demo/ \
             --namespace cryptoverse-login-demo-${{ github.sha }} \
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }} \
-            --set tlsSecretName=login-demo-tls \
-            --debug
-          sleep 1m
+            --set tlsSecretName=login-demo-tls
+
+      #########
+      # Debug #
+      #########
       - name: Ingress
         run: |
           kubectl get ingress --all-namespaces
@@ -215,7 +204,7 @@ jobs:
       - name: Pods
         run: |
           kubectl get pods --all-namespaces -o wide --show-labels
-          kubectl describe pod -l app=cryptoverse-login-demo --all-namespaces
+          kubectl describe pod -l app=cryptoverse-login-login --all-namespaces
       # TODO: Test dynamic client registration
       #######################
       # Test using Demo App #
