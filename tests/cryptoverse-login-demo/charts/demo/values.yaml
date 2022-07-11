@@ -1,4 +1,5 @@
 domain: login-demo.cryptoverse.cc
+tlsSecretName: login-demo-tls
 version: ---TAG---
 registry: registry.digitalocean.com/cryptoverse
 
