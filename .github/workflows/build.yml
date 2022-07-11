@@ -169,7 +169,7 @@ jobs:
       ########
       - name: Create Namespace and log in to DO Container Registry
         run: |
-          kubectl create namespace cryptoverse-login-${{ github.sha }}
+          kubectl create namespace cryptoverse-login-demo-${{ github.sha }}
           doctl registry login --expiry-seconds 1200
           doctl registry kubernetes-manifest --namespace cryptoverse-login-demo-${{ github.sha }} | kubectl apply -f -
       - name: Resolve demo app domain to localhost #TODO resolve to cluster ip
