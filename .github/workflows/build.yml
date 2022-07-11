@@ -184,10 +184,10 @@ jobs:
           sudo cp local-demo.crt /etc/ssl/certs/
           sudo update-ca-certificates
           kubectl create secret tls login-demo-tls \
-            --namespace cryptoverse-login-demo-${{ github.sha }} \
+            --namespace default \
             --key local-demo.key \
             --cert local-demo.crt
-          sleep 10s
+          sleep 2s
       - name: Install Cryptoverse Login Demo App (Python+Django)
         run: |
           helm upgrade --install \
@@ -196,7 +196,7 @@ jobs:
             --namespace cryptoverse-login-demo-${{ github.sha }} \
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }} \
-            --set tlsSecretName=cryptoverse-login-demo-${{ github.sha }}/login-demo-tls \
+            --set tlsSecretName=login-demo-tls \
             --debug
           sleep 1m
       - name: Ingress
