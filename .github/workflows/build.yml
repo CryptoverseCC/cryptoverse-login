@@ -114,6 +114,14 @@ jobs:
         with:
           channel: "latest/stable"
           addons: '["dns", "ingress"]'
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.4.0
+
+      #####################
+      # Cryptoverse Login #
+      #####################
       - name: Create Namespace and log in to DO Container Registry
         run: |
           kubectl create namespace cryptoverse-login-${{ github.sha }}
@@ -135,10 +143,6 @@ jobs:
             --key local.key \
             --cert local.crt
           sleep 10s
-      - name: Set up Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: v3.4.0
       - name: Install Cryptoverse Login
         run: |
           helm upgrade --install --wait --timeout 10m \
@@ -184,7 +188,7 @@ jobs:
           sudo cp local-demo.crt /etc/ssl/certs/
           sudo update-ca-certificates
           kubectl create secret tls login-demo-tls \
-            --namespace default \
+            --namespace cryptoverse-login-demo-${{ github.sha }} \
             --key local-demo.key \
             --cert local-demo.crt
           sleep 2s

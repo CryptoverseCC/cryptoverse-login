@@ -1,5 +1,8 @@
 domain: login-demo.cryptoverse.local
 
+imagePullSecrets:
+  - name: registry-cryptoverse
+
 demo:
   oidcRedirectUrl: https://login-demo.cryptoverse.local/oidc/callback/
   logoutRedirectUrl: https://login-demo.cryptoverse.local/
