@@ -22,6 +22,6 @@ spec:
             port:
               number: 80
   tls:
-    - secretName: cryptoverse-login-demo-python-ingress-tls # pragma: allowlist secret
+    - secretName: {{ .Values.tlsSecretName }}
       hosts:
         - {{ .Values.domain }}

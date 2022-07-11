@@ -114,12 +114,10 @@ jobs:
         with:
           channel: "latest/stable"
           addons: '["dns", "ingress"]'
-      - name: Log in to DO Container Registry
-        run: |
-          doctl registry login --expiry-seconds 1200
-      - name: Create Namespace For "Cryptoverse Login"
+      - name: Create Namespace and log in to DO Container Registry
         run: |
           kubectl create namespace cryptoverse-login-${{ github.sha }}
+          doctl registry login --expiry-seconds 1200
           doctl registry kubernetes-manifest --namespace cryptoverse-login-${{ github.sha }} | kubectl apply -f -
       - name: Resolve domain to localhost #TODO resolve to cluster ip
         run: |
@@ -133,7 +131,7 @@ jobs:
           sudo cp local.crt /etc/ssl/certs/
           sudo update-ca-certificates
           kubectl create secret tls cryptoverse-login \
-            --namespace default \
+            --namespace cryptoverse-login-${{ github.sha }} \
             --key local.key \
             --cert local.crt
           sleep 10s
@@ -169,9 +167,10 @@ jobs:
       ########
       # Demo #
       ########
-      - name: Create Namespace For "Cryptoverse Login" Demo App
+      - name: Create Namespace and log in to DO Container Registry
         run: |
-          kubectl create namespace cryptoverse-login-demo-${{ github.sha }}
+          kubectl create namespace cryptoverse-login-${{ github.sha }}
+          doctl registry login --expiry-seconds 1200
           doctl registry kubernetes-manifest --namespace cryptoverse-login-demo-${{ github.sha }} | kubectl apply -f -
       - name: Resolve demo app domain to localhost #TODO resolve to cluster ip
         run: |
