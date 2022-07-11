@@ -44,7 +44,7 @@ module.exports = {
         }
         return webpackConfig.isEnvProduction
           ? "static/js/[name].[contenthash:8].js"
-          : "static/js/bundle.js";
+          : "static/js/bundle.[contenthash:8].js";
       };
 
       webpackConfig.optimization.splitChunks = {
@@ -61,6 +61,16 @@ module.exports = {
         main: path.resolve(__dirname, "./src/index.tsx"),
         embed: path.resolve(__dirname, "./src/embed/index.ts"),
         final: path.resolve(__dirname, "./src/final/index.ts"),
+      };
+
+      webpackConfig.resolve.fallback = {
+        crypto: false,
+        https: false,
+        http: false,
+        stream: false,
+        os: false,
+        url: false,
+        assert: false,
       };
 
       return webpackConfig;

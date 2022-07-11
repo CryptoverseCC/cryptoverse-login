@@ -19,18 +19,20 @@ WORKDIR /tmp/builder
 FROM builder as frontendBuilder
 
 ENV NODE_OPTIONS=--openssl-legacy-provider
+ENV NODE_ENV=production
 
 COPY frontend/package.json .
 COPY frontend/yarn.lock .
-COPY frontend/deps ./deps
-RUN cd deps/web3modal && npm install && npm run-script build
-RUN yarn
+#COPY frontend/deps ./deps
+#RUN cd deps/web3modal && npm install && npm run-script build
+RUN yarn install --only=production
 COPY frontend .
 RUN yarn build
 
 FROM builder as backendBuilder
 
 ENV NODE_OPTIONS=--openssl-legacy-provider
+#ENV NODE_ENV=production
 
 COPY backend/package.json .
 COPY backend/yarn.lock .
@@ -40,15 +42,20 @@ RUN npx webpack
 
 FROM node:alpine
 
+RUN apk add --no-cache dumb-init
+
 ENV NODE_OPTIONS=--openssl-legacy-provider
+ENV NODE_ENV=production
 
 RUN mkdir -p /app
 WORKDIR /app
 
-COPY --from=backendBuilder /tmp/builder/build/ /app/
-COPY --from=frontendBuilder /tmp/builder/build/ /app/public/login/
+COPY --chown=node:node --from=backendBuilder /tmp/builder/build/ /app/
+COPY --chown=node:node --from=frontendBuilder /tmp/builder/build/ /app/public/login/
 
 RUN mkdir -p /app/views/
 RUN mv /app/public/login/index.html /app/views/index.html
 
-ENTRYPOINT node /app/server.js
+USER node
+
+CMD ["dumb-init", "node", "/app/server.js"]

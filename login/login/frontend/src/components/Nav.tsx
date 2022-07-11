@@ -5,6 +5,7 @@ import Link from "@material-ui/core/Link";
 
 export interface NavProps {
   origin: string;
+  children: React.ReactNode;
   className: any;
 }
 
