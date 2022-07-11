@@ -1,5 +1,7 @@
 FROM node:alpine AS builder
 
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 RUN apk add --no-cache \
   git \
   python3 \
@@ -16,6 +18,8 @@ WORKDIR /tmp/builder
 
 FROM builder as frontendBuilder
 
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 COPY frontend/package.json .
 COPY frontend/yarn.lock .
 COPY frontend/deps ./deps
@@ -26,6 +30,8 @@ RUN yarn build
 
 FROM builder as backendBuilder
 
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 COPY backend/package.json .
 COPY backend/yarn.lock .
 RUN yarn
@@ -33,6 +39,8 @@ COPY backend .
 RUN npx webpack
 
 FROM node:alpine
+
+ENV NODE_OPTIONS=--openssl-legacy-provider
 
 RUN mkdir -p /app
 WORKDIR /app
