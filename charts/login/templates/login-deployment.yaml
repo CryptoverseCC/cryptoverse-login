@@ -39,6 +39,8 @@ spec:
               value: {{ .Values.infuraApiKey }}
             - name: ALCHEMY_API_KEY
               value: {{ .Values.alchemyApiKey }}
+            - name: DEBUG
+              value: "{{ .Values.debug }}"
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.registry }}/{{ .Values.login.image.repository }}:{{ .Values.version }}"

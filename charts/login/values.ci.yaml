@@ -24,3 +24,5 @@ introspectAccess:
 
 monitoring:
   enabled: false
+
+debug: true
