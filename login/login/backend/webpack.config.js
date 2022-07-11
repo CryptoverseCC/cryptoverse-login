@@ -3,7 +3,7 @@ const webpack = require("webpack");
 
 module.exports = {
   entry: "./src/server.ts",
-  target: "node15",
+  target: "node18",
 
   devtool: "inline-source-map",
   module: {
