@@ -16,6 +16,8 @@ logging.basicConfig(level=logging.INFO)
 
 
 class Utils:
+    snap_counter = 0
+
     def tearDown(self) -> None:
         self.driver.quit()
         return super().tearDown()
@@ -27,7 +29,7 @@ class Utils:
             if self.driver.title == title:
                 break
 
-    def switch_to_auth_frame(self):
+    def focus_on_auth_frame(self):
         auth_frame = self.driver.find_element(by=By.XPATH, value="//body/iframe")
         self.driver.switch_to.frame(auth_frame)
 
@@ -39,6 +41,10 @@ class Utils:
         button: WebElement = self.driver.find_element(by=By.XPATH, value=xpath)
         button.click()
         time.sleep(2)
+
+    def snap(self, name):
+        self.snap_counter += 1
+        self.driver.save_screenshot("screenshots/{}_{}.png".format(self.snap_counter, name))
 
 
 class Base(Utils):
@@ -53,17 +59,25 @@ class Base(Utils):
             "https://{}?auth_domain={}".format(self.DEMO_APP_DOMAIN, self.AUTH_DOMAIN)
         )
 
+        self.snap("demo_app_loaded")
+
         self.click('//*[text()="Login with Ethereum Wallet"]')
 
         assert self.get_current_domain() == self.AUTH_DOMAIN
 
-        self.switch_to_auth_frame()
+        time.sleep(2)
 
-        self.driver.save_screenshot("screenshots/ala.kota.png")
+        self.snap("login_page_loaded")
+
+        self.focus_on_auth_frame()
 
         self.click('//*[text()="Ethereum Wallet"]')
 
+        self.snap("after_wallet_select")
+
         self.click('//*[text()="MetaMask"]')
+
+        self.snap("after_metamask_select")
 
         self.switch_to("MetaMask Notification")
 
@@ -77,9 +91,11 @@ class Base(Utils):
 
         time.sleep(5)
 
-        self.switch_to_auth_frame()
+        self.focus_on_auth_frame()
 
         time.sleep(5)
+
+        self.snap("after_wallet_connect")
 
         self.click('//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
 
@@ -88,6 +104,10 @@ class Base(Utils):
         self.click('//button[text()="Sign"]')
 
         self.switch_to("login-demo.cryptoverse.cc - Login with Ethereum Wallet")
+
+        time.sleep(5)
+
+        self.snap("after_wallet_sign")
 
         # Check if we logged in successfully
         self.driver.find_element(
