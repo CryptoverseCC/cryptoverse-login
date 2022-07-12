@@ -189,6 +189,9 @@ jobs:
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }} \
             --set tlsSecretName=login-demo-tls
+      - name: Verify connectivity
+        run: |
+          curl https://${DOMAIN_DEMO_APP}/ -vk
 
       #########
       # Debug #
