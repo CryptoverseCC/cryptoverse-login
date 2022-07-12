@@ -150,7 +150,8 @@ jobs:
             ./charts/login/ \
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
-            --set version=${{ github.sha }}
+            --set version=${{ github.sha }} \
+            --set sentryDSN=${{ secrets.SENTRY_DSN }}
       - name: Verify connectivity
         run: |
           curl https://${DOMAIN}/.well-known/openid-configuration -vk
