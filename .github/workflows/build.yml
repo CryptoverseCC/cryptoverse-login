@@ -193,30 +193,6 @@ jobs:
         run: |
           curl https://${DOMAIN_DEMO_APP}/ -vk
 
-      #########
-      # Debug #
-      #########
-      - name: Ingress
-        run: |
-          kubectl get ingress --all-namespaces
-          kubectl describe ingress --all-namespaces
-          kubectl describe pod -l name=nginx-ingress-microk8s -n ingress
-          kubectl logs -l name=nginx-ingress-microk8s -n ingress
-      - name: Services
-        run: |
-          kubectl get service --all-namespaces
-      - name: Pods
-        run: |
-          kubectl get pods --all-namespaces -o wide --show-labels
-          kubectl describe pod -l app=cryptoverse-login-login --all-namespaces
-          kubectl get event --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
-          mkdir logs
-          kubectl logs --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login > logs/login-logs.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: login-logs
-          path: logs
-
       # TODO: Test dynamic client registration
       #######################
       # Test using Demo App #
@@ -226,3 +202,7 @@ jobs:
           cd tests
           pip install -r requirements.txt
           python browser.py -k TestFirefox
+      - uses: actions/upload-artifact@v3
+        with:
+          name: screenshots
+          path: screenshots
