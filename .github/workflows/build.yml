@@ -206,4 +206,4 @@ jobs:
         if: failure()
         with:
           name: screenshots
-          path: screenshots/
+          path: tests/screenshots/
