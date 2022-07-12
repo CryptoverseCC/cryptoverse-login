@@ -205,8 +205,14 @@ jobs:
         run: |
           kubectl get pods --all-namespaces -o wide --show-labels
           kubectl describe pod -l app=cryptoverse-login-login --all-namespaces
-          kubectl logs --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login --previous --tail 10
           kubectl get event --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login
+          mkdir logs
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login --previous > logs/login-logs.previous.txt
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login > logs/login-logs.txt
+      - uses: actions/upload-artifact@v3
+        with:
+          name: login-logs
+          path: logs
 
       # TODO: Test dynamic client registration
       #######################
