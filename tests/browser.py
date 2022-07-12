@@ -55,7 +55,7 @@ class Base(Utils):
 
         self.click('//*[text()="Login with Ethereum Wallet"]')
 
-        assert self.get_current_domain() == "login.cryptoverse.cc"
+        assert self.get_current_domain() == self.AUTH_DOMAIN
 
         self.switch_to_auth_frame()
 
