@@ -202,10 +202,7 @@ jobs:
           mkdir -p /tmp/screenshots/
           cd tests
           pip install -r requirements.txt
-          python browser.py -k TestFirefox || true
-          ls -l
-          ls -l /tmp/
-          ls -l /tmp/screenshots/
+          python browser.py -k TestFirefox
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
