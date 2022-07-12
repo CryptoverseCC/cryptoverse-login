@@ -199,6 +199,7 @@ jobs:
       #######################
       - name: Selenium Tests
         run: |
+          mkdir -p /tmp/screenshots/
           cd tests
           pip install -r requirements.txt
           python browser.py -k TestFirefox || true
