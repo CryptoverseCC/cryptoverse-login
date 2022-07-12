@@ -11,8 +11,8 @@ on:
 
 env:
   # Needs to match "domain" value in values.ci.yaml
-  DOMAIN: login.cryptoverse.local
-  DOMAIN_DEMO: login-demo.cryptoverse.local
+  DOMAIN_LOGIN: login.cryptoverse.local
+  DOMAIN_DEMO_APP: login-demo.cryptoverse.local
   PROJECT: cryptoverse-login
   REGISTRY: registry.digitalocean.com/cryptoverse
 
@@ -129,13 +129,13 @@ jobs:
           doctl registry kubernetes-manifest --namespace cryptoverse-login-${{ github.sha }} | kubectl apply -f -
       - name: Resolve domain to localhost #TODO resolve to cluster ip
         run: |
-          echo "127.0.0.1 ${DOMAIN}" | sudo tee -a /etc/hosts
+          echo "127.0.0.1 ${DOMAIN_LOGIN}" | sudo tee -a /etc/hosts
       - name: Certs
         run: |
           openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
             -out local.crt \
             -keyout local.key \
-            -subj "/CN=${DOMAIN}/O=Cryptoverse OU"
+            -subj "/CN=${DOMAIN_LOGIN}/O=Cryptoverse OU"
           sudo cp local.crt /etc/ssl/certs/
           sudo update-ca-certificates
           kubectl create secret tls cryptoverse-login \
@@ -154,7 +154,7 @@ jobs:
             --set sentryDSN=${{ secrets.SENTRY_DSN }}
       - name: Verify connectivity
         run: |
-          curl https://${DOMAIN}/.well-known/openid-configuration -vk
+          curl https://${DOMAIN_LOGIN}/.well-known/openid-configuration -vk
 
       ########
       # Demo #

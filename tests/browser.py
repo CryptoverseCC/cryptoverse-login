@@ -136,8 +136,8 @@ class TestChrome(Base, unittest.TestCase):
 
 
 if __name__ == "__main__":
-    auth_domain = os.getenv("DOMAIN", "login.cryptoverse.cc")
-    demo_app_domain = os.getenv("DEMO_APP_DOMAIN", "login-demo.cryptoverse.cc")
+    auth_domain = os.getenv("DOMAIN_LOGIN", "login.cryptoverse.cc")
+    demo_app_domain = os.getenv("DOMAIN_DEMO_APP", "login-demo.cryptoverse.cc")
 
     TestChrome.DEMO_APP_DOMAIN = demo_app_domain
     TestChrome.AUTH_DOMAIN = auth_domain
