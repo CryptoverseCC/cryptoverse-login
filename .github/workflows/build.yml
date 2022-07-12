@@ -166,13 +166,13 @@ jobs:
           doctl registry kubernetes-manifest --namespace cryptoverse-login-demo-${{ github.sha }} | kubectl apply -f -
       - name: Resolve demo app domain to localhost #TODO resolve to cluster ip
         run: |
-          echo "127.0.0.1 ${DOMAIN_DEMO}" | sudo tee -a /etc/hosts
+          echo "127.0.0.1 ${DOMAIN_DEMO_APP}" | sudo tee -a /etc/hosts
       - name: Certs
         run: |
           openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
             -out local-demo.crt \
             -keyout local-demo.key \
-            -subj "/CN=${DOMAIN_DEMO}/O=Cryptoverse OU"
+            -subj "/CN=${DOMAIN_DEMO_APP}/O=Cryptoverse OU"
           sudo cp local-demo.crt /etc/ssl/certs/
           sudo update-ca-certificates
           kubectl create secret tls login-demo-tls \
