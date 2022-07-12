@@ -44,7 +44,7 @@ class Utils:
 
     def snap(self, name):
         self.snap_counter += 1
-        self.driver.save_screenshot("screenshots/{}_{}.png".format(self.snap_counter, name))
+        self.driver.save_screenshot("/tmp/screenshots/{}_{}.png".format(self.snap_counter, name))
 
 
 class Base(Utils):
