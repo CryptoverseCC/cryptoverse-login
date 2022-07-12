@@ -35,6 +35,8 @@ spec:
               value: {{ .Values.version | quote }}
             - name: SENTRY_DSN
               value: {{ .Values.sentryDSN }}
+            - name: SENTRY_ENV
+              value: {{ .Values.sentryEnv }}
             - name: INFURA_API_KEY
               value: {{ .Values.infuraApiKey }}
             - name: ALCHEMY_API_KEY

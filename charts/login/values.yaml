@@ -1,6 +1,7 @@
 domain: login.cryptoverse.cc
 version: 1.2.168
 sentryDSN: "..."
+sentryEnv: "development"
 registry: registry.digitalocean.com/cryptoverse
 
 db:

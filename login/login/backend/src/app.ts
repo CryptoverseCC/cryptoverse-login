@@ -12,6 +12,7 @@ import { router as consentRouter } from "./routes/consent";
 
 const app = express();
 const version = process.env["VERSION"]
+const sentryEnv = process.env["SENTRY_ENV"]
 const sentryDSN = process.env["SENTRY_DSN"]
 const metricsMiddleware = promBundle({
   includeMethod: true,
@@ -24,6 +25,7 @@ const metricsMiddleware = promBundle({
 Sentry.init({
   dsn: sentryDSN,
   release: version,
+  environment: sentryEnv,
 });
 
 // Sentry

@@ -1,4 +1,5 @@
-sentryDSN: https://???@???.ingest.sentry.io/???
+sentryDSN: "...filled in CI..."
+sentryEnv: "ci"
 domain: login.cryptoverse.local
 
 ingressClassName: public
