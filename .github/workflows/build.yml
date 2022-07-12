@@ -205,8 +205,9 @@ jobs:
         run: |
           kubectl get pods --all-namespaces -o wide --show-labels
           kubectl describe pod -l app=cryptoverse-login-login --all-namespaces
-          sleep 2m
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} -l app=cryptoverse-login-login --previous --tail 10
+          kubectl get event --namespace abc-namespace -l app=cryptoverse-login-login
+
       # TODO: Test dynamic client registration
       #######################
       # Test using Demo App #
