@@ -68,7 +68,7 @@ class Base(Utils):
 
         assert self.get_current_domain() == self.AUTH_DOMAIN
 
-        time.sleep(2)
+        time.sleep(10)
 
         self.snap("login_page_loaded")
 
