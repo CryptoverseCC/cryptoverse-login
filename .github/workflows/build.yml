@@ -15,6 +15,7 @@ env:
   DOMAIN_DEMO_APP: login-demo.cryptoverse.local
   PROJECT: cryptoverse-login
   REGISTRY: registry.digitalocean.com/cryptoverse
+  SCREENSHOTS_PATH: /tmp/screenshots/
 
 jobs:
   build-gateway:
@@ -199,12 +200,12 @@ jobs:
       #######################
       - name: Selenium Tests
         run: |
-          mkdir -p /tmp/screenshots/
+          mkdir -p ${SCREENSHOTS_PATH}
           cd tests
           pip install -r requirements.txt
-          python browser.py -k TestFirefox
+          python test_full.py
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: screenshots
-          path: /tmp/screenshots/
+          path: ${SCREENSHOTS_PATH}
