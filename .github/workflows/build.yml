@@ -205,7 +205,7 @@ jobs:
           pip install -r requirements.txt
           python test_full.py
       - uses: actions/upload-artifact@v3
-        if: failure()
+        if: always()
         with:
           name: screenshots
           path: ${SCREENSHOTS_PATH}

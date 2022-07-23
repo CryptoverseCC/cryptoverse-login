@@ -28,21 +28,24 @@ def switch_to(driver, title):
         if driver.title == title:
             break
 
+
 def focus_on_auth_frame(driver):
     auth_frame = driver.find_element(by=By.XPATH, value="//body/iframe")
     driver.switch_to.frame(auth_frame)
 
+
 def get_current_domain(driver) -> str:
     url = driver.current_url
     return urlparse(url).netloc
+
 
 def click(driver, xpath):
     button: WebElement = driver.find_element(by=By.XPATH, value=xpath)
     button.click()
     time.sleep(2)
 
-snap_counter = 0
 
+snap_counter = 0
 def snap(driver, name):
     global snap_counter
     snap_counter += 1
@@ -52,85 +55,59 @@ def snap(driver, name):
     else:
         logging.error("Screenshot saving failed")
 
-@asynccontextmanager
-async def subscribe_to_console_events(driver):
-    logging.info("Registering for console events")
-    async with driver.bidi_connection() as session:
-        logging.info("Registered for console events")
-
-        log = Log(driver, session)
-
-        async def logs():
-            while True:
-                async with log.add_listener(Console.ALL) as messages:
-                    logging.info(messages)
-
-        async def errors():
-            while True:
-                async with log.add_js_error_listener() as messages:
-                    logging.info(messages)
-
-        async with trio.open_nursery() as nursery:
-            nursery.start_soon(logs)
-            nursery.start_soon(errors)
-            yield
-            nursery.cancel_scope.cancel()
 
 async def test_initial(driver):
     assert AUTH_DOMAIN is not None
     assert DEMO_APP_DOMAIN is not None
 
-    async with subscribe_to_console_events(driver):
-        # Setup Metamask
-        metamask.init(driver)
+    # Setup Metamask
+    metamask.init(driver)
 
-        # Load Initial Page
-        driver.get("https://{}?auth_domain={}".format(DEMO_APP_DOMAIN, AUTH_DOMAIN))
-        snap(driver, "demo_app_loaded")
+    # Load Initial Page
+    driver.get("https://{}?auth_domain={}".format(DEMO_APP_DOMAIN, AUTH_DOMAIN))
+    snap(driver, "demo_app_loaded")
 
-        # Start Authentication Flow
-        click(driver, '//*[text()="Login with Ethereum Wallet"]')
-        assert get_current_domain(driver) == AUTH_DOMAIN
-        time.sleep(20)
-        snap(driver, "login_page_loaded")
+    # Start Authentication Flow
+    click(driver, '//*[text()="Login with Ethereum Wallet"]')
+    assert get_current_domain(driver) == AUTH_DOMAIN
+    time.sleep(20)
+    snap(driver, "login_page_loaded")
 
-        # Select Wallet Type
-        focus_on_auth_frame(driver)
-        click(driver, '//*[text()="Ethereum Wallet"]')
-        time.sleep(1)
-        snap(driver, "after_wallet_select")
+    # Select Wallet Type
+    focus_on_auth_frame(driver)
+    click(driver, '//*[text()="Ethereum Wallet"]')
+    time.sleep(1)
+    snap(driver, "after_wallet_select")
 
-        # Select Wallet Provider
-        click(driver, '//*[text()="MetaMask"]')
-        time.sleep(1)
-        snap(driver, "after_metamask_selected")
-        switch_to(driver, "MetaMask Notification")
-        click(driver, '//button[text()="Next"]')
-        click(driver, '//button[text()="Connect"]')
-        time.sleep(5)
-        switch_to(driver, "login-demo.cryptoverse.cc - Login with Ethereum Wallet")
-        time.sleep(5)
-        snap(driver, "after_wallet_connected")
+    # Select Wallet Provider
+    click(driver, '//*[text()="MetaMask"]')
+    time.sleep(1)
+    snap(driver, "after_metamask_selected")
+    switch_to(driver, "MetaMask Notification")
+    click(driver, '//button[text()="Next"]')
+    click(driver, '//button[text()="Connect"]')
+    time.sleep(5)
+    switch_to(driver, "login-demo.cryptoverse.cc - Login with Ethereum Wallet")
+    time.sleep(5)
+    snap(driver, "after_wallet_connected")
 
-        # Use specific address for login
-        focus_on_auth_frame(driver)
-        click(driver, '//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
-        switch_to(driver, "MetaMask Notification")
-        click(driver, '//button[text()="Sign"]')
-        switch_to(driver, "login-demo.cryptoverse.cc - Login with Ethereum Wallet")
-        snap(driver, "after_wallet_sign")
+    # Use specific address for login
+    focus_on_auth_frame(driver)
+    click(driver, '//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
+    switch_to(driver, "MetaMask Notification")
+    click(driver, '//button[text()="Sign"]')
+    switch_to(driver, "login-demo.cryptoverse.cc - Login with Ethereum Wallet")
+    snap(driver, "after_wallet_sign")
 
-        # Wait for login redirects and final page
-        time.sleep(20)
-        snap(driver, "final_page_loaded")
-        # Check if we logged in successfully
-        element = driver.find_element(
-            by=By.XPATH,
-            value='//pre[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]',
-        )
-
-        logging.info("Login successful for: {}".format(element.text))
-
+    # Wait for login redirects and final page
+    time.sleep(20)
+    snap(driver, "final_page_loaded")
+    # Check if we logged in successfully
+    element = driver.find_element(
+        by=By.XPATH,
+        value='//pre[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]',
+    )
+    logging.info("Login successful for: {}".format(element.text))
     logging.info("Test Finished")
 
 
