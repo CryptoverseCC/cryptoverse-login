@@ -203,7 +203,9 @@ jobs:
           mkdir -p ${SCREENSHOTS_PATH}
           cd tests
           pip install -r requirements.txt
+          echo "Testing..."
           python test_full.py
+          echo "Testing done."
       - uses: actions/upload-artifact@v3
         if: always()
         with:
