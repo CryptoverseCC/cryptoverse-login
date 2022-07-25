@@ -6,15 +6,12 @@
     <title>Login with Ethereum Wallet - Final</title>
     <script
       id="sentry"
-      async
       src="/login/sentry.min.js"
-      integrity="sha256-lUNQ3Xc8M5FRiBcVg3K4A9K59mVrBsQhB7WUmUMuHX8="
       crossorigin="anonymous"
     ></script>
     <script>
-      sentry.addEventListener("load", function () {
+      Sentry.onLoad(function () {
         Sentry.init({
-          dsn: "{{ sentry_dsn }}",
           release: "{{ version }}",
         });
       });
