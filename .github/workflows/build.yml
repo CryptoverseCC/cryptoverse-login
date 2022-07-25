@@ -15,7 +15,7 @@ env:
   DOMAIN_DEMO_APP: login-demo.cryptoverse.local
   PROJECT: cryptoverse-login
   REGISTRY: registry.digitalocean.com/cryptoverse
-  SCREENSHOTS_PATH: /tmp/screenshots/
+  ASSETS_PATH: /tmp/assets/
 
 jobs:
   build-gateway:
@@ -200,14 +200,12 @@ jobs:
       #######################
       - name: Selenium Tests
         run: |
-          mkdir -p ${SCREENSHOTS_PATH}
+          mkdir -p ${ASSETS_PATH}
           cd tests
           pip install -r requirements.txt
-          echo "Testing..."
-          python test_full.py
-          echo "Testing done."
+          pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml --html=${ASSETS_PATH}/report.html
       - uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: screenshots
-          path: ${SCREENSHOTS_PATH}
+          name: assets
+          path: ${ASSETS_PATH}
