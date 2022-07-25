@@ -6,14 +6,12 @@
     <title>{{ params.client_id.0 }} - Login with Ethereum Wallet</title>
     <script
       id="sentry"
-      async
       src="/login/sentry.min.js"
       crossorigin="anonymous"
     ></script>
     <script>
-      sentry.addEventListener("load", function () {
+      Sentry.onLoad(function () {
         Sentry.init({
-          dsn: "{{ sentry_dsn }}",
           release: "{{ version }}",
         });
       });
