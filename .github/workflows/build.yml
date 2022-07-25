@@ -203,7 +203,7 @@ jobs:
           mkdir -p ${ASSETS_PATH}
           cd tests
           pip install -r requirements.txt
-          pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml
+          pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml --verbose --log-level=INFO --capture=no --log-cli-level=INFO
       - uses: actions/upload-artifact@v3
         if: always()
         with:
