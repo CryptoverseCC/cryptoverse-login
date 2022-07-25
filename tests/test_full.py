@@ -1,25 +1,24 @@
 import logging
 import os
 import time
-from contextlib import asynccontextmanager
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
-import trio
 from selenium import webdriver
-from selenium.webdriver.chrome.webdriver import Service as ChromeService
-from selenium.webdriver.common.bidi.console import Console
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.log import Log
 from selenium.webdriver.firefox.webdriver import Service as FirefoxService
 from selenium.webdriver.remote.webelement import WebElement
 
 import metamask
 
 logging.basicConfig(level=logging.INFO)
+
 AUTH_DOMAIN = os.getenv("DOMAIN_LOGIN", "login.cryptoverse.cc")
 DEMO_APP_DOMAIN = os.getenv("DOMAIN_DEMO_APP", "login-demo.cryptoverse.cc")
-BASE_PATH = os.getenv("BASE_PATH", "./")
+ASSETS_PATH = os.getenv("ASSETS_PATH", "./assets")
+
+os.makedirs(ASSETS_PATH, exist_ok=True)
 
 def switch_to(driver, title):
     for handle in driver.window_handles:
@@ -49,8 +48,8 @@ snap_counter = 0
 def snap(driver, name):
     global snap_counter
     snap_counter += 1
-    path = "{}screenshots/{}_{}.png".format(BASE_PATH, snap_counter, name)
-    if driver.save_screenshot(path):
+    path = Path(ASSETS_PATH) / "{}_{}.png".format(snap_counter, name)
+    if driver.save_screenshot(str(path)):
         logging.info("Screenshot saved to {}".format(path))
     else:
         logging.error("Screenshot saving failed")

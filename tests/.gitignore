@@ -1,5 +1,5 @@
 tools/*
 .venv
 __pycache__
-screenshots
+assets
 geckodriver.log
