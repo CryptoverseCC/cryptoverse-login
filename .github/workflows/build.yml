@@ -208,4 +208,4 @@ jobs:
         if: always()
         with:
           name: assets
-          path: ${ASSETS_PATH}
+          path: /tmp/assets/
