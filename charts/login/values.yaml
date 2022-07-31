@@ -19,7 +19,7 @@ ingressClassName: nginx
 
 hydra:
   image:
-    tag: v1.11.0
+    tag: v1.11.8
   hydra-maester:
     forwardedProto: https
   hydra: # Overrride `hydra` subchart values
