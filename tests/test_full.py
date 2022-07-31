@@ -69,7 +69,7 @@ async def test_initial(driver):
     # Start Authentication Flow
     click(driver, '//*[text()="Login with Ethereum Wallet"]')
     assert get_current_domain(driver) == AUTH_DOMAIN
-    time.sleep(20)
+    time.sleep(60)
     snap(driver, "login_page_loaded")
 
     # Select Wallet Type
