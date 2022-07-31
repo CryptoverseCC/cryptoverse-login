@@ -204,7 +204,16 @@ jobs:
           cd tests
           pip install -r requirements.txt
           pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml --verbose --log-level=INFO --capture=no --log-cli-level=INFO
+      - name: Logs
+        if: always()
+        run: |
+          kubectl get pods --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-gateway
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-login
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-wrapper
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app.kubernetes.io/name=hydra
       - name: Microk8s - Gather debug info
+        if: always()
         run: |
           cd ${ASSETS_PATH}
           microk8s inspect
@@ -213,10 +222,3 @@ jobs:
         with:
           name: assets
           path: /tmp/assets/
-      - name: Logs
-        if: always()
-        run: |
-          kubectl get pods --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
-          kubectl logs -l app.kubernetes.io/name=cryptoverse-login --namespace cryptoverse-login-${{ github.sha }} --tail 1000
-          kubectl get pods --namespace default -o wide --show-labels
-          kubectl logs -l app.kubernetes.io/name=hydra --namespace default --tail 1000
