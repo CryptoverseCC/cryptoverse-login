@@ -212,4 +212,4 @@ jobs:
       - name: Logs
         if: always()
         run: |
-          kubectl logs -l app=cryptoverse-login-login
+          kubectl logs -l app=cryptoverse-login-login --namespace cryptoverse-login-demo-${{ github.sha }}
