@@ -1,12 +1,35 @@
-from flask import Flask, request, render_template
-from urllib.parse import parse_qs, urlparse
 from os import environ
+from urllib.parse import parse_qs, urlparse
+
+import sentry_sdk
+from flask import Flask, render_template, request
+from sentry_sdk.integrations.flask import FlaskIntegration
 
 app = Flask(__name__)
 
 VERSION = environ["VERSION"]
 SENTRY_ENV = environ["SENTRY_ENV"]
 SENTRY_DSN = environ["SENTRY_DSN"]
+
+
+sentry_sdk.init(
+    dsn=SENTRY_DSN,
+    integrations=[
+        FlaskIntegration(),
+    ],
+    environment=SENTRY_ENV,
+
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production.
+    traces_sample_rate=1.0,
+
+    # By default the SDK will try to use the SENTRY_RELEASE
+    # environment variable, or infer a git commit
+    # SHA as release, however you may want to set
+    # something more human-readable.
+    release=VERSION,
+)
 
 
 @app.route("/oauth2/auth", methods=["GET"])
