@@ -1,7 +1,8 @@
-FROM python:3-alpine
+FROM python:3-slim
 
 RUN pip install Flask
 RUN pip install waitress
+RUN pip install sentry-sdk[flask]
 
 COPY wrapper.py /app/wrapper.py
 COPY templates /app/templates
