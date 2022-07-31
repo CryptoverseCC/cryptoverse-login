@@ -204,6 +204,10 @@ jobs:
           cd tests
           pip install -r requirements.txt
           pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml --verbose --log-level=INFO --capture=no --log-cli-level=INFO
+      - name: Microk8s - Gather debug info
+        run: |
+          cd ${ASSETS_PATH}
+          microk8s inspect
       - uses: actions/upload-artifact@v3
         if: always()
         with:
@@ -212,5 +216,7 @@ jobs:
       - name: Logs
         if: always()
         run: |
+          kubectl get pods --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
           kubectl logs -l app.kubernetes.io/name=cryptoverse-login --namespace cryptoverse-login-${{ github.sha }} --tail 1000
+          kubectl get pods --namespace default -o wide --show-labels
           kubectl logs -l app.kubernetes.io/name=hydra --namespace default --tail 1000
