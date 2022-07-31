@@ -13,6 +13,7 @@
       Sentry.onLoad(function () {
         Sentry.init({
           release: "{{ version }}",
+          environment: "{{ sentry_env }}",
         });
       });
     </script>

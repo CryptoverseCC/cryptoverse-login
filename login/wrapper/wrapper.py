@@ -5,6 +5,7 @@ from os import environ
 app = Flask(__name__)
 
 VERSION = environ["VERSION"]
+SENTRY_ENV = environ["SENTRY_ENV"]
 SENTRY_DSN = environ["SENTRY_DSN"]
 
 
@@ -16,7 +17,7 @@ def embed():
     parts = urlparse(url)
     params = parse_qs(parts.query)
     return render_template(
-        "embed.html", url=url, params=params, version=VERSION, sentry_dsn=SENTRY_DSN,
+        "embed.html", url=url, params=params, version=VERSION, sentry_dsn=SENTRY_DSN, sentry_env=SENTRY_ENV,
     )
 
 
@@ -28,5 +29,5 @@ def final():
     url = urlparse(url).geturl()  # make sure we deal with url
     app.logger.info(url)
     return render_template(
-        "final.html", url=url, version=VERSION, sentry_dsn=SENTRY_DSN,
+        "final.html", url=url, version=VERSION, sentry_env=SENTRY_ENV, sentry_dsn=SENTRY_DSN,
     )

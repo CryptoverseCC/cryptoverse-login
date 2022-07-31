@@ -32,6 +32,8 @@ spec:
               value: {{ .Values.version | quote }}
             - name: SENTRY_DSN
               value: {{ .Values.sentryDSN }}
+            - name: SENTRY_ENV
+              value: {{ .Values.sentryEnv }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.registry }}/{{ .Values.wrapper.image.repository }}:{{ .Values.version }}"
