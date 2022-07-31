@@ -209,3 +209,7 @@ jobs:
         with:
           name: assets
           path: /tmp/assets/
+      - name: Logs
+        if: always()
+        run: |
+          kubectl logs -l app=cryptoverse-login-login
