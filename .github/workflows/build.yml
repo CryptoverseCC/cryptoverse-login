@@ -212,4 +212,5 @@ jobs:
       - name: Logs
         if: always()
         run: |
-          kubectl logs -l app=cryptoverse-login-login --namespace cryptoverse-login-${{ github.sha }}
+          kubectl logs -l app.kubernetes.io/name=cryptoverse-login --namespace cryptoverse-login-${{ github.sha }} --tail 1000
+          kubectl logs -l app.kubernetes.io/name=hydra --namespace default --tail 1000
