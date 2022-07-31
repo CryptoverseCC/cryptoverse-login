@@ -1,6 +1,7 @@
 const { whenProd, paths } = require("@craco/craco");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const path = require("path");
+const webpack = require("webpack");
 
 module.exports = {
   webpack: {
@@ -26,6 +27,10 @@ module.exports = {
                   minifyCSS: true,
                   minifyURLs: true,
                 },
+              }),
+              new webpack.ProvidePlugin({
+                process: "process/browser",
+                Buffer: ["buffer", "Buffer"],
               }),
             ].filter(Boolean),
           []
@@ -63,11 +68,13 @@ module.exports = {
         final: path.resolve(__dirname, "./src/final/index.ts"),
       };
 
+      webpackConfig.resolve.extensions = [".ts", ".tsx", ".js", ".jsx"];
       webpackConfig.resolve.fallback = {
         crypto: false,
         https: false,
         http: false,
-        stream: false,
+        stream: require.resolve("stream-browserify"),
+        buffer: require.resolve("buffer"),
         os: false,
         url: false,
         assert: false,
