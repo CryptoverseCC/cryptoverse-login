@@ -4,7 +4,8 @@ import { ethers } from "ethers";
 import Web3Modal, { getProviderInfoByName } from "web3modal";
 import {
   TConnectRequest,
-  TConnectResponse
+  TConnectResponse,
+  TEthereumAddress
 } from "../services/loginProvider";
 import { Window, setIdentities, setProvider, getProvider, setEthers } from "./utils";
 
@@ -37,7 +38,7 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
 
   const pi = getProviderInfoByName(name)
 
-  let p;
+  let p: ethers.providers.ExternalProvider;
 
   try {
     p = await web3Modal.connectTo(pi.id);
@@ -52,12 +53,13 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
   setProvider(new ethers.providers.Web3Provider(p));
   setEthers(ethers);
 
-  let addresses;
+  let addresses: TEthereumAddress[];
 
   try {
     addresses = await getProvider().send("eth_requestAccounts", []);
   } catch (error) {
     sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
+    return { identities: [] };
   }
 
   sentry.onLoad(() => sentry?.setContext("user", { addresses }));
