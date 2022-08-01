@@ -68,6 +68,8 @@ module.exports = {
         final: path.resolve(__dirname, "./src/final/index.ts"),
       };
 
+      webpackConfig.devtool = "source-map";
+
       webpackConfig.resolve.extensions = [".ts", ".tsx", ".js", ".jsx"];
       webpackConfig.resolve.fallback = {
         crypto: false,
