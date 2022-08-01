@@ -125,14 +125,8 @@ export const Background: React.FC<BackgroundProps> = ({
                 <Grid container>
                   <Grid item xs>
                     <Link
-                      href="#"
+                      href="mailto:xunkulapchvatal@ethmail.cc"
                       variant="body2"
-                      onClick={() => {
-                        ((window as unknown) as any).$crisp?.push([
-                          "do",
-                          "chat:open",
-                        ]);
-                      }}
                     >
                       I need help
                     </Link>
