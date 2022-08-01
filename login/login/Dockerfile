@@ -23,8 +23,6 @@ ENV NODE_ENV=production
 
 COPY frontend/package.json .
 COPY frontend/yarn.lock .
-#COPY frontend/deps ./deps
-#RUN cd deps/web3modal && npm install && npm run-script build
 RUN yarn install --only=production
 COPY frontend .
 RUN yarn build
