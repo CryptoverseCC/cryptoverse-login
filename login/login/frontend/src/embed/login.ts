@@ -13,14 +13,14 @@ export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): P
 
   const pp = getInjectedProvider();
 
-  sentry?.setContext("provider", {
+  sentry.onLoad(() => sentry?.setContext("provider", {
     name: pp?.name,
     id: pp?.id,
-  });
+  }));
 
-  sentry?.setContext("user", {
+  sentry.onLoad(() => sentry?.setContext("user", {
     address
-  });
+  }));
 
   if (pp) {
     const name = pp.name.toLowerCase();
