@@ -66,7 +66,7 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
 
   if (!addresses) {
     try {
-      await p.enable();
+      await (p as unknown as any).enable();
       addresses = await getProvider().listAccounts();
     } catch (error) {
       sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter
