@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import fetch from 'node-fetch';
 
+// @ts-ignore
 global.fetch = fetch;
 
 // let provider = new ethers.providers.JsonRpcProvider(
@@ -68,10 +69,17 @@ interface IDToken {
   zoneinfo: string; //String from zoneinfo [zoneinfo] time zone database representing the End-User's time zone. For example, Europe/Paris or America/Los_Angeles.
 }
 
+type TUDDomain = {
+  name: string;
+}
+
+type UDAPIResponse = {
+  domains: TUDDomain[];
+}
 
 async function getUDomains(address: ETHAddress): Promise<UDomain[]> {
-  let response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
-  let data = await response.json();
+  const response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
+  const data = await response.json() as UDAPIResponse;
   return data.domains.map(domain => domain.name as UDomain).filter(name => name.endsWith(".crypto"));
 }
 
@@ -79,7 +87,7 @@ export async function getData(response): Promise<IDToken> {
   const user: ETHAddress = response.subject;
   const domain: string = process.env.MAILSERVER_DOMAIN;
 
-  let emails: IDTokenEmails = {
+  const emails: IDTokenEmails = {
     default: `${user}@${domain}`,
     all: [`${user}@${domain}`],
     ens: {
@@ -91,7 +99,7 @@ export async function getData(response): Promise<IDToken> {
       all: []
     }
   }
-  let names: IDTokenNames = {
+  const names: IDTokenNames = {
     default: user,
     all: [user],
     ens: {
@@ -113,12 +121,12 @@ export async function getData(response): Promise<IDToken> {
     alchemy: "SMpPuRIv3DSD_7SYzkMf9TPOS4HbNSq8",
   });
 
-  let ENSName = await provider.lookupAddress(user);
+  const ENSName = await provider.lookupAddress(user);
 
   console.log("ENS: Address lookup result:", ENSName);
 
   if (ENSName) {
-    let ENSEmail = `${ENSName.replace(/\.eth/gi, "")}@${domain}`;
+    const ENSEmail = `${ENSName.replace(/\.eth/gi, "")}@${domain}`;
 
     emails.all.push(ENSEmail);
     emails.ens.default = ENSEmail;
@@ -129,7 +137,7 @@ export async function getData(response): Promise<IDToken> {
     names.ens.all.push(ENSName);
   }
 
-  let UNames = await getUDomains(user);
+  const UNames = await getUDomains(user);
 
   console.log("UD: Address lookup result:", UNames);
 
@@ -137,7 +145,7 @@ export async function getData(response): Promise<IDToken> {
 
 
     UNames.forEach(name => {
-      let UDEmail = `${name.replace(/\.crypto$/, "")}@unstoppable.email`;
+      const UDEmail = `${name.replace(/\.crypto$/, "")}@unstoppable.email`;
       emails.all.push(UDEmail);
       emails.unstoppabledomains.default = emails.unstoppabledomains.default ?? name;
       emails.unstoppabledomains.all.push(UDEmail)

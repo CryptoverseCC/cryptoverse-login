@@ -39,6 +39,7 @@ app.use(metricsMiddleware);
 
 // Rendering engine
 app.set("views", path.join(__dirname, "views"));
+// @ts-ignore
 app.engine(".html", RenderingEngine({ extname: '.html' }));
 app.set("view engine", ".html");
 

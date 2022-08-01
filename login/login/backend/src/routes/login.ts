@@ -16,6 +16,7 @@ const loginStatus = new promClient.Counter({
   labelNames: ['status', 'client']
 });
 
+// @ts-ignore
 global.fetch = fetch;
 
 export const router = Router();

@@ -38,7 +38,7 @@ RUN yarn
 COPY backend .
 RUN npx webpack
 
-FROM node:alpine
+FROM node:alpine as final
 
 RUN apk add --no-cache dumb-init
 
