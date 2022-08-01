@@ -33,7 +33,7 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
     providerOptions,
   });
 
-  sentry?.setContext("providerName", { name });
+  sentry.onLoad(() => sentry?.setContext("providerName", { name }));
 
   const pi = getProviderInfoByName(name)
 
@@ -42,8 +42,8 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
   try {
     p = await web3Modal.connectTo(pi.id);
   } catch (error) {
-    sentry?.setContext("providerInstance", { p });
-    sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
+    sentry.onLoad(() => sentry?.setContext("providerInstance", { p }));
+    sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter
     return { identities: [] };
   }
 
@@ -60,19 +60,19 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
     sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
   }
 
-  sentry?.setContext("user", { addresses });
+  sentry.onLoad(() => sentry?.setContext("user", { addresses }));
 
   if (!addresses) {
     try {
       await p.enable();
       addresses = await getProvider().listAccounts();
     } catch (error) {
-      sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
+      sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter
       return { identities: [] };
     }
   }
 
-  sentry?.setContext("user", { addresses });
+  sentry.onLoad(() => sentry?.setContext("user", { addresses }));
 
   if (!addresses) {
     return { identities: [] }
