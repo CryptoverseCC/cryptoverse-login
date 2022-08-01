@@ -11,16 +11,16 @@ hydra:
   hydra:
     config:
       dsn: "memory"
-    secrets:
-      cookie:
-        - localsecretttttt # pragma: allowlist secret
-      system:
-        - localsecretttttt # pragma: allowlist secret
       urls:
         login: https://login.cryptoverse.local/login
         consent: https://login.cryptoverse.local/consent
         self:
           issuer: https://login.cryptoverse.local/
+    secrets:
+      cookie:
+        - localsecretttttt # pragma: allowlist secret
+      system:
+        - localsecretttttt # pragma: allowlist secret
 
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
