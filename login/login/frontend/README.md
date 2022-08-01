@@ -1,19 +1,3 @@
-To set up the app run commands as follows:
-* from `deps/web3modal` directory
-```
-yarn
-yarn build
-```
-
-* from `frontend` directory
-```
-yarn
-yarn add file:deps/web3modal/
-```
-
-After that, you're ready to go with `yarn storybook`
-
-
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
