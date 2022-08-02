@@ -212,6 +212,8 @@ jobs:
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-login
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-wrapper
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app.kubernetes.io/name=hydra
+          kubectl get pods --namespace cryptoverse-login-demo-${{ github.sha }} -o wide --show-labels
+          kubectl logs --namespace cryptoverse-login-demo-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-demo
       - name: Microk8s - Gather debug info
         if: always()
         run: |
