@@ -190,6 +190,7 @@ jobs:
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }} \
             --set tlsSecretName=login-demo-tls \
+            --set demo.oidc.jwksEndpoint=http://cryptoverse-login-hydra-public.cryptoverse-login-${{ github.sha }}:4444/.well-known/jwks.json \
             --set demo.oidc.tokenEndpoint=http://cryptoverse-login-hydra-public.cryptoverse-login-${{ github.sha }}:4444/oauth2/token \
             --set demo.oidc.userEndpoint=http://cryptoverse-login-hydra-public.cryptoverse-login-${{ github.sha }}:4444/userinfo
         #   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
