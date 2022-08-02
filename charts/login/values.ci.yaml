@@ -9,6 +9,7 @@ imagePullSecrets:
 
 hydra:
   hydra:
+    dangerousForceHttp: true
     config:
       dsn: "memory"
       urls:
