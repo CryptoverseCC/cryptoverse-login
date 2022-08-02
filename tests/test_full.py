@@ -82,11 +82,13 @@ async def test_initial(driver):
     click(driver, '//*[text()="MetaMask"]')
     time.sleep(1)
     snap(driver, "after_metamask_selected")
+
     switch_to(driver, "MetaMask Notification")
+
     click(driver, '//button[text()="Next"]')
     click(driver, '//button[text()="Connect"]')
     time.sleep(5)
-    switch_to(driver, "login-demo.cryptoverse.cc - Login with Ethereum Wallet")
+    switch_to(driver, f"{DEMO_APP_DOMAIN} - Login with Ethereum Wallet")
     time.sleep(5)
     snap(driver, "after_wallet_connected")
 
@@ -94,8 +96,9 @@ async def test_initial(driver):
     focus_on_auth_frame(driver)
     click(driver, '//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
     switch_to(driver, "MetaMask Notification")
+
     click(driver, '//button[text()="Sign"]')
-    switch_to(driver, "login-demo.cryptoverse.cc - Login with Ethereum Wallet")
+    switch_to(driver, f"{DEMO_APP_DOMAIN} - Login with Ethereum Wallet")
     snap(driver, "after_wallet_sign")
 
     # Wait for login redirects and final page
