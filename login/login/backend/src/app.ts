@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 import * as Sentry from "@sentry/node";
 import promBundle from "express-prom-bundle";
-import RenderingEngine from "express-handlebars";
+import { engine } from 'express-handlebars';
 
 import { router as loginRouter } from "./routes/login";
 import { router as consentRouter } from "./routes/consent";
@@ -39,8 +39,7 @@ app.use(metricsMiddleware);
 
 // Rendering engine
 app.set("views", path.join(__dirname, "views"));
-// @ts-ignore
-app.engine(".html", RenderingEngine({ extname: '.html' }));
+app.engine(".html", engine({ extname: '.html' }));
 app.set("view engine", ".html");
 
 // Misc
