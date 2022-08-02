@@ -106,6 +106,8 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 #####
+# Issue with saving session quickly: https://github.com/mozilla/mozilla-django-oidc/issues/435#issuecomment-1036372844
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_COOKIE_AGE = 5 * 60 * 60
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
