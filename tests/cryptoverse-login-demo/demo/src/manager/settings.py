@@ -136,5 +136,10 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler", "level": "DEBUG"}},
     "loggers": {
         "django": {"handlers": ["console"], "level": "DEBUG", "propagate": True},
+        'mozilla_django_oidc': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            "propagate": True,
+        },
     },
 }

@@ -14,7 +14,7 @@ class OIDCAB(OIDCAuthenticationBackend):
     def create_user(self, claims):
         user = super(OIDCAB, self).create_user(claims)
 
-        logger.info(claims)
+        logger.info(f"Claims: {claims}")
 
         user.first_name = claims.get("given_name", "")[:30]
         user.last_name = claims.get("family_name", "")[:30]
@@ -24,7 +24,7 @@ class OIDCAB(OIDCAuthenticationBackend):
 
     def update_user(self, user, claims):
 
-        logger.info(claims)
+        logger.info(f"Claims: {claims}")
 
         user.first_name = claims.get("given_name", "")[:30]
         user.last_name = claims.get("family_name", "")[:30]
