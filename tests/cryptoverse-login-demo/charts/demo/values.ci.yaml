@@ -9,8 +9,12 @@ demo:
   oidc:
     authEndpoint: https://login.cryptoverse.local/oauth2/auth
     jwksEndpoint: https://login.cryptoverse.local/.well-known/jwks.json
-    tokenEndpoint: https://login.cryptoverse.local/oauth2/token
-    userEndpoint: https://login.cryptoverse.local/userinfo
+    # Using cryptoverse-login-gateway.svc instead of login.cryptoverse.local
+    # is a workaround for the demo app being in the same cluster
+    # and not being able to resolve login.cryptoverse.local from inside
+    # since it's defined in /etc/hosts on host machine
+    tokenEndpoint: https://cryptoverse-login-gateway.svc/oauth2/token
+    userEndpoint: https://cryptoverse-login-gateway.svc/userinfo
   secret: 1a96c2572fee6abd9d40baad40a10c049a8e6343b37d92a7bc1092d9529ff76213d56268 # pragma: allowlist secret
 # restrictions:
 #   - tokenAddress: "0x1dAD862095d40d43c2109370121cf087632874dB"
