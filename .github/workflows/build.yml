@@ -208,6 +208,7 @@ jobs:
         if: always()
         run: |
           kubectl get pods --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
+          kubectl get services --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-gateway
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-login
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-wrapper
