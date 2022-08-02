@@ -105,7 +105,7 @@ async def test_initial(driver):
     snap(driver, "after_wallet_sign")
 
     # Wait for login redirects and final page
-    time.sleep(20)
+    time.sleep(60)
     snap(driver, "final_page_loaded")
     # Check if we logged in successfully
     element = driver.find_element(
