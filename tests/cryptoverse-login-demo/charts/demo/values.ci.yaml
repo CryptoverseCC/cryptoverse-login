@@ -8,6 +8,7 @@ demo:
   logoutRedirectUrl: https://login-demo.cryptoverse.local/
   oidc:
     authEndpoint: https://login.cryptoverse.local/oauth2/auth
+    # overwritten in build.yaml
     jwksEndpoint: https://login.cryptoverse.local/.well-known/jwks.json
     # overwritten in build.yaml
     tokenEndpoint: https://login.cryptoverse.local/oauth2/token
