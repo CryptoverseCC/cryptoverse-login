@@ -23,9 +23,12 @@ os.makedirs(ASSETS_PATH, exist_ok=True)
 def switch_to(driver, title):
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
-        logging.info("Switching to: {}".format(driver.title))
         if driver.title == title:
-            break
+            logging.info("Switching to: {}".format(driver.title))
+            return
+
+    logging.error("Couldn't find window with title: {}".format(title))
+    raise Exception("Couldn't find window with title: {}".format(title))
 
 
 def focus_on_auth_frame(driver):
