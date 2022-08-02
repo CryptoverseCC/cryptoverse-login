@@ -190,6 +190,13 @@ jobs:
             -f ./tests/cryptoverse-login-demo/charts/demo/values.ci.yaml \
             --set version=${{ github.sha }} \
             --set tlsSecretName=login-demo-tls
+            --set demo.oidc.tokenEndpoint=https://cryptoverse-login-gateway.cryptoverse-login-${{ github.sha }}/oauth2/token
+            --set demo.oidc.userEndpoint=https://cryptoverse-login-gateway.cryptoverse-login-${{ github.sha }}/userinfo
+        #   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        #   Using cryptoverse-login-gateway.svc instead of login.cryptoverse.local
+        #   is a workaround for the demo app being in the same cluster
+        #   and not being able to resolve login.cryptoverse.local from inside
+        #   since it's defined in /etc/hosts on host machine
       - name: Verify connectivity
         run: |
           curl https://${DOMAIN_DEMO_APP}/ -vk
