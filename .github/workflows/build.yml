@@ -1,4 +1,4 @@
-name: CI
+name: Built & Test
 
 on:
   push:
@@ -151,8 +151,7 @@ jobs:
             ./charts/login/ \
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
-            --set version=${{ github.sha }} \
-            --set sentryDSN=${{ secrets.SENTRY_DSN }}
+            --set version=${{ github.sha }}
       - name: Verify connectivity
         run: |
           curl https://${DOMAIN_LOGIN}/.well-known/openid-configuration -vk
