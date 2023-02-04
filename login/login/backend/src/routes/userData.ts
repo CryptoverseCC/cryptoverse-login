@@ -74,13 +74,18 @@ type TUDDomain = {
 }
 
 type UDAPIResponse = {
-  domains: TUDDomain[];
+  domains?: TUDDomain[];
 }
 
 async function getUDomains(address: ETHAddress): Promise<UDomain[]> {
-  const response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
-  const data = await response.json() as UDAPIResponse;
-  return data.domains.map(domain => domain.name as UDomain).filter(name => name.endsWith(".crypto"));
+  try {
+    const response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
+    const data = await response.json() as UDAPIResponse;
+    return data.domains.map(domain => domain.name as UDomain).filter(name => name.endsWith(".crypto"));
+  } catch (err) {
+    console.error(err);
+    return []
+  }
 }
 
 export async function getData(response): Promise<IDToken> {
