@@ -17,11 +17,11 @@ hydra:
         consent: https://login.cryptoverse.local/consent
         self:
           issuer: https://login.cryptoverse.local/
-    secrets:
-      cookie:
-        - localsecretttttt # pragma: allowlist secret
-      system:
-        - localsecretttttt # pragma: allowlist secret
+      secrets:
+        cookie:
+          - localsecretttttt # pragma: allowlist secret
+        system:
+          - localsecretttttt # pragma: allowlist secret
 
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
