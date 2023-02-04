@@ -20,6 +20,7 @@ env:
 jobs:
   build-gateway:
     runs-on: ubuntu-latest
+    environment: CI
     steps:
       - uses: actions/checkout@v2
       - name: Install doctl
@@ -40,6 +41,7 @@ jobs:
           cache-to: type=gha,mode=max
   build-login:
     runs-on: ubuntu-latest
+    environment: CI
     steps:
       - uses: actions/checkout@v2
       - name: Install doctl
@@ -60,6 +62,7 @@ jobs:
           cache-to: type=gha,mode=max
   build-wrapper:
     runs-on: ubuntu-latest
+    environment: CI
     steps:
       - uses: actions/checkout@v2
       - name: Install doctl
@@ -80,6 +83,7 @@ jobs:
           cache-to: type=gha,mode=max
   build-demo:
     runs-on: ubuntu-latest
+    environment: CI
     steps:
       - uses: actions/checkout@v2
       - name: Install doctl
@@ -100,6 +104,7 @@ jobs:
           cache-to: type=gha,mode=max
   test:
     runs-on: ubuntu-latest
+    environment: CI
     needs:
       - build-gateway
       - build-login

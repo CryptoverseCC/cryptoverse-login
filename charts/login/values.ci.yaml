@@ -1,4 +1,4 @@
-sentryDSN: "...filled in CI..."
+sentryDSN: ""
 sentryEnv: "ci"
 domain: login.cryptoverse.local
 
