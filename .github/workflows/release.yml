@@ -33,7 +33,7 @@ jobs:
       - name: Install Cryptoverse Login
         run: |
           gpg --quiet --batch --yes --decrypt \
-            --passphrase="$VALUES_ENCRYPTION_PASSPHRASE" \
+            --passphrase="${{ secrets.VALUES_ENCRYPTION_PASSPHRASE }}" \
             --output ./charts/login/values.prod.yaml ./charts/login/values.prod.yaml.gpg
           helm upgrade --dry-run --install --wait --timeout 10m \
             cryptoverse-login \
