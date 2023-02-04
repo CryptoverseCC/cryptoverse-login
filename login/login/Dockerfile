@@ -43,4 +43,4 @@ COPY --from=frontendBuilder /tmp/builder/build/ /app/public/login/
 RUN mkdir -p /app/views/
 RUN mv /app/public/login/index.html /app/views/index.html
 
-ENTRYPOINT node /app/server.js
+ENTRYPOINT node --enable-sourcemaps /app/server.js
