@@ -56,4 +56,4 @@ RUN mv /app/public/login/index.html /app/views/index.html
 
 USER node
 
-CMD ["dumb-init", "node", "/app/server.js"]
+CMD ["dumb-init", "node", "--enable-source-maps", "/app/server.js"]
