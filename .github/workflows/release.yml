@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  PROJECT: cryptoverse-login
+  REGISTRY: registry.digitalocean.com/cryptoverse
+
+
+jobs:
+  helm-release:
+    runs-on: ubuntu-latest
+    environment: Prod (do-sfo2-cryptoverse)
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Log in to DO Container Registry
+        run: doctl registry login --expiry-seconds 1200
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.4.0
+
+      ############################
+      # Cryptoverse Login Relase #
+      ############################
+      - name: Install Cryptoverse Login
+        run: |
+          gpg --quiet --batch --yes --decrypt \
+            --passphrase="$VALUES_ENCRYPTION_PASSPHRASE" \
+            --output ./charts/login/values.prod.yaml ./charts/login/values.prod.yaml.gpg
+          helm upgrade --dry-run --install --wait --timeout 10m \
+            cryptoverse-login \
+            ./charts/login/ \
+            --namespace cryptoverse-login \
+            -f ./charts/login/values.prod.yaml \
+            --set version=${{ github.sha }}
+      - name: Verify connectivity
+        run: |
+          sleep 60s
+          curl https://${DOMAIN_LOGIN}/.well-known/openid-configuration -vk
