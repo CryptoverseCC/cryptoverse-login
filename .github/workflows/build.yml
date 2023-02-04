@@ -116,7 +116,7 @@ jobs:
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-      - uses: balchua/microk8s-actions@v0.2.2
+      - uses: balchua/microk8s-actions@v0.3.1
         with:
           channel: "latest/stable"
           addons: '["dns", "ingress"]'
