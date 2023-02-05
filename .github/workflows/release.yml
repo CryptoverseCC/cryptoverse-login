@@ -6,6 +6,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 env:
+  DOMAIN_LOGIN: login.cryptoverse.cc
   PROJECT: cryptoverse-login
   REGISTRY: registry.digitalocean.com/cryptoverse
 
