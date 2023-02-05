@@ -20,7 +20,7 @@
     "axios": "^1.3.2",
     "buffer": "^6.0.3",
     "comlink": "^4.4.1",
-    "ethers": "^6.0.2",
+    "ethers": "5.7.2",
     "postcss-normalize": "^10.0.1",
     "process": "^0.11.10",
     "react": "^18.2.0",
