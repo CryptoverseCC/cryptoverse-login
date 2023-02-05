@@ -18,6 +18,7 @@ module.exports = {
   },
   resolve: {
     extensions: [".ts", ".js"],
+    mainFields: ["main", "module"],
   },
   output: {
     filename: "server.js",
