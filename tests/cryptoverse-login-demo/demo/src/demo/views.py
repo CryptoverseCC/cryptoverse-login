@@ -12,5 +12,9 @@ def home(request):
 @login_required
 def protected(request):
     return render(
-        request, "demo/protected.html", {"user": request.user}
+        request, "demo/protected.html",
+        {
+            "user": request.user,
+            "data": request.session.get("oidc_id_token")
+        }
     )
