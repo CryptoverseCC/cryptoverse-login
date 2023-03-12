@@ -1,6 +1,6 @@
 import logging
 import json
-from jwt import JWT
+from jwt import JWT, jwk, jws
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.conf import settings
@@ -16,8 +16,7 @@ def home(request):
 def protected(request):
     id_token = request.session.get("oidc_id_token")
     if id_token:
-        id_token = JWT().decode(id_token, settings.OIDC_RP_CLIENT_SECRET)
-        id_token = json.dumps(JWT)
+        id_token = jws.JWS().decode(id_token, do_verify=False)
     return render(
         request, "demo/protected.html", {"user": request.user, "data": id_token}
     )
