@@ -25,11 +25,11 @@
 
       .pure-g {
         margin: auto;
-        width: 600px;
+        width: 800px;
         padding-top: 30px;
       }
 
-      @media (max-width: 600px) {
+      @media (max-width: 800px) {
         .pure-g {
           width: 100%;
         }
@@ -40,7 +40,7 @@
       }
 
       .data {
-        width: 80%;
+        width: 100%;
       }
     </style>
   </head>
@@ -50,7 +50,7 @@
         <h2>Success! You are logged in as:</h2>
         <span>{{user}}</span>
         Data:
-        <div class="data">{{data}}</div>
+        <pre class="data">{{data}}</pre>
       </div>
     </div>
   </body>
