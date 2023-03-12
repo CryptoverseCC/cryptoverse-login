@@ -1,7 +1,7 @@
 import logging
 import json
+import jwt
 
-from base64 import b64decode
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
@@ -15,7 +15,8 @@ def home(request):
 def protected(request):
     id_token = request.session.get("oidc_id_token")
     if id_token:
-        id_token = b64decode(id_token)
+        _, payload_data, _ = id_token.split(b".")
+        id_token = b64decode(payload_data)
         id_token = json.dumps(id_token)
     return render(
         request, "demo/protected.html",
