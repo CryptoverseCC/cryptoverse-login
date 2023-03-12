@@ -20,6 +20,7 @@ def protected(request):
         padded = payload + "=" * (4 - len(payload) % 4)
         decoded = base64.b64decode(padded)
         id_token = json.loads(decoded)
+        id_token = json.dumps(id_token, indent=2)
     return render(
         request, "demo/protected.html", {"user": request.user, "data": id_token}
     )
