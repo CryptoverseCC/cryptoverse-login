@@ -15,7 +15,7 @@ def home(request):
 def protected(request):
     id_token = request.session.get("oidc_id_token")
     if id_token:
-        _, payload_data, _ = id_token.split(b".")
+        _, payload_data, _ = id_token.split(".")
         id_token = b64decode(payload_data)
         id_token = json.dumps(id_token)
     return render(
