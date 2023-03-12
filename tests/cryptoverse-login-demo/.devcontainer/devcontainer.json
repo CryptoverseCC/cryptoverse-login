@@ -1,0 +1,27 @@
+{
+	"name": "Cryptoverse Login Demo",
+	"build": {
+		"dockerfile": "../demo/Dockerfile",
+		"target": "devcontainer",
+		"context": "../demo"
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/local/bin/python",
+				"python.formatting.provider": "black",
+				"python.formatting.blackPath": "/opt/venv/bin/black",
+				"python.linting.enabled": true,
+				"python.linting.pylintEnabled": true,
+				"python.linting.mypyEnabled": true,
+				"editor.insertSpaces": true,
+				"editor.tabSize": 4,
+				"editor.detectIndentation": false,
+				"editor.formatOnSave": false,
+				"[python]": {
+					"editor.formatOnSave": true
+				}
+			}
+		}
+	}
+}
