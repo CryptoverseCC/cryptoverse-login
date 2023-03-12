@@ -16,7 +16,7 @@ def home(request):
 def protected(request):
     id_token = request.session.get("oidc_id_token")
     if id_token:
-        id_token = JWT.decode(id_token, settings.OIDC_RP_CLIENT_SECRET)
+        id_token = JWT().decode(id_token, settings.OIDC_RP_CLIENT_SECRET)
         id_token = json.dumps(JWT)
     return render(
         request, "demo/protected.html", {"user": request.user, "data": id_token}
