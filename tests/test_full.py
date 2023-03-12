@@ -110,7 +110,7 @@ async def test_initial(driver):
     # Check if we logged in successfully
     element = driver.find_element(
         by=By.XPATH,
-        value='//pre[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]',
+        value='//span[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]',
     )
     logging.info("Login successful for: {}".format(element.text))
     logging.info("Test Finished")
