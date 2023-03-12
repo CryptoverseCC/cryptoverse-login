@@ -19,6 +19,8 @@ RUN pip install jwt
 FROM base as devcontainer
 
 RUN pip install black
+RUN pip install mypy
+RUN pip install pylint
 
 FROM base as runner
 

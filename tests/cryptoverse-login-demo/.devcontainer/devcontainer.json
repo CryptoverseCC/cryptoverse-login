@@ -10,7 +10,6 @@
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
 				"python.formatting.provider": "black",
-				"python.formatting.blackPath": "/opt/venv/bin/black",
 				"python.linting.enabled": true,
 				"python.linting.pylintEnabled": true,
 				"python.linting.mypyEnabled": true,
