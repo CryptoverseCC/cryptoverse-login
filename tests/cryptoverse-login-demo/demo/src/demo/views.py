@@ -1,6 +1,7 @@
 import logging
 import json
 
+from base64 import b64decode
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
