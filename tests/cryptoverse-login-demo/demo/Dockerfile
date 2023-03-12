@@ -14,6 +14,11 @@ RUN pip install gunicorn
 RUN pip install mozilla-django-oidc
 RUN pip install django-request-logging
 RUN pip install django-prometheus
+RUN pip install jwt
+
+FROM base as devcontainer
+
+RUN pip install black
 
 FROM base as runner
 
