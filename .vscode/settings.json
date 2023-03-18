@@ -1,5 +1,13 @@
 {
     "python.analysis.extraPaths": [
         "./tests/.venv/lib/python3.8/site-packages/"
+    ],
+    "python.linting.mypyEnabled": true,
+    "python.linting.mypyArgs": [
+        "--follow-imports=silent",
+        "--ignore-missing-imports",
+        "--show-column-numbers",
+        "--no-pretty",
+        "--strict"
     ]
 }

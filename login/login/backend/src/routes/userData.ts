@@ -77,15 +77,41 @@ type UDAPIResponse = {
   domains?: TUDDomain[];
 }
 
-async function getUDomains(address: ETHAddress): Promise<UDomain[]> {
-  try {
-    const response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
-    const data = await response.json() as UDAPIResponse;
-    return data.domains.map(domain => domain.name as UDomain).filter(name => name.endsWith(".crypto"));
-  } catch (err) {
-    console.error(err);
-    return []
-  }
+async function getUDomains(
+  provider: ethers.providers.BaseProvider,
+  address: ETHAddress
+): Promise<UDomain[]> {
+  // TODO: ADD POLYGON NETWORK
+
+  // https://docs.unstoppabledomains.com/developer-toolkit/reference/smart-contracts/uns-smart-contracts/#unsregistry
+  const proxyReaderAddress = "0x049aba7510f45BA5b64ea9E658E342F904DB358D";
+
+  // partial ABI, just for the reverseOf method
+  const proxyReaderAbi = [
+    "function reverseOf(address addr) external view returns (uint256)",
+  ];
+
+  const proxyReaderContract = new ethers.Contract(
+    proxyReaderAddress,
+    proxyReaderAbi,
+    provider
+  );
+
+  // call the reverseOf method
+  const reverseResolutionTokenId = await proxyReaderContract.reverseOf(address);
+  const response = await fetch(`https://resolve.unstoppabledomains.com/metadata/${reverseResolutionTokenId}`);
+  const data: any = await response.json();
+
+  return [data.name as UDomain];
+
+  // try {
+  //   const response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
+  //   const data = await response.json() as UDAPIResponse;
+  //   return data.domains.map(domain => domain.name as UDomain).filter(name => name.endsWith(".crypto"));
+  // } catch (err) {
+  //   console.error(err);
+  //   return []
+  // }
 }
 
 export async function getData(response): Promise<IDToken> {

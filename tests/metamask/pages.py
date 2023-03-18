@@ -1,43 +1,44 @@
 import time
 
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
 
 class BasePage(object):
-    def __init__(self, driver):
+    def __init__(self, driver: webdriver.Firefox) -> None:
         self.driver = driver
 
-    def click(self, button_text):
+    def click(self, button_text: str) -> None:
         button: WebElement = self.driver.find_element(
-            by=By.XPATH, value='//button[text()="{}"]'.format(button_text)
+            by=By.XPATH, value=f'//button[text()="{button_text}"]'
         )
         button.click()
 
 
 class GetStarted(BasePage):
-    def next(self):
+    def next(self) -> None:
         self.click("Get Started")
 
 
 class WalletChoice(BasePage):
-    def import_wallet(self):
+    def import_wallet(self) -> None:
         self.click("Import wallet")
 
 
 class ToS(BasePage):
-    def next(self):
+    def next(self) -> None:
         time.sleep(10)
         self.click("I Agree")
         time.sleep(10)
 
 
 class ImportForm(BasePage):
-    def fill_field(self, by, by_value, value):
-        input: WebElement = self.driver.find_element(by=by, value=by_value)
-        input.send_keys(value)
+    def fill_field(self, by: str, by_value: str, value: str) -> None:
+        input_element: WebElement = self.driver.find_element(by=by, value=by_value)
+        input_element.send_keys(value)
 
-    def next(self):
+    def next(self) -> None:
         pas = "selenium_tests"
 
         self.driver.save_screenshot("screenshots/password.png")
@@ -58,5 +59,5 @@ class ImportForm(BasePage):
 
 
 class AllDone(BasePage):
-    def next(self):
+    def next(self) -> None:
         self.click("All Done")

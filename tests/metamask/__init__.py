@@ -1,11 +1,11 @@
 from select import select
 import time
 
-from selenium.webdriver.remote.webdriver import WebDriver
+from selenium import webdriver
 from .pages import *
 
 
-def start(driver: WebDriver):
+def start(driver: webdriver.Firefox) -> None:
     time.sleep(2)
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
@@ -13,7 +13,7 @@ def start(driver: WebDriver):
             break
 
 
-def finish(driver):
+def finish(driver: webdriver.Firefox) -> None:
     time.sleep(2)
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
@@ -21,7 +21,7 @@ def finish(driver):
             break
 
 
-def init(driver):
+def init(driver: webdriver.Firefox) -> None:
     start(driver)
     GetStarted(driver).next()
     WalletChoice(driver).import_wallet()

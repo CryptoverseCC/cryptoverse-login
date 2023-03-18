@@ -1,16 +1,22 @@
+import json
 import logging
 import os
 import time
 from pathlib import Path
+from typing import Generator, TypeAlias, Any
+from unittest import TestCase
 from urllib.parse import urlparse
 
+import metamask
 import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.webdriver import Service as FirefoxService
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.remote.webelement import WebElement
 
-import metamask
+Domain: TypeAlias = str
+IDToken: TypeAlias = dict[str, Any]
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,45 +26,50 @@ ASSETS_PATH = os.getenv("ASSETS_PATH", "./assets")
 
 os.makedirs(ASSETS_PATH, exist_ok=True)
 
-def switch_to(driver, title):
+
+class MissingWindow(Exception):
+    pass
+
+
+def switch_to(driver: webdriver.Firefox, title: str) -> None:
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
         if driver.title == title:
-            logging.info("Switching to: {}".format(driver.title))
+            logging.info("Switching to: %s", driver.title)
             return
 
-    logging.error("Couldn't find window with title: {}".format(title))
-    raise Exception("Couldn't find window with title: {}".format(title))
+    logging.error("Couldn't find window with title: %s", title)
+    raise MissingWindow(f"Couldn't find window with title: {title}")
 
 
-def focus_on_auth_frame(driver):
+def focus_on_auth_frame(driver: webdriver.Firefox) -> None:
     auth_frame = driver.find_element(by=By.XPATH, value="//body/iframe")
     driver.switch_to.frame(auth_frame)
 
 
-def get_current_domain(driver) -> str:
+def get_current_domain(driver: webdriver.Firefox) -> Domain:
     url = driver.current_url
     return urlparse(url).netloc
 
 
-def click(driver, xpath):
+def click(driver: webdriver.Firefox, xpath: str) -> None:
     button: WebElement = driver.find_element(by=By.XPATH, value=xpath)
     button.click()
-    time.sleep(2)
+    time.sleep(1)
 
 
 snap_counter = 0
-def snap(driver, name):
+def snap(driver: webdriver.Firefox, name: str) -> None:
     global snap_counter
     snap_counter += 1
-    path = Path(ASSETS_PATH) / "{}_{}.png".format(snap_counter, name)
+    path = Path(ASSETS_PATH) / f"{snap_counter}_{name}.png"
     if driver.save_screenshot(str(path)):
-        logging.info("Screenshot saved to {}".format(path))
+        logging.info("Screenshot saved to %s", path)
     else:
         logging.error("Screenshot saving failed")
 
 
-async def test_initial(driver):
+async def test_initial(driver: webdriver.Firefox) -> None:
     assert AUTH_DOMAIN is not None
     assert DEMO_APP_DOMAIN is not None
 
@@ -105,21 +116,90 @@ async def test_initial(driver):
     snap(driver, "after_wallet_sign")
 
     # Wait for login redirects and final page
-    time.sleep(60)
+    time.sleep(30)
     snap(driver, "final_page_loaded")
     # Check if we logged in successfully
     element = driver.find_element(
         by=By.XPATH,
         value='//pre[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]',
     )
-    logging.info("Login successful for: {}".format(element.text))
+    logging.info("Login successful for: %s", element.text)
+
+    element = driver.find_element(
+        by=By.CLASS_NAME,
+        value='data',
+    )
+
+    id_token: IDToken = json.loads(element.text)
+
+    TestCase().assertDictContainsSubset({
+        "address": {
+            "country": "Cryptoverse",
+            "region": "Ethereum"
+        },
+        "aud": [
+            "login-demo.cryptoverse.local"
+        ],
+        "birthdate": "",
+        "email": "0x6be450972b30891b16c8588dcbc10c8c2aef04da@ethmail.cc",
+        "email_verified": True,
+        "emails": {
+            "all": [
+                "0x6be450972b30891b16c8588dcbc10c8c2aef04da@ethmail.cc",
+                "xunkulapchvatal@ethmail.cc"
+            ],
+            "default": "0x6be450972b30891b16c8588dcbc10c8c2aef04da@ethmail.cc",
+            "ens": {
+                "all": [
+                    "xunkulapchvatal@ethmail.cc"
+                ],
+                "default": "xunkulapchvatal@ethmail.cc"
+            },
+            "unstoppabledomains": {
+                "all": [],
+                "default": None
+            }
+        },
+        "family_name": "Ethereum",
+        "gender": "ethereum-address",
+        "given_name": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "locale": "",
+        "middle_name": "",
+        "name": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "names": {
+            "all": [
+                "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+                "xunkulapchvatal.eth"
+            ],
+            "default": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+            "ens": {
+                "all": [
+                    "xunkulapchvatal.eth"
+                ],
+                "default": "xunkulapchvatal.eth"
+            },
+            "unstoppabledomains": {
+            "all": [],
+            "default": None
+            }
+        },
+        "nickname": "xunkulapchvatal.eth",
+        "phone_number": "",
+        "phone_number_verified": False,
+        "picture": "https://cryptoverse.cc/0x6be450972b30891b16c8588dcbc10c8c2aef04da.png",
+        "preferred_username": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "profile": "https://cryptoverse.cc/0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "sub": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "website": "https://0x6be450972b30891b16c8588dcbc10c8c2aef04da.cryptoverse.cc/",
+        "zoneinfo": ""
+    }, id_token)
+
+
     logging.info("Test Finished")
 
 
 @pytest.fixture()
-def driver():
-    from selenium.webdriver.firefox.options import Options
-
+def driver() -> Generator[webdriver.Firefox, None, None]:
     currentdir = os.path.dirname(os.path.abspath(__file__))
     driverpath = os.path.join(currentdir, "tools/geckodriver")
     metamask_path = os.path.join(
@@ -130,7 +210,6 @@ def driver():
     options = Options()
     options.set_capability("se:recordVideo", True)
     options.set_capability("moz:debuggerAddress", True)
-    options.log.level = "debug"
     options.headless = True
 
     driver = webdriver.Firefox(
