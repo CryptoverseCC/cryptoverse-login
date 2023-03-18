@@ -168,7 +168,7 @@ export async function getData(response): Promise<IDToken> {
     names.ens.all.push(ENSName);
   }
 
-  const UNames = await getUDomains(user);
+  const UNames = await getUDomains(provider, user);
 
   console.log("UD: Address lookup result:", UNames);
 
