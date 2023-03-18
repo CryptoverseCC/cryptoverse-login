@@ -141,14 +141,14 @@ async def test_initial(driver: webdriver.Firefox) -> None:
             "login-demo.cryptoverse.local"
         ],
         "birthdate": "",
-        "email": "0x6be450972b30891b16c8588dcbc10c8c2aef04da@ethmail.cc",
+        "email": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
         "email_verified": True,
         "emails": {
             "all": [
-                "0x6be450972b30891b16c8588dcbc10c8c2aef04da@ethmail.cc",
+                "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
                 "xunkulapchvatal@ethmail.cc"
             ],
-            "default": "0x6be450972b30891b16c8588dcbc10c8c2aef04da@ethmail.cc",
+            "default": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
             "ens": {
                 "all": [
                     "xunkulapchvatal@ethmail.cc"
@@ -162,16 +162,16 @@ async def test_initial(driver: webdriver.Firefox) -> None:
         },
         "family_name": "Ethereum",
         "gender": "ethereum-address",
-        "given_name": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "given_name": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
         "locale": "",
         "middle_name": "",
-        "name": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+        "name": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
         "names": {
             "all": [
-                "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+                "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
                 "xunkulapchvatal.eth"
             ],
-            "default": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
+            "default": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
             "ens": {
                 "all": [
                     "xunkulapchvatal.eth"
@@ -186,11 +186,11 @@ async def test_initial(driver: webdriver.Firefox) -> None:
         "nickname": "xunkulapchvatal.eth",
         "phone_number": "",
         "phone_number_verified": False,
-        "picture": "https://cryptoverse.cc/0x6be450972b30891b16c8588dcbc10c8c2aef04da.png",
-        "preferred_username": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
-        "profile": "https://cryptoverse.cc/0x6be450972b30891b16c8588dcbc10c8c2aef04da",
-        "sub": "0x6be450972b30891b16c8588dcbc10c8c2aef04da",
-        "website": "https://0x6be450972b30891b16c8588dcbc10c8c2aef04da.cryptoverse.cc/",
+        "picture": "https://cryptoverse.cc/0xae89b4e1b97661dab58bee7771e95ec58fc6a94b.png",
+        "preferred_username": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
+        "profile": "https://cryptoverse.cc/0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
+        "sub": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
+        "website": "https://0xae89b4e1b97661dab58bee7771e95ec58fc6a94b.cryptoverse.cc/",
         "zoneinfo": ""
     }, id_token)
 
