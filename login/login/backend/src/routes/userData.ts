@@ -102,7 +102,14 @@ async function getUDomains(
   const response = await fetch(`https://resolve.unstoppabledomains.com/metadata/${reverseResolutionTokenId}`);
   const data: any = await response.json();
 
-  return [data.name as UDomain];
+  console.log(`Got UD\nToken: ${reverseResolutionTokenId}\nMetadata: ${data}`);
+
+  if (data.name) {
+    return [data.name as UDomain];
+  }
+
+  return [];
+
 
   // try {
   //   const response = await fetch(`https://unstoppabledomains.com/api/v1/resellers/udtesting/domains?owner=${address}&extension=crypto`)
