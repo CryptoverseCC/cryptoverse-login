@@ -146,14 +146,11 @@ async def test_initial(driver: webdriver.Firefox) -> None:
         "emails": {
             "all": [
                 "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
-                "xunkulapchvatal@ethmail.cc"
             ],
             "default": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
             "ens": {
-                "all": [
-                    "xunkulapchvatal@ethmail.cc"
-                ],
-                "default": "xunkulapchvatal@ethmail.cc"
+                "all": [],
+                "default": None
             },
             "unstoppabledomains": {
                 "all": [],
@@ -169,21 +166,18 @@ async def test_initial(driver: webdriver.Firefox) -> None:
         "names": {
             "all": [
                 "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
-                "xunkulapchvatal.eth"
             ],
             "default": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b",
             "ens": {
-                "all": [
-                    "xunkulapchvatal.eth"
-                ],
-                "default": "xunkulapchvatal.eth"
+                "all": [],
+                "default": None
             },
             "unstoppabledomains": {
-            "all": [],
-            "default": None
+                "all": [],
+                "default": None
             }
         },
-        "nickname": "xunkulapchvatal.eth",
+        "nickname": None,
         "phone_number": "",
         "phone_number_verified": False,
         "picture": "https://cryptoverse.cc/0xae89b4e1b97661dab58bee7771e95ec58fc6a94b.png",
