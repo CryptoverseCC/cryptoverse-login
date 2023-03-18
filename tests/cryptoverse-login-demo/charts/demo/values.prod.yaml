@@ -1,0 +1,6 @@
+domain: login-demo.cryptoverse.cc
+
+demo:
+  secret: 43d348636b369a43864b879151e4baaa750fde6b233f08aad8b3f3c1769fb6b2b96d21a3 # pragma: allowlist secret
+
+monitoring: false
