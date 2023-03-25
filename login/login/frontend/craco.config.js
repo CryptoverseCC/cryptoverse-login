@@ -67,7 +67,7 @@ module.exports = {
         final: path.resolve(__dirname, "./src/final/index.ts"),
       };
 
-      webpackConfig.devtool = "inline-source-map"; //TODO: this should only be set to inline for CI
+      // webpackConfig.devtool = "inline-source-map"; //TODO: this should only be set to inline for CI
 
       webpackConfig.resolve.extensions = [".ts", ".tsx", ".js", ".jsx"];
       webpackConfig.resolve.fallback = {
