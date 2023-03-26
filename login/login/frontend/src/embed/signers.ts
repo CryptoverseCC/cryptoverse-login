@@ -2,7 +2,7 @@ import {
   TEthereumAddress,
   TSignature,
 } from "../services/loginProvider";
-import { getProvider, getEthers } from "./utils";
+import { getEthers } from "./utils";
 
 const verify = (recoveredAddress: string, address: string) => {
   recoveredAddress = recoveredAddress.toLowerCase();
