@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Prod (do-sfo2-cryptoverse)
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: Prod (do-sfo2-cryptoverse)
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
