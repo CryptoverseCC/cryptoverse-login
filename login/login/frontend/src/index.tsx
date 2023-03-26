@@ -3,7 +3,6 @@ import ReactDOM from "react-dom";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import { ThemeProvider } from "@material-ui/core/styles";
 import { App } from "./App";
-import "./index.css";
 import reportWebVitals from "./reportWebVitals";
 import theme from "./theme";
 import {
@@ -27,7 +26,6 @@ const Background: React.FC<BackgroundProps> = ({
   loginProvider,
   walletProviders,
 }) => {
-  console.log(loginData.clientId);
   switch (loginData.clientId) {
     case "fwb.cryptoverse.cc":
       return (
