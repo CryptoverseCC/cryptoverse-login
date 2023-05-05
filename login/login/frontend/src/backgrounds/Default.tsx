@@ -14,18 +14,6 @@ import { App } from "../App";
 import { ProviderList } from "../components/ConnectWalletPage";
 import { ILoginProvider } from "../services/loginProvider";
 
-function Info() {
-  return (
-    <Typography variant="body2" color="textSecondary" align="center">
-      {"More information at "}
-      <Link color="inherit" href="https://cryptoauth.io/">
-        cryptoauth.io
-      </Link>{" "}
-      {"."}
-    </Typography>
-  );
-}
-
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
     height: "100vh",
@@ -65,7 +53,35 @@ const useStyles = makeStyles((theme: Theme) => ({
     top: 0,
     left: 0,
   },
+  info: {},
+  coffee: {
+    marginTop: 20,
+    height: 40,
+    width: 143,
+  },
 }));
+
+function Info() {
+  const classes = useStyles();
+  return (
+    <Typography
+      variant="body2"
+      color="textSecondary"
+      align="center"
+      className={classes.info}
+    >
+      {"Support cryptoverse login with a coffee!"}
+      <br />
+      <Link href="https://www.buymeacoffee.com/xunkulapchvatal" target="_blank">
+        <img
+          src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png"
+          alt="Buy Me A Coffee"
+          className={classes.coffee}
+        />
+      </Link>
+    </Typography>
+  );
+}
 
 export interface BackgroundProps {
   AppComponent: typeof App;
@@ -129,11 +145,6 @@ export const Background: React.FC<BackgroundProps> = ({
                       variant="body2"
                     >
                       I need help
-                    </Link>
-                  </Grid>
-                  <Grid item>
-                    <Link href="#" variant="body2">
-                      I don't know why I'm here.
                     </Link>
                   </Grid>
                 </Grid>
