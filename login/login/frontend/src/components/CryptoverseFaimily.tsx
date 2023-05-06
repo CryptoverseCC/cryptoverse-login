@@ -37,7 +37,7 @@ export const CryptoverseFamily: React.FC<CryptoverseFamilyProps> = () => {
       <Grid key={"divider"} item xs={12} className={classes.divider}>
         <Divider />
       </Grid>
-      <Grid key={"header"} item container xs={12} justify="center">
+      <Grid key={"header"} item container xs={12} justifyContent="center">
         <Typography variant="h6">Cryptoverse Family</Typography>
       </Grid>
       <Grid key={"items"} item container xs={12} className={classes.help}>

@@ -85,7 +85,7 @@ const WalletConnect: React.FC<WalletProps> = ({
       onClick={() => (active ? onClick(provider) : null)}
     >
       <Grid item container>
-        <Grid item container xs={12} justify="center">
+        <Grid item container xs={12} justifyContent="center">
           <img
             className={classes.avatar}
             src={provider.logo}
@@ -93,7 +93,7 @@ const WalletConnect: React.FC<WalletProps> = ({
           ></img>
         </Grid>
         {isConnected && (
-          <Grid item container xs={12} justify="center">
+          <Grid item container xs={12} justifyContent="center">
             <Chip
               label="Connected"
               color="primary"
@@ -103,7 +103,7 @@ const WalletConnect: React.FC<WalletProps> = ({
             />
           </Grid>
         )}
-        <Grid item container xs={12} justify="center">
+        <Grid item container xs={12} justifyContent="center">
           <Typography>{provider.name}</Typography>
           {provider.description ? (
             <Typography variant="caption">{provider.description}</Typography>
@@ -128,14 +128,14 @@ const Default: React.FC<WalletProps> = ({ active, provider, onClick }) => {
       onClick={() => (active ? onClick(provider) : null)}
     >
       <Grid item container>
-        <Grid item container xs={12} justify="center">
+        <Grid item container xs={12} justifyContent="center">
           <img
             className={classes.avatar}
             src={provider.logo}
             alt={provider.name}
           ></img>
         </Grid>
-        <Grid item container xs={12} justify="center">
+        <Grid item container xs={12} justifyContent="center">
           <Typography>{provider.name}</Typography>
           {provider.description ? (
             <Typography variant="caption">{provider.description}</Typography>

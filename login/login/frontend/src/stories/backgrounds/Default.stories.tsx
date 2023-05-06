@@ -6,7 +6,6 @@ import { Background, BackgroundProps } from "../../backgrounds/Default";
 import { ThemeProvider } from "@material-ui/styles";
 import theme from "../../theme";
 import { walletProviders } from "../../providers";
-import App from "../../App";
 
 export default {
   title: "Backgrounds/Default",
@@ -21,7 +20,6 @@ const Template: Story<BackgroundProps> = (args) => (
 
 export const Base = Template.bind({});
 Base.args = {
-  AppComponent: App,
   loginProvider: {
     init: async () => ({ name: "" }),
     login: async () => ({

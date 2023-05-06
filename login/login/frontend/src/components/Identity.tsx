@@ -64,7 +64,7 @@ export const Identity: React.FC<IdentityProps> = ({ identity, onClick }) => {
       <Grid item container>
         <Tooltip title={`Login with ${identity.name}`} arrow>
           <Paper elevation={3} className={classes.paper}>
-            <Grid item container xs={12} justify="center">
+            <Grid item container xs={12} justifyContent="center">
               <Avatar
                 src={`https://my.cryptoverse.cc/profile/${identity.name}.png`}
                 alt={identity.name}
@@ -76,7 +76,7 @@ export const Identity: React.FC<IdentityProps> = ({ identity, onClick }) => {
               item
               container
               xs={12}
-              justify="center"
+              justifyContent="center"
               className={classes.name}
             >
               <Typography>{identity.name}</Typography>
@@ -85,7 +85,7 @@ export const Identity: React.FC<IdentityProps> = ({ identity, onClick }) => {
               item
               container
               xs={12}
-              justify="center"
+              justifyContent="center"
               className={classes.logmein}
             >
               <Button

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 
 import Avatar from "@material-ui/core/Avatar";
 import Box from "@material-ui/core/Box";
@@ -10,9 +10,11 @@ import Paper from "@material-ui/core/Paper";
 import { makeStyles, Theme } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
 import LockOutlinedIcon from "@material-ui/icons/LockOutlined";
-import App from "../App";
 import { ProviderList } from "../components/ConnectWalletPage";
 import { ILoginProvider } from "../services/loginProvider";
+import { Loader } from "../components/Loader";
+
+const App = lazy(() => import("../App"));
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -84,20 +86,18 @@ function Info() {
 }
 
 export interface BackgroundProps {
-  AppComponent: typeof App;
   loginProvider: ILoginProvider;
   walletProviders: ProviderList;
 }
 
 export const Background: React.FC<BackgroundProps> = ({
-  AppComponent,
   loginProvider,
   walletProviders,
 }) => {
   const classes = useStyles();
   const [open, setOpen] = useState(false);
   return (
-    <>
+    <Suspense fallback={<Loader />}>
       {!open && (
         <Grid container component="main" className={classes.root}>
           <CssBaseline />
@@ -157,12 +157,12 @@ export const Background: React.FC<BackgroundProps> = ({
         </Grid>
       )}
       {open && (
-        <AppComponent
+        <App
           className={classes.app}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
         />
       )}
-    </>
+    </Suspense>
   );
 };
