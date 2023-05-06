@@ -10,9 +10,9 @@ import { Window, getIdentities } from "./utils";
   async function main() {
     try {
       const loginProvider: IProvider = {
-        init: (await import(/* webpackPrefetch: true */"./init")).init,
-        login: (await import(/* webpackPrefetch: true */"./login")).login,
-        connect: (await import(/* webpackPrefetch: true */"./connect")).connect,
+        init: (await import(/* webpackPreload: true */"./init")).init,
+        login: (await import(/* webpackPreload: true */"./login")).login,
+        connect: (await import(/* webpackPreload: true */"./connect")).connect,
         identities: async (request: TIdentitiesRequest): Promise<TIdentitiesResponse> => {
           return { identities: getIdentities() };
         },
