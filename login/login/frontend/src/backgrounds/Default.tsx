@@ -10,7 +10,7 @@ import Paper from "@material-ui/core/Paper";
 import { makeStyles, Theme } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
 import LockOutlinedIcon from "@material-ui/icons/LockOutlined";
-import { App } from "../App";
+import App from "../App";
 import { ProviderList } from "../components/ConnectWalletPage";
 import { ILoginProvider } from "../services/loginProvider";
 

@@ -6,7 +6,7 @@ import { Background, BackgroundProps } from "../../backgrounds/Default";
 import { ThemeProvider } from "@material-ui/styles";
 import theme from "../../theme";
 import { walletProviders } from "../../providers";
-import { App } from "../../App";
+import App from "../../App";
 
 export default {
   title: "Backgrounds/Default",

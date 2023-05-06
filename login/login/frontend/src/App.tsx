@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import {
   ILoginProvider,
@@ -7,13 +7,12 @@ import {
 } from "./services/loginProvider";
 import {
   Modes as ConnectWalletPageModes,
-  ConnectWalletPage,
   ProviderList,
 } from "./components/ConnectWalletPage";
 
 import { injected, getProviderInfoByName, IProviderInfo } from "web3modal";
 import { IIdentity } from "./services/loginProvider";
-import { LoginPage, Modes as LoginPageModes } from "./components/LoginPage";
+import { Modes as LoginPageModes } from "./components/LoginPage";
 import { Loader } from "./components/Loader";
 import { CssBaseline, Grid, Paper } from "@material-ui/core";
 
@@ -59,7 +58,7 @@ const missingWallet = {
 
 let identitiesInterval: number | null = null;
 
-export const App: React.FC<AppProps> = ({
+const App: React.FC<AppProps> = ({
   loginProvider,
   walletProviders,
   className,
@@ -120,7 +119,7 @@ export const App: React.FC<AppProps> = ({
         window.location.assign(data.redirect);
       }, 0);
     } catch (error) {
-      const sentry = ((window as unknown) as Window).Sentry;
+      const sentry = (window as unknown as Window).Sentry;
       sentry?.captureException(error);
       setLoading(false);
     }
@@ -139,7 +138,7 @@ export const App: React.FC<AppProps> = ({
     try {
       response = await loginProvider.connect(request);
     } catch (error) {
-      const sentry = ((window as unknown) as Window).Sentry;
+      const sentry = (window as unknown as Window).Sentry;
       sentry?.captureException(error);
       setLoading(false);
       return;
@@ -165,7 +164,7 @@ export const App: React.FC<AppProps> = ({
         }
       }, 1000);
     } catch (error) {
-      const sentry = ((window as unknown) as Window).Sentry;
+      const sentry = (window as unknown as Window).Sentry;
       sentry?.captureException(error);
     }
 
@@ -187,7 +186,7 @@ export const App: React.FC<AppProps> = ({
       try {
         resp = await loginProvider.init({});
       } catch (error) {
-        const sentry = ((window as unknown) as Window).Sentry;
+        const sentry = (window as unknown as Window).Sentry;
         sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
         setLoading(false);
         return;
@@ -207,6 +206,10 @@ export const App: React.FC<AppProps> = ({
   let providers = [injectedProvider, ...walletProviders];
   let origin = loginProvider.loginData.clientId;
   let restrictions = loginProvider.loginData.restrictions;
+  const LoginPage = lazy(() => import("./components/LoginPage"));
+  const ConnectWalletPage = lazy(
+    () => import("./components/ConnectWalletPage")
+  );
   return (
     <Grid container component="main" className={`${classes.root} ${className}`}>
       <CssBaseline />
@@ -238,3 +241,5 @@ export const App: React.FC<AppProps> = ({
     </Grid>
   );
 };
+
+export default App;

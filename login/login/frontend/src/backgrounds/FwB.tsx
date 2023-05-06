@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { makeStyles, Theme } from "@material-ui/core/styles";
-import { App } from "../App";
+import App from "../App";
 import { ILoginProvider } from "../services/loginProvider";
 import { ProviderList } from "../components/ConnectWalletPage";
 
