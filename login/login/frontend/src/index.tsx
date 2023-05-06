@@ -1,9 +1,9 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
+import { lazy } from "react";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import { ThemeProvider } from "@material-ui/core/styles";
-import { App } from "./App";
-import reportWebVitals from "./reportWebVitals";
+//import reportWebVitals from "./reportWebVitals";
 import theme from "./theme";
 import {
   LoginProvider,
@@ -30,7 +30,7 @@ const Background: React.FC<BackgroundProps> = ({
     case "fwb.cryptoverse.cc":
       return (
         <FwBBackground
-          AppComponent={App}
+          AppComponent={lazy(() => import("./App"))}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
         />
@@ -38,7 +38,7 @@ const Background: React.FC<BackgroundProps> = ({
     default:
       return (
         <DefaultBackground
-          AppComponent={App}
+          AppComponent={lazy(() => import("./App"))}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
         />
@@ -46,15 +46,16 @@ const Background: React.FC<BackgroundProps> = ({
   }
 };
 
-ReactDOM.render(
+const container = document.getElementById("root");
+const root = createRoot(container!); // createRoot(container!) if you use TypeScript
+root.render(
   <ThemeProvider theme={theme}>
     <CssBaseline />
     <Background loginProvider={provider} walletProviders={walletProviders} />
-  </ThemeProvider>,
-  document.getElementById("root")
+  </ThemeProvider>
 );
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
+//reportWebVitals();

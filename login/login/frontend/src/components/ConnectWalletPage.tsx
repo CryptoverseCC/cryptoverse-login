@@ -146,9 +146,9 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               className={classes.main}
               justify="center"
             >
-              {providers.map((providerItem) => (
+              {providers.map((providerItem, index) => (
                 <Wallet
-                  key={providerItem.provider.id}
+                  key={providerItem.provider.id + index}
                   onClick={() => onConnect(providerItem.provider)}
                   active={providerItem.active}
                   provider={providerItem.provider}
@@ -244,3 +244,5 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
     </>
   );
 };
+
+export default ConnectWalletPage;

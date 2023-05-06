@@ -5,7 +5,7 @@ import { Story, Meta } from "@storybook/react";
 import { Background, BackgroundProps } from "../../backgrounds/FwB";
 import { ThemeProvider } from "@material-ui/styles";
 import theme from "../../theme";
-import { App } from "../../App";
+import App from "../../App";
 import { walletProviders } from "../../providers";
 
 export default {
