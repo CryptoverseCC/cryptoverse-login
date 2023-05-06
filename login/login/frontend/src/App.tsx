@@ -206,9 +206,11 @@ const App: React.FC<AppProps> = ({
   let providers = [injectedProvider, ...walletProviders];
   let origin = loginProvider.loginData.clientId;
   let restrictions = loginProvider.loginData.restrictions;
-  const LoginPage = lazy(() => import("./components/LoginPage"));
+  const LoginPage = lazy(
+    () => import(/* webpackPreload: true */ "./components/LoginPage")
+  );
   const ConnectWalletPage = lazy(
-    () => import("./components/ConnectWalletPage")
+    () => import(/* webpackPreload: true */ "./components/ConnectWalletPage")
   );
   return (
     <Grid container component="main" className={`${classes.root} ${className}`}>
