@@ -26,6 +26,8 @@ COPY frontend/package.json .
 COPY frontend/yarn.lock .
 RUN yarn install --only=production
 COPY frontend .
+# Workaround for lack of storybook installed
+RUN rm -rf src/stories
 RUN yarn build
 
 
