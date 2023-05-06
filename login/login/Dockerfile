@@ -24,7 +24,7 @@ ENV NODE_ENV=production
 
 COPY frontend/package.json .
 COPY frontend/yarn.lock .
-RUN yarn install
+RUN yarn install --only=production
 COPY frontend .
 RUN yarn build
 
