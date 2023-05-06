@@ -97,7 +97,7 @@ export const Background: React.FC<BackgroundProps> = ({
   const classes = useStyles();
   const [open, setOpen] = useState(false);
   return (
-    <Suspense fallback={<Loader />}>
+    <>
       {!open && (
         <Grid container component="main" className={classes.root}>
           <CssBaseline />
@@ -157,12 +157,14 @@ export const Background: React.FC<BackgroundProps> = ({
         </Grid>
       )}
       {open && (
-        <App
-          className={classes.app}
-          loginProvider={loginProvider}
-          walletProviders={walletProviders}
-        />
+        <Suspense fallback={<Loader />}>
+          <App
+            className={classes.app}
+            loginProvider={loginProvider}
+            walletProviders={walletProviders}
+          />
+        </Suspense>
       )}
-    </Suspense>
+    </>
   );
 };
