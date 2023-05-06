@@ -1,7 +1,7 @@
 const { whenProd, paths, whenDev } = require("@craco/craco");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-const BundleAnalyzerPlugin =
-  require("webpack-bundle-analyzer").BundleAnalyzerPlugin;
+// const BundleAnalyzerPlugin =
+//   require("webpack-bundle-analyzer").BundleAnalyzerPlugin;
 const path = require("path");
 const webpack = require("webpack");
 
@@ -13,7 +13,7 @@ module.exports = {
         ...whenProd(
           () =>
             [
-              new BundleAnalyzerPlugin(),
+              //new BundleAnalyzerPlugin(),
               new HtmlWebpackPlugin({
                 template: "./public/index.html",
                 excludeChunks: ["embed", "final"],
