@@ -5,7 +5,6 @@ import { Story, Meta } from "@storybook/react";
 import { Background, BackgroundProps } from "../../backgrounds/FwB";
 import { ThemeProvider } from "@material-ui/styles";
 import theme from "../../theme";
-import App from "../../App";
 import { walletProviders } from "../../providers";
 
 export default {
@@ -21,7 +20,6 @@ const Template: Story<BackgroundProps> = (args) => (
 
 export const Base = Template.bind({});
 Base.args = {
-  AppComponent: App,
   loginProvider: {
     init: async () => ({ name: "" }),
     login: async () => ({

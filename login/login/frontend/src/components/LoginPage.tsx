@@ -113,7 +113,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               item
               container
               xs={12}
-              justify="center"
+              justifyContent="center"
               className={classes.restrictions}
             >
               <Restrictions restrictions={restrictions}></Restrictions>
@@ -124,7 +124,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             container
             xs={12}
             className={classes.main}
-            justify="space-evenly"
+            justifyContent="space-evenly"
           >
             {identities.map((identity) => (
               <Identity
@@ -162,9 +162,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             container
             xs={12}
             className={classes.main}
-            justify="center"
+            justifyContent="center"
           >
-            <Grid key={"header"} item container xs={12} justify="center">
+            <Grid key={"header"} item container xs={12} justifyContent="center">
               <Typography variant="h6">Login with Identity</Typography>
             </Grid>
             <Grid
@@ -173,7 +173,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               container
               xs={12}
               className={classes.help}
-              //justify="center"
+              //justifyContent="center"
             >
               <Typography className={classes.helpText}>
                 In this step you need to decide whish address you wan to use as

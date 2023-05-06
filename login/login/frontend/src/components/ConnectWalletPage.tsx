@@ -120,9 +120,9 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
             container
             xs={12}
             className={classes.main}
-            justify="center"
+            justifyContent="center"
           >
-            <Grid key={"header"} item container xs={12} justify="center">
+            <Grid key={"header"} item container xs={12} justifyContent="center">
               <Typography variant="h6">
                 Which wallet you want to use?
               </Typography>
@@ -133,7 +133,7 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
                 item
                 container
                 xs={12}
-                justify="center"
+                justifyContent="center"
               >
                 <Restrictions restrictions={restrictions}></Restrictions>
               </Grid>
@@ -144,7 +144,7 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               container
               xs={12}
               className={classes.main}
-              justify="center"
+              justifyContent="center"
             >
               {providers.map((providerItem, index) => (
                 <Wallet
@@ -184,9 +184,9 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
             container
             xs={12}
             className={classes.main}
-            justify="center"
+            justifyContent="center"
           >
-            <Grid key={"header"} item container xs={12} justify="center">
+            <Grid key={"header"} item container xs={12} justifyContent="center">
               <Typography variant="h6">Select Wallet</Typography>
             </Grid>
             <Grid
@@ -195,7 +195,7 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               container
               xs={12}
               className={classes.help}
-              //justify="center"
+              //justifyContent="center"
             >
               <Typography className={classes.helpText}>
                 Hi, if you're here then you are probably wondering what you

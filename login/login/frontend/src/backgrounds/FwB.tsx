@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { makeStyles, Theme } from "@material-ui/core/styles";
-import App from "../App";
 import { ILoginProvider } from "../services/loginProvider";
 import { ProviderList } from "../components/ConnectWalletPage";
+import { Loader } from "../components/Loader";
+
+const App = lazy(() => import("../App"));
 
 const useStyles = makeStyles((theme: Theme) => ({
   app: {
@@ -13,20 +15,18 @@ const useStyles = makeStyles((theme: Theme) => ({
 }));
 
 export interface BackgroundProps {
-  AppComponent: typeof App;
   loginProvider: ILoginProvider;
   walletProviders: ProviderList;
 }
 
 export const Background: React.FC<BackgroundProps> = ({
-  AppComponent,
   loginProvider,
   walletProviders,
 }) => {
   const classes = useStyles();
   const [open, setOpen] = useState(false);
   return (
-    <>
+    <Suspense fallback={<Loader />}>
       <style>
         {`
         /*
@@ -174,12 +174,12 @@ export const Background: React.FC<BackgroundProps> = ({
         src="https://freight.cargo.site/w/750/i/05fa11c73bebaec7407875332dc2c3bbe92a26f8a13f53af3cea7fd0230bd755/1082919_SMPNG_776241850T539131C.png"
       />
       {open && (
-        <AppComponent
+        <App
           className={classes.app}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
         />
       )}
-    </>
+    </Suspense>
   );
 };

@@ -1,6 +1,5 @@
-import React from "react";
+import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { lazy } from "react";
 import CssBaseline from "@material-ui/core/CssBaseline";
 import { ThemeProvider } from "@material-ui/core/styles";
 //import reportWebVitals from "./reportWebVitals";
@@ -30,7 +29,6 @@ const Background: React.FC<BackgroundProps> = ({
     case "fwb.cryptoverse.cc":
       return (
         <FwBBackground
-          AppComponent={lazy(() => import("./App"))}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
         />
@@ -38,7 +36,6 @@ const Background: React.FC<BackgroundProps> = ({
     default:
       return (
         <DefaultBackground
-          AppComponent={lazy(() => import("./App"))}
           loginProvider={loginProvider}
           walletProviders={walletProviders}
         />
@@ -49,10 +46,12 @@ const Background: React.FC<BackgroundProps> = ({
 const container = document.getElementById("root");
 const root = createRoot(container!); // createRoot(container!) if you use TypeScript
 root.render(
-  <ThemeProvider theme={theme}>
-    <CssBaseline />
-    <Background loginProvider={provider} walletProviders={walletProviders} />
-  </ThemeProvider>
+  <StrictMode>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Background loginProvider={provider} walletProviders={walletProviders} />
+    </ThemeProvider>
+  </StrictMode>
 );
 
 // If you want to start measuring performance in your app, pass a function
