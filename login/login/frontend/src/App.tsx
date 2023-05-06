@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import {
   ILoginProvider,
@@ -217,25 +217,29 @@ const App: React.FC<AppProps> = ({
         {loading ? (
           <Loader />
         ) : currentProvider ? (
-          <LoginPage
-            origin={origin}
-            identities={identities}
-            restrictions={restrictions}
-            provider={currentProvider}
-            onLogin={onLogin}
-            onSelectWallet={onBackToSelectWallet}
-            mode={loginPageMode}
-            switchMode={setLoginPageMode}
-          ></LoginPage>
+          <Suspense fallback={<Loader />}>
+            <LoginPage
+              origin={origin}
+              identities={identities}
+              restrictions={restrictions}
+              provider={currentProvider}
+              onLogin={onLogin}
+              onSelectWallet={onBackToSelectWallet}
+              mode={loginPageMode}
+              switchMode={setLoginPageMode}
+            ></LoginPage>
+          </Suspense>
         ) : (
-          <ConnectWalletPage
-            origin={origin}
-            onConnect={onConnect}
-            providers={providers}
-            restrictions={restrictions}
-            mode={walletPageMode}
-            switchMode={setWalletPageMode}
-          />
+          <Suspense fallback={<Loader />}>
+            <ConnectWalletPage
+              origin={origin}
+              onConnect={onConnect}
+              providers={providers}
+              restrictions={restrictions}
+              mode={walletPageMode}
+              switchMode={setWalletPageMode}
+            />
+          </Suspense>
         )}
       </Paper>
     </Grid>
