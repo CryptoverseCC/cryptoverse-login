@@ -1,16 +1,18 @@
-import MewConnect from '@myetherwallet/mewconnect-web-client';
-import WalletConnectProvider from "@walletconnect/web3-provider";
-import { ethers } from "ethers";
-import Web3Modal, { getProviderInfoByName } from "web3modal";
+
 import {
   TConnectRequest,
   TConnectResponse,
   TEthereumAddress
 } from "../services/loginProvider";
-import { Window, setIdentities, setProvider, getProvider, setEthers } from "./utils";
-
+import { Window, setIdentities, getProvider, setProvider } from "./utils";
 
 export const connect = async ({ name }: TConnectRequest): Promise<TConnectResponse> => {
+  const MewConnect = await import(/* webpackPrefetch: true */ '@myetherwallet/mewconnect-web-client');
+  const WalletConnectProvider = await import(/* webpackPrefetch: true */ "@walletconnect/web3-provider");
+  const BrowserProvider = (await import(/* webpackPrefetch: true */ 'ethers')).default.BrowserProvider;
+  const Web3Modal = (await import(/* webpackPrefetch: true */ "web3modal")).default;
+  const getProviderInfoByName = (await import(/* webpackPrefetch: true */ "web3modal")).getProviderInfoByName;
+
   let providerOptions = {
     walletconnect: {
       package: WalletConnectProvider,
@@ -38,20 +40,17 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
 
   const pi = getProviderInfoByName(name)
 
-  let p: ethers.providers.ExternalProvider;
+  let prvder: any;
 
   try {
-    p = await web3Modal.connectTo(pi.id);
+    prvder = await web3Modal.connectTo(pi.id);
   } catch (error) {
-    sentry.onLoad(() => sentry?.setContext("providerInstance", { p }));
+    sentry.onLoad(() => sentry?.setContext("providerInstance", { prvder }));
     sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter
     return { identities: [] };
   }
 
-  ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.DEBUG);
-
-  setProvider(new ethers.providers.Web3Provider(p));
-  setEthers(ethers);
+  setProvider(new BrowserProvider(prvder));
 
   let addresses: TEthereumAddress[];
 
@@ -66,7 +65,7 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
 
   if (!addresses) {
     try {
-      await (p as unknown as any).enable();
+      await (prvder as unknown as any).enable();
       addresses = await getProvider().listAccounts();
     } catch (error) {
       sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter

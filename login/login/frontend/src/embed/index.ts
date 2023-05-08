@@ -5,14 +5,15 @@ import {
   TIdentitiesResponse
 } from "../services/loginProvider";
 import { Window, getIdentities } from "./utils";
+import { init } from "./init";
+import { login } from "./login";
+import { connect } from "./connect";
 
 ((window as unknown) as Window).ready = new Promise<void>((resolve, reject) => {
   async function main() {
     try {
       const loginProvider: IProvider = {
-        init: (await import(/* webpackPreload: true */"./init")).init,
-        login: (await import(/* webpackPreload: true */"./login")).login,
-        connect: (await import(/* webpackPreload: true */"./connect")).connect,
+        init, login, connect,
         identities: async (request: TIdentitiesRequest): Promise<TIdentitiesResponse> => {
           return { identities: getIdentities() };
         },

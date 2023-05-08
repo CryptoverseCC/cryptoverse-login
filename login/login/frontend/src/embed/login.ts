@@ -1,12 +1,13 @@
-import { getInjectedProvider } from "web3modal";
 import {
   TInnerLoginRequest, TLoginResponse,
 } from "../services/loginProvider";
 import { signers } from "./signers";
-import { getProvider, getEthers, Window } from "./utils";
+import { Window } from "./utils";
 
 
 export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): Promise<TLoginResponse> => {
+  const getInjectedProvider = (await import(/* webpackPrefetch: true */ "web3modal")).getInjectedProvider;
+
   const sentry = (window as unknown as Window).Sentry;
   let message = `Cryptoverse Login - auth.cryptoverse.cc|${csrf}|${challenge}`;
   let signer;
@@ -31,7 +32,7 @@ export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): P
     signer = signers.default;
   }
 
-  signer = signer(getProvider(), getEthers());
+  signer = signer();
 
   let signature;
 

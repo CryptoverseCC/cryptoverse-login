@@ -7,10 +7,9 @@ export interface Window {
 }
 let ethereum = (window as unknown as Window).ethereum;
 
-const state: { identities: IIdentity[], provider: any, ethers: any } = {
+const state: { identities: IIdentity[], provider: any } = {
   identities: [],
   provider: null,
-  ethers: null,
 };
 
 export const setIdentities = (accounts: string[]) => {
@@ -31,14 +30,6 @@ export const setProvider = (provider: any) => {
 export const getProvider = () => {
   return state.provider;
 }
-
-export const setEthers = (ethers: any) => {
-  state.ethers = ethers;
-}
-export const getEthers = () => {
-  return state.ethers;
-}
-
 
 const startChangeWatcher = () => {
   if (ethereum && ethereum.on) {

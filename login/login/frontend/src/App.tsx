@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from "react";
+import React, { useEffect, useState } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import {
   ILoginProvider,
@@ -6,13 +6,14 @@ import {
   TLoginRequest,
 } from "./services/loginProvider";
 import {
+  ConnectWalletPage,
   Modes as ConnectWalletPageModes,
   ProviderList,
 } from "./components/ConnectWalletPage";
 
 import { injected, getProviderInfoByName, IProviderInfo } from "web3modal";
 import { IIdentity } from "./services/loginProvider";
-import { Modes as LoginPageModes } from "./components/LoginPage";
+import { LoginPage, Modes as LoginPageModes } from "./components/LoginPage";
 import { Loader } from "./components/Loader";
 import { CssBaseline, Grid, Paper } from "@material-ui/core";
 
@@ -206,12 +207,6 @@ const App: React.FC<AppProps> = ({
   let providers = [injectedProvider, ...walletProviders];
   let origin = loginProvider.loginData.clientId;
   let restrictions = loginProvider.loginData.restrictions;
-  const LoginPage = lazy(
-    () => import(/* webpackPreload: true */ "./components/LoginPage")
-  );
-  const ConnectWalletPage = lazy(
-    () => import(/* webpackPreload: true */ "./components/ConnectWalletPage")
-  );
   return (
     <Grid container component="main" className={`${classes.root} ${className}`}>
       <CssBaseline />
@@ -219,29 +214,25 @@ const App: React.FC<AppProps> = ({
         {loading ? (
           <Loader />
         ) : currentProvider ? (
-          <Suspense fallback={<Loader />}>
-            <LoginPage
-              origin={origin}
-              identities={identities}
-              restrictions={restrictions}
-              provider={currentProvider}
-              onLogin={onLogin}
-              onSelectWallet={onBackToSelectWallet}
-              mode={loginPageMode}
-              switchMode={setLoginPageMode}
-            ></LoginPage>
-          </Suspense>
+          <LoginPage
+            origin={origin}
+            identities={identities}
+            restrictions={restrictions}
+            provider={currentProvider}
+            onLogin={onLogin}
+            onSelectWallet={onBackToSelectWallet}
+            mode={loginPageMode}
+            switchMode={setLoginPageMode}
+          ></LoginPage>
         ) : (
-          <Suspense fallback={<Loader />}>
-            <ConnectWalletPage
-              origin={origin}
-              onConnect={onConnect}
-              providers={providers}
-              restrictions={restrictions}
-              mode={walletPageMode}
-              switchMode={setWalletPageMode}
-            />
-          </Suspense>
+          <ConnectWalletPage
+            origin={origin}
+            onConnect={onConnect}
+            providers={providers}
+            restrictions={restrictions}
+            mode={walletPageMode}
+            switchMode={setWalletPageMode}
+          />
         )}
       </Paper>
     </Grid>

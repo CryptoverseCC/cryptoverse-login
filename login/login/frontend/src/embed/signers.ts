@@ -2,7 +2,7 @@ import {
   TEthereumAddress,
   TSignature,
 } from "../services/loginProvider";
-import { getEthers } from "./utils";
+import { getProvider } from "./utils";
 
 const verify = (recoveredAddress: string, address: string) => {
   recoveredAddress = recoveredAddress.toLowerCase();
@@ -15,28 +15,30 @@ const verify = (recoveredAddress: string, address: string) => {
   return true;
 }
 
-const defaultSigner = (provider: any, ethers: any) => ({
+const defaultSigner = () => ({
   sign: async (message: string): Promise<string> => {
-    let signer = provider.getSigner();
+    let signer = getProvider().getSigner();
     let signature = await signer.signMessage(message);
     return signature;
   },
   verify: async (signature: TSignature, message: string, address: TEthereumAddress): Promise<boolean> => {
-    let recoveredAddress = ethers.utils.verifyMessage(message, signature);
+    const verifyMessage = (await import(/* webpackPrefetch: true */ 'ethers')).default.verifyMessage;
+    let recoveredAddress = verifyMessage(message, signature);
 
     return verify(recoveredAddress, address);
   }
 })
 
 
-const personalSigner = (provider: any, ethers: any) => {
+const personalSigner = () => {
   return {
     sign: async (message: string): Promise<string> => {
-      const ethers = getEthers();
+      const toUtf8Bytes = (await import(/* webpackPrefetch: true */ 'ethers')).default.toUtf8Bytes;
+      const hexlify = (await import(/* webpackPrefetch: true */ 'ethers')).default.hexlify;
+      const data = toUtf8Bytes(message);
+      const msg = hexlify(data);
 
-      const data = ethers.utils.toUtf8Bytes(message);
-      const msg = ethers.utils.hexlify(data);
-
+      const provider = getProvider();
       const signer = provider.getSigner();
       const addr = await signer.getAddress();
 
@@ -49,9 +51,8 @@ const personalSigner = (provider: any, ethers: any) => {
       return sig;
     },
     verify: async (signature: TSignature, message: string, address: TEthereumAddress): Promise<boolean> => {
-      // Now you have the digest,
-      // const recoveredPubKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
-      let recoveredAddress = ethers.utils.verifyMessage(message, signature);
+      const verifyMessage = (await import(/* webpackPrefetch: true */ 'ethers')).default.verifyMessage;
+      let recoveredAddress = verifyMessage(message, signature);
 
       recoveredAddress = recoveredAddress.toLowerCase();
 
@@ -65,14 +66,16 @@ const personalSigner = (provider: any, ethers: any) => {
   };
 }
 
-const directSigner = (provider: any, ethers: any) => {
+const directSigner = () => {
   return {
     sign: async (message: string): Promise<string> => {
-      const ethers = getEthers();
+      const toUtf8Bytes = (await import(/* webpackPrefetch: true */ 'ethers')).default.toUtf8Bytes;
+      const hexlify = (await import(/* webpackPrefetch: true */ 'ethers')).default.hexlify;
 
-      const data = ethers.utils.toUtf8Bytes(message);
-      const msg = ethers.utils.hexlify(data);
+      const data = toUtf8Bytes(message);
+      const msg = hexlify(data);
 
+      const provider = getProvider();
       const signer = provider.getSigner();
       const addr = await signer.getAddress();
 
@@ -97,9 +100,8 @@ const directSigner = (provider: any, ethers: any) => {
       return sig;
     },
     verify: async (signature: TSignature, message: string, address: TEthereumAddress): Promise<boolean> => {
-      // Now you have the digest,
-      // const recoveredPubKey = ethers.utils.recoverPublicKey(msgHashBytes, signature);
-      let recoveredAddress = ethers.utils.verifyMessage(message, signature);
+      const verifyMessage = (await import(/* webpackPrefetch: true */ 'ethers')).default.verifyMessage;
+      let recoveredAddress = verifyMessage(message, signature);
 
       recoveredAddress = recoveredAddress.toLowerCase();
 
@@ -115,7 +117,7 @@ const directSigner = (provider: any, ethers: any) => {
 
 
 export const signers: {
-  [key: string]: (provider: any, ethers: any) => {
+  [key: string]: () => {
     sign: (message: string) => Promise<string>,
     verify: (signature: TSignature, message: string, address: TEthereumAddress) => Promise<boolean>
   }
