@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from "react";
+import React, { useState, lazy, Suspense, StrictMode } from "react";
 
 import Avatar from "@material-ui/core/Avatar";
 import Box from "@material-ui/core/Box";
@@ -14,7 +14,9 @@ import { ProviderList } from "../components/ConnectWalletPage";
 import { ILoginProvider } from "../services/loginProvider";
 import { Loader } from "../components/Loader";
 
-const App = lazy(() => import(/* webpackPreload: true */ "../App"));
+const App = lazy(
+  () => import(/* webpackPreload: true, webpackChunkName: "app" */ "../App")
+);
 
 const useStyles = makeStyles((theme: Theme) => ({
   root: {
@@ -97,7 +99,7 @@ export const Background: React.FC<BackgroundProps> = ({
   const classes = useStyles();
   const [open, setOpen] = useState(false);
   return (
-    <>
+    <StrictMode>
       {!open && (
         <Grid container component="main" className={classes.root}>
           <CssBaseline />
@@ -165,6 +167,6 @@ export const Background: React.FC<BackgroundProps> = ({
           />
         </Suspense>
       )}
-    </>
+    </StrictMode>
   );
 };

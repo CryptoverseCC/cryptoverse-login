@@ -1,4 +1,4 @@
-import { getInjectedProvider, IProviderInfo } from "web3modal";
+import { IProviderInfo } from "web3modal";
 import {
   TInitRequest,
   TInitResponse,
@@ -23,6 +23,7 @@ const retryOperation = (operation: Function, delay: number, retries: number) => 
 
 
 export const init = async (request: TInitRequest): Promise<TInitResponse> => {
+  const getInjectedProvider = (await import(/* webpackPrefetch: true */ "web3modal")).getInjectedProvider;
   const sentry = (window as unknown as Window).Sentry;
 
   try {

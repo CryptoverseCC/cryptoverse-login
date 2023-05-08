@@ -173,7 +173,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               container
               xs={12}
               className={classes.help}
-              //justifyContent="center"
+              justifyContent="center"
             >
               <Typography className={classes.helpText}>
                 In this step you need to decide whish address you wan to use as

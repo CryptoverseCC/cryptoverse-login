@@ -195,7 +195,7 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               container
               xs={12}
               className={classes.help}
-              //justifyContent="center"
+              justifyContent="center"
             >
               <Typography className={classes.helpText}>
                 Hi, if you're here then you are probably wondering what you

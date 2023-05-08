@@ -4,7 +4,9 @@ import { ILoginProvider } from "../services/loginProvider";
 import { ProviderList } from "../components/ConnectWalletPage";
 import { Loader } from "../components/Loader";
 
-const App = lazy(() => import(/* webpackPreload: true */ "../App"));
+const App = lazy(
+  () => import(/* webpackPreload: true, webpackChunkName: "app" */ "../App")
+);
 
 const useStyles = makeStyles((theme: Theme) => ({
   app: {
