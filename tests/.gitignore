@@ -3,3 +3,4 @@ tools/*
 __pycache__
 assets
 geckodriver.log
+.pytest_cache

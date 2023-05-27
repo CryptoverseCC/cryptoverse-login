@@ -1,0 +1,23 @@
+domain: login-demo.cryptoverse.dev
+registry: localhost:32000/cryptoverse
+
+imagePullSecrets:
+  - name: registry-cryptoverse
+
+demo:
+  oidcRedirectUrl: https://login-demo.cryptoverse.dev/oidc/callback/
+  logoutRedirectUrl: https://login-demo.cryptoverse.dev/
+  oidc:
+    authEndpoint: https://login.cryptoverse.dev/oauth2/auth
+    # overwritten in build.yaml
+    jwksEndpoint: https://login.cryptoverse.dev/.well-known/jwks.json
+    # overwritten in build.yaml
+    tokenEndpoint: https://login.cryptoverse.dev/oauth2/token
+    # overwritten in build.yaml
+    userEndpoint: https://login.cryptoverse.dev/userinfo
+  secret: 1a96c2572fee6abd9d40baad40a10c049a8e6343b37d92a7bc1092d9529ff76213d56268 # pragma: allowlist secret
+# restrictions:
+#   - tokenAddress: "0x1dAD862095d40d43c2109370121cf087632874dB"
+#     condition: "balanceOf > 0"
+
+monitoring: false

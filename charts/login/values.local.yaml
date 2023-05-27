@@ -1,16 +1,25 @@
-sentryDSN: https://???@???.ingest.sentry.io/???
+sentryDSN: ""
+version: "Should be set in ./setup.sh shell script"
+registry: localhost:32000/cryptoverse
 
 domain: login.cryptoverse.dev
 
 hydra:
   hydra:
     config:
-      dsn: "postgres://cryptoverse:cryptopass@postgres-postgresql.default.svc.cluster.local:5432/cryptoverse-login" # pragma: allowlist secret
+      dsn: "postgresql://cryptoverse:cryptopass@postgres-postgresql.default:5432/cryptoverse-login?sslmode=disable" # pragma: allowlist secret
+      log:
+        level: debug
       secrets:
         cookie:
           - localsecretttttt # pragma: allowlist secret
         system:
           - localsecretttttt # pragma: allowlist secret
+      urls:
+        login: https://login.cryptoverse.dev/login
+        consent: https://login.cryptoverse.dev/consent
+        self:
+          issuer: https://login.cryptoverse.dev/
 
 djangoSecrets: "localsecret" # pragma: allowlist secret
 

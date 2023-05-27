@@ -27,13 +27,6 @@ spec:
     - {{ .Values.demo.logoutRedirectUrl }}
   audience:
     - audience-a
-  hydraAdmin:
-    # if hydraAdmin is specified, all of these fields are requried,
-    # but they can be empty/0
-    url: http://cryptoverse-login-hydra-admin
-    port: 4445
-    endpoint: /clients
-    forwardedProto: https
   tokenEndpointAuthMethod: client_secret_post
   metadata:
     app: {{ .Values.domain }}
