@@ -19,7 +19,7 @@ router.get("/", csrfProtection, async function (req, res, next) {
   let response;
 
   try {
-    response = await hydra.getConsentRequest(challenge);
+      response = await hydra.getOAuth2ConsentRequest({ consentChallenge: challenge });
   } catch (error) {
     console.error(error);
     next(error);
@@ -39,11 +39,19 @@ router.get("/", csrfProtection, async function (req, res, next) {
   let resp;
 
   try {
-    resp = await hydra.acceptConsentRequest(challenge, {
-      grant_scope: response.data.requested_scope,
-      grant_access_token_audience: response.requested_access_token_audience,
-      session: { id_token: userData }
-    });
+      resp = await hydra.acceptOAuth2ConsentRequest({
+          consentChallenge: challenge,
+          acceptOAuth2ConsentRequest: {
+            grant_scope: response.data.requested_scope,
+            grant_access_token_audience: response.requested_access_token_audience,
+            session: {
+              access_token: {
+                some_custom_claim: "some_custom_value",
+              },
+              id_token: userData,
+            },
+          }
+      });
   } catch (error) {
     console.error(error);
     next(error)

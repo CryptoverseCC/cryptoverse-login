@@ -1,4 +1,4 @@
-import { LoginRequest } from "@ory/hydra-client";
+import { OAuth2LoginRequest } from "@ory/client";
 import { AxiosResponse } from "axios";
 import csrf from "csurf";
 import { ethers } from "ethers";
@@ -42,10 +42,10 @@ router.get("/", csrfProtection, async function (req, res, next) {
   }
 
 
-  let hydraReqeust: AxiosResponse<LoginRequest>;
+  let hydraReqeust: AxiosResponse<OAuth2LoginRequest>;
 
   try {
-    hydraReqeust = await hydra.getLoginRequest(challenge)
+      hydraReqeust = await hydra.getOAuth2LoginRequest({ loginChallenge: challenge })
   } catch (error) {
     console.error(error);
     loginStatus.labels('error-during-init-error', 'unknown').inc(1);
@@ -94,7 +94,7 @@ router.post("/process", csrfProtection, async function (req, res, next) {
   let hydraReqeust;
 
   try {
-    hydraReqeust = await hydra.getLoginRequest(challenge);
+      hydraReqeust = await hydra.getOAuth2LoginRequest({ loginChallenge: challenge });
   } catch (error) {
     loginStatus.labels('error-retrieving-hydra-request', 'unknown').inc(1);
     next(error);
@@ -111,10 +111,10 @@ router.post("/process", csrfProtection, async function (req, res, next) {
     sig: loginData.signature
   };
 
-  const digest = ethers.utils.arrayify(
-    ethers.utils.hashMessage(data.msg)
+  const digest = ethers.getBytes(
+    ethers.hashMessage(data.msg)
   );
-  let recoveredAddress = await ethers.utils.recoverAddress(
+  let recoveredAddress = await ethers.recoverAddress(
     digest,
     data.sig
   );
@@ -140,9 +140,10 @@ router.post("/process", csrfProtection, async function (req, res, next) {
   const allow = (clientId: string) => {
     // Seems like the user authenticated! Let's tell hydra...
     hydra
-      .acceptLoginRequest(challenge, {
-        subject: `${recoveredAddress}`
-      })
+        .acceptOAuth2LoginRequest({
+            loginChallenge: challenge,
+            //subject: `${recoveredAddress}`,
+        })
       .then(function (response) {
         // All we need to do now is to redirect the user back to hydra!
         console.info(

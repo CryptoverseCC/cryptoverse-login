@@ -12,7 +12,7 @@ restrictions:
 
 */
 
-import { OAuth2Client } from "@ory/hydra-client";
+import { OAuth2Client } from "@ory/client";
 import { parser as mathParser } from "mathjs";
 import { ethers } from "ethers";
 import { readFile } from "fs";
@@ -125,19 +125,19 @@ async function balanceOf(contract: ethers.Contract, address: TAddress) {
 
   try {
     // For contracts without `decimals` function this will throw
-    decimals = await contract.functions.decimals();
+    decimals = await contract.decimals();
   } catch (error) {
     console.error(error);
   }
 
-  let final = 0;
+  let final = 0n;
 
   try {
-    const result = await contract.functions.balanceOf(address)
+    const result = await contract.balanceOf(address)
     if (result.length === 1) {
-      const balance = ethers.BigNumber.from(result[0]);
-      const a = ethers.BigNumber.from(10).pow(ethers.BigNumber.from(decimals));
-      final = balance.div(a).toNumber();
+      const balance = BigInt(result[0]);
+      const a = BigInt(10) ^ BigInt(decimals);
+      final = balance / a;
     }
   } catch (error) {
     console.error(error);

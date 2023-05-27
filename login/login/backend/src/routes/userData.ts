@@ -78,7 +78,7 @@ type UDAPIResponse = {
 }
 
 async function getUDomains(
-  provider: ethers.providers.BaseProvider,
+  provider: ethers.Provider,
   address: ETHAddress
 ): Promise<UDomain[]> {
   // TODO: ADD POLYGON NETWORK

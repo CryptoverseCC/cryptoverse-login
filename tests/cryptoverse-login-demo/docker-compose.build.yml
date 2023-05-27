@@ -1,0 +1,6 @@
+---
+services:
+  demo-python-django:
+    build: demo
+    image: "${REGISTRY}/${PROJECT}/demo-python-django:${TAG}"
+version: "3.7"

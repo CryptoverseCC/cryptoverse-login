@@ -1,4 +1,4 @@
-import { AdminApi, Configuration } from '@ory/hydra-client';
+import { Configuration, OAuth2Api } from '@ory/client';
 import axios from 'axios';
 
 axios.defaults.headers.common['X-Forwarded-Proto'] = 'https'
@@ -15,6 +15,6 @@ axios.defaults.headers.common['X-Forwarded-Proto'] = 'https'
 
 const hydraAdminUrl = process.env.HYDRA_ADMIN_URL
 
-export default new AdminApi(new Configuration({
+export default new OAuth2Api(new Configuration({
   basePath: hydraAdminUrl,
 }));

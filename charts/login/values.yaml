@@ -18,25 +18,30 @@ djangoSecrets: "!!! CHANGE THIS !!!"
 ingressClassName: nginx
 
 hydra:
-  image:
-    tag: v1.11.8
   hydra-maester:
     forwardedProto: https
+    nameOverride: hydra-maester-cryptoverse-login
+    hydraAdmin:
+      url: http://cryptoverse-login-hydra-admin.cryptoverse-login
+      port: 4445
+      endpoint: /clients
+      forwardedProto: https
   hydra: # Overrride `hydra` subchart values
-    autoMigrate: true
     existingSecret: "cryptoverse-login-hydra" # pragma: allowlist secret
+    automigration:
+      enabled: true
     config:
       log:
-        level: debug
+        level: info
         leak_sensitive_values: true
       serve:
         public:
           port: 4444
-          access_log:
+          request_log:
             disable_for_health: true
         admin:
           port: 4445
-          access_log:
+          request_log:
             disable_for_health: true
         tls:
           allow_termination_from:
@@ -81,7 +86,8 @@ login:
     port: 80
   image:
     repository: cryptoverse-login/login
-  hydraAdminUrl: http://cryptoverse-login-hydra-admin:4445
+  # TODO: remember to tie namespace to release namespace
+  hydraAdminUrl: http://cryptoverse-login-hydra-admin.cryptoverse-login:4445
   mailserverDomain: ethmail.cc
 
 wrapper:

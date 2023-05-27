@@ -9,7 +9,9 @@ import { Window, setIdentities, getProvider, setProvider } from "./utils";
 export const connect = async ({ name }: TConnectRequest): Promise<TConnectResponse> => {
   const MewConnect = await import(/* webpackPrefetch: true */ '@myetherwallet/mewconnect-web-client');
   const WalletConnectProvider = await import(/* webpackPrefetch: true */ "@walletconnect/web3-provider");
-  const BrowserProvider = (await import(/* webpackPrefetch: true */ 'ethers')).default.BrowserProvider;
+  const x = (await import(/* webpackPrefetch: true */ 'ethers'));
+  const d = x.default;
+  const BrowserProvider = x.BrowserProvider;
   const Web3Modal = (await import(/* webpackPrefetch: true */ "web3modal")).default;
   const getProviderInfoByName = (await import(/* webpackPrefetch: true */ "web3modal")).getProviderInfoByName;
 
