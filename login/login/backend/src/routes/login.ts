@@ -42,10 +42,10 @@ router.get("/", csrfProtection, async function (req, res, next) {
   }
 
 
-  let hydraReqeust: AxiosResponse<OAuth2LoginRequest>;
+  let hydraRequest: AxiosResponse<OAuth2LoginRequest>;
 
   try {
-      hydraReqeust = await hydra.getOAuth2LoginRequest({ loginChallenge: challenge })
+      hydraRequest = await hydra.getOAuth2LoginRequest({ loginChallenge: challenge })
   } catch (error) {
     console.error(error);
     loginStatus.labels('error-during-init-error', 'unknown').inc(1);
@@ -53,9 +53,9 @@ router.get("/", csrfProtection, async function (req, res, next) {
     return;
   }
 
-  const clientId = hydraReqeust.data.client.client_id;
+  const clientId = hydraRequest.data.client.client_id;
 
-  const restrictions = await getRestrictions(hydraReqeust.data.client, next);
+  const restrictions = await getRestrictions(hydraRequest.data.client, next);
 
   const renderData = {
     sourceId: "default",
@@ -66,7 +66,7 @@ router.get("/", csrfProtection, async function (req, res, next) {
     layout: false
   };
 
-  const initialURL: string = hydraReqeust.data.request_url;
+  const initialURL: string = hydraRequest.data.request_url;
 
   if (initialURL) {
     const url = new URL(initialURL);
@@ -91,17 +91,21 @@ router.post("/process", csrfProtection, async function (req, res, next) {
     return;
   }
 
-  let hydraReqeust;
+  let hydraRequest;
 
   try {
-      hydraReqeust = await hydra.getOAuth2LoginRequest({ loginChallenge: challenge });
+      hydraRequest = await hydra.getOAuth2LoginRequest({
+          loginChallenge: challenge,
+      });
   } catch (error) {
+    console.log("Hydra error")
+    console.error(error)
     loginStatus.labels('error-retrieving-hydra-request', 'unknown').inc(1);
     next(error);
     return;
   }
 
-  const clientId = hydraReqeust.data.client.client_id;
+  const clientId = hydraRequest.data.client.client_id;
 
   loginStatus.labels('login-start', clientId).inc(1);
 
@@ -142,7 +146,9 @@ router.post("/process", csrfProtection, async function (req, res, next) {
     hydra
         .acceptOAuth2LoginRequest({
             loginChallenge: challenge,
-            //subject: `${recoveredAddress}`,
+            acceptOAuth2LoginRequest: {
+                subject: `${recoveredAddress}`
+            }
         })
       .then(function (response) {
         // All we need to do now is to redirect the user back to hydra!
@@ -164,7 +170,7 @@ router.post("/process", csrfProtection, async function (req, res, next) {
   };
 
   const clientRestrictions = await getRestrictions(
-    hydraReqeust.data.client,
+    hydraRequest.data.client,
     next
   );
 
