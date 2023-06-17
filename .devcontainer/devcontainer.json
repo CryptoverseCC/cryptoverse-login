@@ -1,5 +1,5 @@
 {
-	"name": "Cryptoverse Login Demo",
+	"name": "Cryptoverse Login",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"context": "../"
@@ -21,7 +21,8 @@
 				}
 			},
             "extensions": [
-				"ms-python.python"
+				"ms-python.python",
+				"github.vscode-github-actions"
 			]
 		}
 	}

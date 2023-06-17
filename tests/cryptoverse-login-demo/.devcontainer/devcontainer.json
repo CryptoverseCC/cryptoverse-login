@@ -1,5 +1,5 @@
 {
-	"name": "Cryptoverse Login Demo",
+	"name": "Cryptoverse Login - Demo App",
 	"build": {
 		"dockerfile": "../demo/Dockerfile",
 		"target": "devcontainer",
