@@ -157,6 +157,7 @@ jobs:
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
             --set version=${{ github.sha }}
+            --set login.hydraAdminUrl=http://cryptoverse-login-hydra-admin.cryptoverse-login-${{ github.sha }}:4445
       - name: Verify connectivity
         run: |
           curl https://${DOMAIN_LOGIN}/.well-known/openid-configuration -vk
