@@ -108,7 +108,6 @@ async def test_initial(driver: webdriver.Firefox) -> None:
     switch_to(driver, "MetaMask Notification")
 
     click(driver, '//button[text()="Sign"]')
-    snap(driver, "after_wallet_sign")
     # switching to final page since switch_to waits 10s before
     # checking available windows and it has time to load
     switch_to(driver, f"Cryptoverse Login - Demo - Success")
@@ -202,7 +201,7 @@ def driver() -> Generator[webdriver.Firefox, None, None]:
     options = Options()
     options.set_capability("se:recordVideo", True)
     options.set_capability("moz:debuggerAddress", True)
-    options.headless = True
+    options.add_argument("-headless")
 
     driver = webdriver.Firefox(
         service=FirefoxService(driverpath), options=options
