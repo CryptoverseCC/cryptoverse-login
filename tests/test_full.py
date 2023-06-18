@@ -18,7 +18,7 @@ from selenium.webdriver.remote.webelement import WebElement
 Domain: TypeAlias = str
 IDToken: TypeAlias = dict[str, Any]
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 AUTH_DOMAIN = os.getenv("DOMAIN_LOGIN", "login.cryptoverse.cc")
 DEMO_APP_DOMAIN = os.getenv("DOMAIN_DEMO_APP", "login-demo.cryptoverse.cc")
@@ -32,9 +32,11 @@ class MissingWindow(Exception):
 
 
 def switch_to(driver: webdriver.Firefox, title: str) -> None:
+    time.sleep(10)
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
-        if driver.title == title:
+        logging.info(driver.title)
+        if title in driver.title:
             logging.info("Switching to: %s", driver.title)
             return
 
@@ -55,7 +57,6 @@ def get_current_domain(driver: webdriver.Firefox) -> Domain:
 def click(driver: webdriver.Firefox, xpath: str) -> None:
     button: WebElement = driver.find_element(by=By.XPATH, value=xpath)
     button.click()
-    time.sleep(1)
 
 
 snap_counter = 0
@@ -83,27 +84,22 @@ async def test_initial(driver: webdriver.Firefox) -> None:
     # Start Authentication Flow
     click(driver, '//*[text()="Login with Ethereum Wallet"]')
     assert get_current_domain(driver) == AUTH_DOMAIN
-    time.sleep(60)
     snap(driver, "login_page_loaded")
 
     # Select Wallet Type
     focus_on_auth_frame(driver)
     click(driver, '//*[text()="Ethereum Wallet"]')
-    time.sleep(1)
     snap(driver, "after_wallet_select")
 
     # Select Wallet Provider
     click(driver, '//*[text()="MetaMask"]')
-    time.sleep(1)
     snap(driver, "after_metamask_selected")
 
     switch_to(driver, "MetaMask Notification")
 
     click(driver, '//button[text()="Next"]')
     click(driver, '//button[text()="Connect"]')
-    time.sleep(5)
-    switch_to(driver, f"{DEMO_APP_DOMAIN} - Login with Ethereum Wallet")
-    time.sleep(5)
+    switch_to(driver, "Login with Ethereum Wallet")
     snap(driver, "after_wallet_connected")
 
     # Use specific address for login
@@ -112,11 +108,13 @@ async def test_initial(driver: webdriver.Firefox) -> None:
     switch_to(driver, "MetaMask Notification")
 
     click(driver, '//button[text()="Sign"]')
-    switch_to(driver, f"{DEMO_APP_DOMAIN} - Login with Ethereum Wallet")
     snap(driver, "after_wallet_sign")
+    # switching to final page since switch_to waits 10s before
+    # checking available windows and it has time to load
+    switch_to(driver, f"Cryptoverse Login - Demo - Success")
+    snap(driver, "after_wallet_sign_2")
 
     # Wait for login redirects and final page
-    time.sleep(30)
     snap(driver, "final_page_loaded")
     # Check if we logged in successfully
     element = driver.find_element(
@@ -138,7 +136,7 @@ async def test_initial(driver: webdriver.Firefox) -> None:
             "region": "Ethereum"
         },
         "aud": [
-            "login-demo.cryptoverse.local"
+            DEMO_APP_DOMAIN
         ],
         "birthdate": "",
         "email": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
@@ -204,13 +202,13 @@ def driver() -> Generator[webdriver.Firefox, None, None]:
     options = Options()
     options.set_capability("se:recordVideo", True)
     options.set_capability("moz:debuggerAddress", True)
-    options.headless = True
+    #options.headless = True
 
     driver = webdriver.Firefox(
         service=FirefoxService(driverpath), options=options
     )
     driver.install_addon(metamask_path, temporary=True)
-    driver.implicitly_wait(10)
+    driver.implicitly_wait(30)
 
     yield driver
 
