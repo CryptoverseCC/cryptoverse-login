@@ -28,9 +28,7 @@ class WalletChoice(BasePage):
 
 class ToS(BasePage):
     def next(self) -> None:
-        time.sleep(10)
         self.click("I Agree")
-        time.sleep(10)
 
 
 class ImportForm(BasePage):
