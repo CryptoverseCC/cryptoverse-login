@@ -202,7 +202,7 @@ def driver() -> Generator[webdriver.Firefox, None, None]:
     options = Options()
     options.set_capability("se:recordVideo", True)
     options.set_capability("moz:debuggerAddress", True)
-    #options.headless = True
+    options.headless = True
 
     driver = webdriver.Firefox(
         service=FirefoxService(driverpath), options=options
