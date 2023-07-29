@@ -1,4 +1,4 @@
-FROM python:3-slim
+FROM python:3.11-slim-bullseye
 
 RUN pip install Flask
 RUN pip install waitress
