@@ -14,6 +14,12 @@ $ helm upgrade cryptoverse-login ./charts/login/ -f charts/login/values.prod.yam
 ...
 ```
 
+## Run (and build) application on local microk8s
+
+```bash
+$ ./setup.sh
+```
+
 ## Run selenium tests locally
 
 ```bash
