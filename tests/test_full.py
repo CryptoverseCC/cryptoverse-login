@@ -11,7 +11,7 @@ import metamask
 import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.remote.webelement import WebElement
 
@@ -41,6 +41,7 @@ def switch_to(driver: webdriver.Firefox, title: str) -> None:
             return
 
     logging.error("Couldn't find window with title: %s", title)
+    snap(driver, f"switch_fail - {title}")
     raise MissingWindow(f"Couldn't find window with title: {title}")
 
 
@@ -70,59 +71,59 @@ def snap(driver: webdriver.Firefox, name: str) -> None:
         logging.error("Screenshot saving failed")
 
 
-async def test_initial(driver: webdriver.Firefox) -> None:
+async def test_initial(drvr: webdriver.Firefox) -> None:
     assert AUTH_DOMAIN is not None
     assert DEMO_APP_DOMAIN is not None
 
     # Setup Metamask
-    metamask.init(driver)
+    metamask.init(drvr)
 
     # Load Initial Page
-    driver.get("https://{}?auth_domain={}".format(DEMO_APP_DOMAIN, AUTH_DOMAIN))
-    snap(driver, "demo_app_loaded")
+    drvr.get("https://{}?auth_domain={}".format(DEMO_APP_DOMAIN, AUTH_DOMAIN))
+    snap(drvr, "demo_app_loaded")
 
     # Start Authentication Flow
-    click(driver, '//*[text()="Login with Ethereum Wallet"]')
-    assert get_current_domain(driver) == AUTH_DOMAIN
-    snap(driver, "login_page_loaded")
+    click(drvr, '//*[text()="Login with Ethereum Wallet"]')
+    assert get_current_domain(drvr) == AUTH_DOMAIN
+    snap(drvr, "login_page_loaded")
 
     # Select Wallet Type
-    focus_on_auth_frame(driver)
-    click(driver, '//*[text()="Ethereum Wallet"]')
-    snap(driver, "after_wallet_select")
+    focus_on_auth_frame(drvr)
+    click(drvr, '//*[text()="Ethereum Wallet"]')
+    snap(drvr, "after_wallet_select")
 
     # Select Wallet Provider
-    click(driver, '//*[text()="MetaMask"]')
-    snap(driver, "after_metamask_selected")
+    click(drvr, '//*[text()="MetaMask"]')
+    snap(drvr, "after_metamask_selected")
 
-    switch_to(driver, "MetaMask Notification")
+    switch_to(drvr, "MetaMask Notification")
 
-    click(driver, '//button[text()="Next"]')
-    click(driver, '//button[text()="Connect"]')
-    switch_to(driver, "Login with Ethereum Wallet")
-    snap(driver, "after_wallet_connected")
+    click(drvr, '//button[text()="Next"]')
+    click(drvr, '//button[text()="Connect"]')
+    switch_to(drvr, "Login with Ethereum Wallet")
+    snap(drvr, "after_wallet_connected")
 
     # Use specific address for login
-    focus_on_auth_frame(driver)
-    click(driver, '//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
-    switch_to(driver, "MetaMask Notification")
+    focus_on_auth_frame(drvr)
+    click(drvr, '//*[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]')
+    switch_to(drvr, "MetaMask Notification")
 
-    click(driver, '//button[text()="Sign"]')
+    click(drvr, '//button[text()="Sign"]')
     # switching to final page since switch_to waits 10s before
     # checking available windows and it has time to load
-    switch_to(driver, f"Cryptoverse Login - Demo - Success")
-    snap(driver, "after_wallet_sign_2")
+    switch_to(drvr, "Cryptoverse Login - Demo - Success")
+    snap(drvr, "after_wallet_sign_2")
 
     # Wait for login redirects and final page
-    snap(driver, "final_page_loaded")
+    snap(drvr, "final_page_loaded")
     # Check if we logged in successfully
-    element = driver.find_element(
+    element = drvr.find_element(
         by=By.XPATH,
         value='//span[text()="0xae89b4e1b97661dab58bee7771e95ec58fc6a94b"]',
     )
     logging.info("Login successful for: %s", element.text)
 
-    element = driver.find_element(
+    element = drvr.find_element(
         by=By.CLASS_NAME,
         value='data',
     )
@@ -187,7 +188,7 @@ async def test_initial(driver: webdriver.Firefox) -> None:
 
 
 @pytest.fixture()
-def driver() -> Generator[webdriver.Firefox, None, None]:
+def drvr() -> Generator[webdriver.Firefox, None, None]:
     currentdir = os.path.dirname(os.path.abspath(__file__))
     driverpath = os.path.join(currentdir, "tools/geckodriver")
     metamask_path = os.path.join(
@@ -195,7 +196,7 @@ def driver() -> Generator[webdriver.Firefox, None, None]:
     )
     logging.info(metamask_path)
 
-    options = Options()
+    options = FirefoxOptions()
     options.set_capability("se:recordVideo", True)
     options.set_capability("moz:debuggerAddress", True)
     options.add_argument("-headless")
