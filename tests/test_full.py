@@ -134,9 +134,6 @@ async def test_initial(driver: webdriver.Firefox) -> None:
             "country": "Cryptoverse",
             "region": "Ethereum"
         },
-        "aud": [
-            DEMO_APP_DOMAIN
-        ],
         "birthdate": "",
         "email": "0xae89b4e1b97661dab58bee7771e95ec58fc6a94b@ethmail.cc",
         "email_verified": True,
