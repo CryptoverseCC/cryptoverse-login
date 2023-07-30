@@ -23,7 +23,7 @@ const defaultSigner = () => ({
         return signature;
     },
     verify: async (signature: TSignature, message: string, address: TEthereumAddress): Promise<boolean> => {
-        const verifyMessage = (await import(/* webpackPrefetch: true */ 'ethers')).verifyMessage;
+        const verifyMessage = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-verify" */ 'ethers')).verifyMessage;
         let recoveredAddress = verifyMessage(message, signature);
 
         return verify(recoveredAddress, address);
@@ -34,8 +34,8 @@ const defaultSigner = () => ({
 const personalSigner = () => {
     return {
         sign: async (message: string, address: string): Promise<string> => {
-            const toUtf8Bytes = (await import(/* webpackPrefetch: true */ 'ethers')).toUtf8Bytes;
-            const hexlify = (await import(/* webpackPrefetch: true */ 'ethers')).hexlify;
+            const toUtf8Bytes = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-toutf" */ 'ethers')).toUtf8Bytes;
+            const hexlify = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-hex" */ 'ethers')).hexlify;
             const data = toUtf8Bytes(message);
             const msg = hexlify(data);
 
@@ -53,7 +53,7 @@ const personalSigner = () => {
             return sig;
         },
         verify: async (signature: TSignature, message: string, address: TEthereumAddress): Promise<boolean> => {
-            const verifyMessage = (await import(/* webpackPrefetch: true */ 'ethers')).verifyMessage;
+            const verifyMessage = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-verify" */ 'ethers')).verifyMessage;
             let recoveredAddress = verifyMessage(message, signature);
 
             recoveredAddress = recoveredAddress.toLowerCase();
@@ -71,9 +71,9 @@ const personalSigner = () => {
 const directSigner = () => {
     return {
         sign: async (message: string, address: string): Promise<string> => {
-            const toUtf8Bytes = (await import(/* webpackPrefetch: true */ 'ethers')).toUtf8Bytes;
-            const hexlify = (await import(/* webpackPrefetch: true */ 'ethers')).hexlify;
-            const JsonRpcSigner = (await import(/* webpackPrefetch: true */ 'ethers')).JsonRpcSigner;
+            const toUtf8Bytes = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-toutf" */ 'ethers')).toUtf8Bytes;
+            const hexlify = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-hex" */ 'ethers')).hexlify;
+            const JsonRpcSigner = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-json" */ 'ethers')).JsonRpcSigner;
 
             const data = toUtf8Bytes(message);
             const msg = hexlify(data);
@@ -91,7 +91,7 @@ const directSigner = () => {
             return sig;
         },
         verify: async (signature: TSignature, message: string, address: TEthereumAddress): Promise<boolean> => {
-            const verifyMessage = (await import(/* webpackPrefetch: true */ 'ethers')).verifyMessage;
+            const verifyMessage = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers-verify" */ 'ethers')).verifyMessage;
             let recoveredAddress = verifyMessage(message, signature);
 
             recoveredAddress = recoveredAddress.toLowerCase();

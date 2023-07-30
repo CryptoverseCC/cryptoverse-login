@@ -15,7 +15,7 @@ import { ILoginProvider } from "../services/loginProvider";
 import { Loader } from "../components/Loader";
 
 const App = lazy(
-  () => import(/* webpackPreload: true, webpackChunkName: "app" */ "../App")
+  () => import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "app" */ "../App")
 );
 
 const useStyles = makeStyles((theme: Theme) => ({

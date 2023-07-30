@@ -6,29 +6,36 @@ import {
 } from "../services/loginProvider";
 import { Window, setIdentities, getProvider, setProvider } from "./utils";
 
-import ethers from "ethers";
-
 export const connect = async ({ name }: TConnectRequest): Promise<TConnectResponse> => {
-  const MewConnect = await import(/* webpackPrefetch: true */ '@myetherwallet/mewconnect-web-client');
-  const WalletConnectProvider = await import(/* webpackPrefetch: true */ "@walletconnect/web3-provider");
-  const BrowserProvider = (await import(/* webpackPrefetch: true */ 'ethers')).BrowserProvider;
-  const Web3Modal = (await import(/* webpackPrefetch: true */ "web3modal")).default;
-  const getProviderInfoByName = (await import(/* webpackPrefetch: true */ "web3modal")).getProviderInfoByName;
+  const MewConnect = await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "mew" */ '@myetherwallet/mewconnect-web-client');
+  const WalletConnectProvider = await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "wc" */ "@walletconnect/web3-provider");
+  const BrowserProvider = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers" */ 'ethers')).BrowserProvider;
+  const Web3Modal = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal" */ "web3modal")).default;
+  const getProviderInfoByName = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal-gpi" */ "web3modal")).getProviderInfoByName;
 
-  let providerOptions = {
-    walletconnect: {
+  console.info(`Connect: name: ${name}`);
+
+  let providerOptions: any = {}
+
+  //TODO: make better condition
+  if (name == "WalletConnect") {
+    providerOptions["walletconnect"] = {
       package: WalletConnectProvider,
       options: {
         infuraId: "b14cd69b84584cc39ec753dfaf245d63", // TODO: Move to some settings
       },
-    },
-    mewconnect: {
+    }
+  }
+
+  //TODO: make better condition
+  if (name == "MEW wallet") {
+    providerOptions["mewconnect"] = {
       package: MewConnect,
       options: {
         infuraId: "b14cd69b84584cc39ec753dfaf245d63", // TODO: Move to some settings
       }
     }
-  };
+  }
 
   const sentry = (window as unknown as Window).Sentry;
 

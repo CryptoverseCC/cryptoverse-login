@@ -23,7 +23,7 @@ const retryOperation = (operation: Function, delay: number, retries: number) => 
 
 
 export const init = async (request: TInitRequest): Promise<TInitResponse> => {
-  const getInjectedProvider = (await import(/* webpackPrefetch: true */ "web3modal")).getInjectedProvider;
+  const getInjectedProvider = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal-gip" */ "web3modal")).getInjectedProvider;
   const sentry = (window as unknown as Window).Sentry;
 
   try {
