@@ -7,8 +7,8 @@ import {
 import { Window, setIdentities, getProvider, setProvider } from "./utils";
 
 export const connect = async ({ name }: TConnectRequest): Promise<TConnectResponse> => {
-  const MewConnect = await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "mew" */ '@myetherwallet/mewconnect-web-client');
-  const WalletConnectProvider = await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "wc" */ "@walletconnect/web3-provider");
+  const MewConnect = (await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "mew" */ '@myetherwallet/mewconnect-web-client')).default;
+  const WalletConnectProvider = (await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "wc" */ "@walletconnect/web3-provider")).default;
   const BrowserProvider = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers" */ 'ethers')).BrowserProvider;
   const Web3Modal = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal" */ "web3modal")).default;
   const getProviderInfoByName = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal-gpi" */ "web3modal")).getProviderInfoByName;
@@ -18,7 +18,7 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
   let providerOptions: any = {}
 
   //TODO: make better condition
-  if (name == "WalletConnect") {
+  if (name === "WalletConnect") {
     providerOptions["walletconnect"] = {
       package: WalletConnectProvider,
       options: {
@@ -28,7 +28,7 @@ export const connect = async ({ name }: TConnectRequest): Promise<TConnectRespon
   }
 
   //TODO: make better condition
-  if (name == "MEW wallet") {
+  if (name === "MEW wallet") {
     providerOptions["mewconnect"] = {
       package: MewConnect,
       options: {
