@@ -80,18 +80,11 @@
     <div id="loader"></div>
     <iframe id="auth" src=""></iframe>
     <script>
-      params = new URLSearchParams(window.location.search);
-      if (params.get("loaded")) {
         window.addEventListener("load", async (event) => {
-          await window.ready; // Wait for Comlink exposing this context
-          const iframe = document.getElementById("auth");
-          iframe.src = "{{ url|safe }}";
+            await window.ready; // Wait for Comlink exposing this context
+            const iframe = document.getElementById("auth");
+            iframe.src = "{{ url|safe }}";
         });
-      } else {
-        var url = new URL(window.location.href);
-        url.searchParams.append("loaded", "yes");
-        window.open(url, "_top");
-      }
     </script>
   </body>
 </html>

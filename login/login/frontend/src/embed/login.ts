@@ -6,7 +6,7 @@ import { Window } from "./utils";
 
 
 export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): Promise<TLoginResponse> => {
-    const getInjectedProvider = (await import(/* webpackPrefetch: true */ "web3modal")).getInjectedProvider;
+    const getInjectedProvider = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal-gip" */ "web3modal")).getInjectedProvider;
 
     const sentry = (window as unknown as Window).Sentry;
     let message = `Cryptoverse Login - auth.cryptoverse.cc|${csrf}|${challenge}`;
