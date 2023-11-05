@@ -33,6 +33,9 @@
         {{#if restrictions }}
         restrictions: JSON.parse('{{{ restrictions }}}'),
         {{/if }}
+        {{#if metadata }}
+        metadata: JSON.parse('{{{ metadata }}}'),
+        {{/if }}
       };
     </script>
   </head>
