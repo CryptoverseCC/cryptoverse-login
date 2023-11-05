@@ -2,7 +2,7 @@ sentryDSN: ""
 version: "Should be set in ./setup.sh shell script"
 registry: localhost:32000/cryptoverse
 
-domain: login.cryptoverse.dev
+domain: login.cryptoverse.local
 
 hydra:
   hydra:
@@ -16,10 +16,10 @@ hydra:
         system:
           - localsecretttttt # pragma: allowlist secret
       urls:
-        login: https://login.cryptoverse.dev/login
-        consent: https://login.cryptoverse.dev/consent
+        login: https://login.cryptoverse.local/login
+        consent: https://login.cryptoverse.local/consent
         self:
-          issuer: https://login.cryptoverse.dev/
+          issuer: https://login.cryptoverse.local/
 
 djangoSecrets: "localsecret" # pragma: allowlist secret
 

@@ -2,8 +2,8 @@
 set -e
 set -o xtrace
 
-DOMAIN_LOGIN=login.cryptoverse.dev
-DOMAIN_DEMO=login-demo.cryptoverse.dev
+DOMAIN_LOGIN=login.cryptoverse.local
+DOMAIN_DEMO=login-demo.cryptoverse.local
 
 echo "Enable DNS"
 microk8s enable dns
@@ -44,9 +44,21 @@ microk8s kubectl create namespace cryptoverse-login-demo || true
 echo "Generate certificates"
 microk8s kubectl delete secret cryptoverse-login -n cryptoverse-login --ignore-not-found --wait=true
 
-openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+cat <<EOF > local.conf
+[req]
+distinguished_name=dn
+[ dn ]
+[ ext ]
+basicConstraints=CA:FALSE,pathlen:0
+subjectAltName=DNS:$DOMAIN_LOGIN
+extendedKeyUsage=serverAuth
+EOF
+
+openssl req -x509 -new -nodes -days 1 -newkey rsa:2048 \
     -out local.crt \
     -keyout local.key \
+    -config local.conf \
+    -extensions ext \
     -subj "/CN=${DOMAIN_LOGIN}/O=Cryptoverse OU"
 
 microk8s kubectl create secret tls cryptoverse-login \
@@ -56,9 +68,21 @@ microk8s kubectl create secret tls cryptoverse-login \
 
 microk8s kubectl delete secret login-demo-tls -n cryptoverse-login-demo --ignore-not-found --wait=true
 
-openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+cat <<EOF > local-demo.conf
+[req]
+distinguished_name=dn
+[ dn ]
+[ ext ]
+basicConstraints=CA:FALSE,pathlen:0
+subjectAltName=DNS:$DOMAIN_DEMO
+extendedKeyUsage=serverAuth
+EOF
+
+openssl req -x509 -new -nodes -days 1 -newkey rsa:2048 \
     -out local-demo.crt \
     -keyout local-demo.key \
+    -config local-demo.conf \
+    -extensions ext \
     -subj "/CN=${DOMAIN_DEMO}/O=Cryptoverse OU"
 
 microk8s kubectl create secret tls login-demo-tls \
@@ -108,5 +132,5 @@ microk8s helm3 upgrade cryptoverse-login-demo ./tests/cryptoverse-login-demo/cha
     --debug
 
 
-dig login.cryptoverse.dev
-dig login-demo.cryptoverse.dev
+dig $DOMAIN_LOGIN
+dig $DOMAIN_DEMO
