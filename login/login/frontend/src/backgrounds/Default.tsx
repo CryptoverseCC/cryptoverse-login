@@ -15,7 +15,10 @@ import { ILoginProvider } from "../services/loginProvider";
 import { Loader } from "../components/Loader";
 
 const App = lazy(
-  () => import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "app" */ "../App")
+  () =>
+    import(
+      /* webpackMode: "eager", webpackPreload: true, webpackChunkName: "app" */ "../App"
+    )
 );
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -98,6 +101,7 @@ export const Background: React.FC<BackgroundProps> = ({
 }) => {
   const classes = useStyles();
   const [open, setOpen] = useState(false);
+  let origin = loginProvider.loginData.metadata?.app || loginProvider.loginData.clientId;
   return (
     <StrictMode>
       {!open && (
@@ -125,7 +129,7 @@ export const Background: React.FC<BackgroundProps> = ({
                 component="h1"
                 variant="h5"
               >
-                {loginProvider.loginData.clientId}
+                {origin}
               </Typography>
               <Typography component="h1" variant="h5">
                 with:

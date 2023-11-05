@@ -24,7 +24,9 @@ const Background: React.FC<BackgroundProps> = ({
   loginProvider,
   walletProviders,
 }) => {
-  switch (loginData.clientId) {
+  let origin =
+    loginProvider.loginData.metadata?.app || loginProvider.loginData.clientId;
+  switch (origin) {
     case "fwb.cryptoverse.cc":
       return (
         <FwBBackground

@@ -205,8 +205,10 @@ const App: React.FC<AppProps> = ({
   }, []);
 
   let providers = [injectedProvider, ...walletProviders];
-  let origin = loginProvider.loginData.clientId;
+  let clientId = loginProvider.loginData.clientId;
+  let metadata = loginProvider.loginData.metadata;
   let restrictions = loginProvider.loginData.restrictions;
+  let origin = metadata?.app || clientId;
   return (
     <Grid container component="main" className={`${classes.root} ${className}`}>
       <CssBaseline />
