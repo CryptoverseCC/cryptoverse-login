@@ -1,20 +1,12 @@
 # Cryptoverse Login
 
 ## Build
-
-```bash
-$ ./docker-build [version]
-...
-```
+Use github actions - builds on PRs
 
 ## Release
+Use github actions - releases on tags
 
-```bash
-$ helm upgrade cryptoverse-login ./charts/login/ -f charts/login/values.prod.yaml -n cryptoverse-login --install
-...
-```
-
-## Run (and build) application on local microk8s
+## Build & run application on local microk8s
 
 ```bash
 $ ./setup.sh
@@ -26,5 +18,5 @@ $ ./setup.sh
 $ cd tests
 $ source .venv/bin/activate.fish
 $ pip install -r requirements.txt --upgrade
-$ python browser.py -k TestFirefox
+$ pytest test_full.py --verbose --log-level=INFO --capture=no --log-cli-level=INFO
 ```
