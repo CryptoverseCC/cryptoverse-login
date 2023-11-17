@@ -257,14 +257,14 @@ jobs:
         if: always()
         run: |
           kubectl logs --namespace cryptoverse-login-demo-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-demo
-      - name: OAuth2Clients
+      - name: OAuth2Client
         if: always()
         run: |
           kubectl get oauth2client --namespace cryptoverse-login-demo-${{ github.sha }} -o=yaml
-      - name: Secrets
+      - name: OAuth2Client Secret
         if: always()
         run: |
-          kubectl get secrets --namespace cryptoverse-login-demo-${{ github.sha }} -o=yaml
+          kubectl get secrets cryptoverse-login-demo-oauth2client --namespace cryptoverse-login-demo-${{ github.sha }} -o=yaml
       - name: Microk8s - Gather debug info
         if: always()
         run: |
