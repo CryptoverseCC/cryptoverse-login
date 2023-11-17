@@ -221,16 +221,41 @@ jobs:
           cd tests
           pip install -r requirements.txt
           pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml --verbose --log-level=INFO --capture=no --log-cli-level=INFO
-      - name: Logs
+      - name: Pods
         if: always()
         run: |
           kubectl get pods --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
+      - name: Services
+        if: always()
+        run: |
           kubectl get services --namespace cryptoverse-login-${{ github.sha }} -o wide --show-labels
+      - name: Logs cryptoverse-login-gateway
+        if: always()
+        run: |
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-gateway
+      - name: Logs cryptoverse-login-login
+        if: always()
+        run: |
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-login
+      - name: Logs cryptoverse-login-wrapper
+        if: always()
+        run: |
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-wrapper
+      - name: Logs kubernetes.io/name=hydra
+        if: always()
+        run: |
           kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app.kubernetes.io/name=hydra
+      - name: Logs kubernetes.io/name=hydra-maester
+        if: always()
+        run: |
+            kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app.kubernetes.io/name=hydra-maester
+      - name: Pods Demo
+        if: always()
+        run: |
           kubectl get pods --namespace cryptoverse-login-demo-${{ github.sha }} -o wide --show-labels
+      - name: Logs Demo cryptoverse-login-demo
+        if: always()
+        run: |
           kubectl logs --namespace cryptoverse-login-demo-${{ github.sha }} --tail 1000 -l app=cryptoverse-login-demo
       - name: Microk8s - Gather debug info
         if: always()
