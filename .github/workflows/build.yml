@@ -149,6 +149,10 @@ jobs:
             --key local.key \
             --cert local.crt
           sleep 10s
+      - name: Helm Dependencies
+        run: |
+          helm repo add ory https://k8s.ory.sh/helm/charts
+          helm dependency build
       - name: Install Cryptoverse Login
         run: |
           helm upgrade --install --wait --timeout 10m \
