@@ -152,7 +152,7 @@ jobs:
       - name: Helm Dependencies
         run: |
           helm repo add ory https://k8s.ory.sh/helm/charts
-          helm dependency build
+          helm dependency build ./charts/login/
       - name: Install Cryptoverse Login
         run: |
           helm upgrade --install --wait --timeout 10m \
