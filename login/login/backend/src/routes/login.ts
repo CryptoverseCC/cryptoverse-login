@@ -7,7 +7,7 @@ import { Router } from "express";
 const promClient = require('prom-client');
 import fetch from 'node-fetch';
 import hydra from "../services/hydra";
-import { checkRestrictions, getRestrictions, TCheckResults } from "./restrictions";
+import { checkRestrictions, getRestrictions, TCheckResults, TRestrictions } from "./restrictions";
 
 // native prom-client metric (no prefix)
 const loginStatus = new promClient.Counter({
@@ -20,6 +20,11 @@ const loginStatus = new promClient.Counter({
 global.fetch = fetch;
 
 export const router = Router();
+
+type TMetadata = {
+    app?: string
+    restrictions?: TRestrictions
+}
 
 // Sets up csrf protection
 const csrfProtection = csrf({ cookie: true });
@@ -54,8 +59,9 @@ router.get("/", csrfProtection, async function (req, res, next) {
     }
 
     const clientId = hydraRequest.data.client.client_id;
-    const metadata = hydraRequest.data.client.metadata;
+    const metadata = hydraRequest.data.client.metadata as TMetadata;
 
+    const title = metadata.app || clientId
     const restrictions = await getRestrictions(hydraRequest.data.client, next);
 
     const renderData = {
@@ -65,6 +71,7 @@ router.get("/", csrfProtection, async function (req, res, next) {
         challenge: challenge,
         restrictions: JSON.stringify(restrictions),
         metadata: JSON.stringify(metadata),
+        title: title,
         layout: false
     };
 
