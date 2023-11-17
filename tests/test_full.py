@@ -205,7 +205,7 @@ def drvr() -> Generator[webdriver.Firefox, None, None]:
         service=FirefoxService(driverpath), options=options
     )
     driver.install_addon(metamask_path, temporary=True)
-    driver.implicitly_wait(30)
+    driver.implicitly_wait(60)
 
     yield driver
 
