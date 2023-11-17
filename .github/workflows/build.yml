@@ -248,7 +248,7 @@ jobs:
       - name: Logs kubernetes.io/name=hydra-maester
         if: always()
         run: |
-            kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app.kubernetes.io/name=hydra-maester
+          kubectl logs --namespace cryptoverse-login-${{ github.sha }} --tail 1000 -l app.kubernetes.io/name=cryptoverse-login-hydra-maester-cryptoverse-login
       - name: Pods Demo
         if: always()
         run: |
