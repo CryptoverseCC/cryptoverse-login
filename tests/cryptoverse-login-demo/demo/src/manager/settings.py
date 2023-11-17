@@ -111,8 +111,8 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_COOKIE_AGE = 5 * 60 * 60
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-OIDC_RP_CLIENT_ID = get_docker_secret("oidc", "client_id")
-OIDC_RP_CLIENT_SECRET = get_docker_secret("oidc", "client_secret")
+OIDC_RP_CLIENT_ID = get_docker_secret("oidc", "CLIENT_ID")
+OIDC_RP_CLIENT_SECRET = get_docker_secret("oidc", "CLIENT_SECRET")
 
 OIDC_OP_AUTHORIZATION_ENDPOINT = os.environ["OIDC_OP_AUTHORIZATION_ENDPOINT"]
 OIDC_OP_TOKEN_ENDPOINT = os.environ["OIDC_OP_TOKEN_ENDPOINT"]
