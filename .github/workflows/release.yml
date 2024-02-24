@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-  
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -40,6 +40,7 @@ jobs:
             --passphrase="${{ secrets.VALUES_ENCRYPTION_PASSPHRASE }}" \
             --output ./charts/login/values.prod.yaml ./charts/login/values.prod.yaml.gpg
           doctl kubernetes cluster kubeconfig save cryptoverse --expiry-seconds 300 --set-current-context
+          helm dependency update ./charts/login
           helm upgrade --install --create-namespace --atomic --wait --timeout 10m \
             cryptoverse-login \
             ./charts/login/ \
