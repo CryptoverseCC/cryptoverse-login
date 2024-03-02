@@ -120,7 +120,7 @@ export async function getRestrictions(client: OAuth2Client, next): Promise<TRest
   return clientRestrictions as TRestrictions;
 }
 
-async function balanceOf(contract: ethers.Contract, address: TAddress) {
+async function balanceOf(contract: ethers.Contract, address: TAddress): Promise<Number> {
   let decimals = 18; // 18 is default in most tokens
 
   try {
@@ -143,7 +143,13 @@ async function balanceOf(contract: ethers.Contract, address: TAddress) {
     console.error(error);
   }
 
-  return final;
+  // This may limit some cases but mathjs has problems evaluating expresions that set BigInt as value, for example:
+  // > a.set("val", 12n)
+  // 12n
+  // > a.evaluate("val > 1")
+  // Uncaught:
+  // TypeError: Unexpected type of argument in function larger (expected: Array or DenseMatrix or SparseMatrix or Matrix, actual: number, index: 1)
+  return Number(final);
 }
 
 function getContract(tokenAddress) {
