@@ -168,12 +168,15 @@ async function checkRestriction(restriction: TRestriction, address: TAddress) {
   const parser = mathParser();
   const data = {};
 
+  console.info(`Checking restriction ${restriction}`)
+
   if (restriction.contractAliases) {
     const aliases = getAliases(restriction.contractAliases);
 
     for (const alias of aliases) {
       const key = `${alias.name}balanceOf`;
       const value = await balanceOf(alias.contract, address);
+      console.info(`Restriction, setting [${key}: ${value}]`)
       data[key] = value;
       parser.set(key, value);
     }
@@ -183,8 +186,11 @@ async function checkRestriction(restriction: TRestriction, address: TAddress) {
     const key = `balanceOf`;
     const value = await balanceOf(getContract(restriction.tokenAddress), address);
     data[key] = value;
+    console.info(`Restriction, setting [${key}: ${value}]`)
     parser.set(key, value);
   }
+
+  console.info(`Restriction, evaluating [${restriction.condition}]`)
 
   const result: Boolean = parser.evaluate(restriction.condition);
 
