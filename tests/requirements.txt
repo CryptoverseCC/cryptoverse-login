@@ -1,2 +1,2 @@
-selenium>=4.x.x
-pytest-trio
+selenium>=4.20,<5
+pytest>=8,<9

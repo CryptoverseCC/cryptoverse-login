@@ -1,31 +1,64 @@
-# Setup tests environment
+# End-to-end tests
 
-## Download drivers
+`test_full.py` drives a real Firefox + MetaMask through the whole login flow
+against a deployed stack: demo RP → Sign-In with Ethereum → back to the demo,
+then asserts the issued ID-token claims.
 
-Put driver executables in `tools` directory
+## 1. Bring up a local cluster (kind)
 
-- [Firefox](https://github.com/mozilla/geckodriver/releases)
-- [Chrome](https://sites.google.com/a/chromium.org/chromedriver/downloads)
-- [Opera](https://github.com/operasoftware/operachromiumdriver/releases)
-
-## Create python virtualenv
-
-virtualenv directory should be cryptoverse-login/tests/.venv
+See [`kind/README.md`](kind/README.md):
 
 ```bash
-$ cd tests
-$ python3 -m venv .venv
-$ source .venv/bin/activte.fish
-$ pip install selenium
-...
+tests/kind/setup.sh
 ```
 
-## Run tests
+This deploys the real charts (gateway + login + wrapper + Ory Hydra 2.x) and the
+demo app on a local kind cluster and prints the exact test command, e.g.:
 
-In activated virtualenv:
+```
+DOMAIN_LOGIN=login.127.0.0.1.nip.io DOMAIN_DEMO_APP=demo.127.0.0.1.nip.io \
+  pytest test_full.py -v --log-cli-level=INFO
+```
+
+## 2. Test prerequisites
+
+- **geckodriver** in `tests/tools/` (already vendored; update from
+  [releases](https://github.com/mozilla/geckodriver/releases) if your Firefox is
+  newer).
+- **MetaMask** is pinned to `extensions/metamask-firefox-9.1.0.zip` — the page
+  selectors in `metamask/pages.py` match that version, so don't bump it casually.
+- Python deps:
 
 ```bash
-$ cd tests
-$ python browser.py
-...
+cd tests
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
 ```
+
+## 3. Run
+
+```bash
+DOMAIN_LOGIN=login.127.0.0.1.nip.io DOMAIN_DEMO_APP=demo.127.0.0.1.nip.io \
+  pytest test_full.py -v --log-cli-level=INFO
+```
+
+Env vars:
+
+| var | default | meaning |
+|---|---|---|
+| `DOMAIN_LOGIN` | `login.cryptoverse.cc` | the IdP host |
+| `DOMAIN_DEMO_APP` | `login-demo.cryptoverse.cc` | the demo RP host |
+| `ASSETS_PATH` | `./assets` | screenshots are written here |
+| `HEADLESS` | `1` | set `0` to watch the browser |
+
+The test seeds MetaMask from a fixed mnemonic (account
+`0xae89b4e1b97661dab58bee7771e95ec58fc6a94b`) and verifies the ID token's `sub`,
+generated email, and ENS/UD name structure.
+
+## Notes
+
+- The login message is now **EIP-4361 (Sign-In with Ethereum)**; the Selenium
+  flow is unchanged (MetaMask still shows a "Sign" button for `personal_sign`).
+- Self-signed certs are accepted via `acceptInsecureCerts` (set in the fixture).
+- `mobile.py` is an unmaintained WalletConnect/mobile experiment, not part of the
+  suite.

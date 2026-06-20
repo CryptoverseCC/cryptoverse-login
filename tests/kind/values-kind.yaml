@@ -1,0 +1,52 @@
+# Login chart overrides for the local kind cluster.
+# Mirrors the known-working CI config (Hydra dsn=memory, inline secrets,
+# dangerousForceHttp behind the TLS-terminating ingress) with kind specifics.
+# Domains use nip.io (resolve to 127.0.0.1, no /etc/hosts needed); the ingress
+# is on standard 443 because the gateway hardcodes the public origin as
+# https://${DOMAIN} (no port).
+
+sentryDSN: ""
+sentryEnv: "kind"
+domain: login.127.0.0.1.nip.io
+
+registry: localhost
+version: test
+imagePullPolicy: Never
+imagePullSecrets: []
+
+ingressClassName: nginx
+
+# No mainnet RPC keys locally; ENS/Unstoppable Domains lookups are best-effort
+# and resolve to empty for the test account.
+infuraApiKey: ""
+alchemyApiKey: ""
+
+djangoSecrets: "localsecret" # pragma: allowlist secret
+
+introspectAccess:
+  user: "localuser" # pragma: allowlist secret
+  pass: "$5$8kkgRZ7KA7$wYpOtm2YBFDcp.uP8nKMcp1Y9BInU.T9GMpUer.hUE." # pragma: allowlist secret
+
+monitoring:
+  enabled: false
+
+debug: false
+
+login:
+  mailserverDomain: ethmail.cc
+
+hydra:
+  hydra:
+    dangerousForceHttp: true
+    config:
+      dsn: "memory"
+      urls:
+        login: https://login.127.0.0.1.nip.io/login
+        consent: https://login.127.0.0.1.nip.io/consent
+        self:
+          issuer: https://login.127.0.0.1.nip.io/
+      secrets:
+        cookie:
+          - localsecretttttt # pragma: allowlist secret
+        system:
+          - localsecretttttt # pragma: allowlist secret

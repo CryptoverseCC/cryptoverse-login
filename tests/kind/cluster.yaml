@@ -1,0 +1,18 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: cryptoverse-login
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    # The gateway hardcodes the public origin as https://${DOMAIN} (no port), so
+    # the ingress must be on standard 443. Rootless podman binding 443 needs
+    # `sudo sysctl net.ipv4.ip_unprivileged_port_start=443` (setup.sh checks it).
+    extraPortMappings:
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP

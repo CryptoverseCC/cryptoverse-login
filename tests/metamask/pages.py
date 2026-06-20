@@ -39,8 +39,6 @@ class ImportForm(BasePage):
     def next(self) -> None:
         pas = "selenium_tests"
 
-        self.driver.save_screenshot("screenshots/password.png")
-
         self.fill_field(
             By.XPATH,
             '//input[@type="password"]',

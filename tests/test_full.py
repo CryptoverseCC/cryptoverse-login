@@ -4,7 +4,6 @@ import os
 import time
 from pathlib import Path
 from typing import Generator, TypeAlias, Any
-from unittest import TestCase
 from urllib.parse import urlparse
 
 import metamask
@@ -71,7 +70,15 @@ def snap(driver: webdriver.Firefox, name: str) -> None:
         logging.error("Screenshot saving failed")
 
 
-async def test_initial(drvr: webdriver.Firefox) -> None:
+def assert_subset(expected: dict, actual: dict) -> None:
+    """Assert every key/value in `expected` is present and equal in `actual`
+    (replaces unittest.assertDictContainsSubset, removed in Python 3.12)."""
+    for key, value in expected.items():
+        assert key in actual, f"id_token missing key: {key!r}"
+        assert actual[key] == value, f"id_token[{key!r}] = {actual[key]!r}, expected {value!r}"
+
+
+def test_initial(drvr: webdriver.Firefox) -> None:
     assert AUTH_DOMAIN is not None
     assert DEMO_APP_DOMAIN is not None
 
@@ -130,7 +137,7 @@ async def test_initial(drvr: webdriver.Firefox) -> None:
 
     id_token: IDToken = json.loads(element.text)
 
-    TestCase().assertDictContainsSubset({
+    assert_subset({
         "address": {
             "country": "Cryptoverse",
             "region": "Ethereum"
@@ -199,7 +206,10 @@ def drvr() -> Generator[webdriver.Firefox, None, None]:
     options = FirefoxOptions()
     options.set_capability("se:recordVideo", True)
     options.set_capability("moz:debuggerAddress", True)
-    options.add_argument("-headless")
+    # The local kind stack uses self-signed certs (see tests/kind/).
+    options.accept_insecure_certs = True
+    if os.getenv("HEADLESS", "1") != "0":
+        options.add_argument("-headless")
 
     driver = webdriver.Firefox(
         service=FirefoxService(driverpath), options=options
