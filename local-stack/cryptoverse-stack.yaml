@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cryptoverse-stack
+  labels:
+    app: cryptoverse-stack
+spec:
+  # Containers in a pod share one network namespace, so they reach each other
+  # via 127.0.0.1:<port> (mirrors the Helm chart's service wiring). Only the
+  # gateway (8000) and Hydra admin (4445) are published to the host.
+  restartPolicy: Always
+  containers:
+    - name: postgres
+      image: docker.io/library/postgres:16-alpine
+      imagePullPolicy: IfNotPresent
+      env:
+        - { name: POSTGRES_USER, value: hydra }
+        - { name: POSTGRES_PASSWORD, value: hydrapw } # pragma: allowlist secret
+        - { name: POSTGRES_DB, value: hydra }
+
+    - name: hydra
+      image: docker.io/oryd/hydra:v2.3.0
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c"]
+      # Wait for postgres (retry migration), then serve public+admin in dev mode
+      # (dev mode permits the http issuer used locally).
+      args:
+        - "until hydra migrate sql up -e --yes; do echo 'waiting for db...'; sleep 2; done; hydra serve all --dev"
+      ports:
+        - { containerPort: 4445, hostPort: 4445 }
+      env:
+        - { name: DSN, value: "postgres://hydra:hydrapw@127.0.0.1:5432/hydra?sslmode=disable" } # pragma: allowlist secret
+        - { name: SECRETS_SYSTEM, value: "this-is-a-very-long-dev-system-secret-0123456789" } # pragma: allowlist secret
+        - { name: URLS_SELF_ISSUER, value: "http://login.cryptoverse.local:8000/" }
+        - { name: URLS_LOGIN, value: "http://login.cryptoverse.local:8000/login" }
+        - { name: URLS_CONSENT, value: "http://login.cryptoverse.local:8000/consent" }
+        - { name: LOG_LEVEL, value: "info" }
+
+    - name: login
+      image: localhost/cryptoverse-login/login:test
+      imagePullPolicy: Never
+      env:
+        - { name: PORT, value: "3001" }
+        - { name: HYDRA_ADMIN_URL, value: "http://127.0.0.1:4445" }
+        - { name: DOMAIN, value: "login.cryptoverse.local" }
+        - { name: MAILSERVER_DOMAIN, value: "ethmail.cc" }
+        - { name: SENTRY_DSN, value: "" }
+        - { name: SENTRY_ENV, value: "local" }
+        - { name: VERSION, value: "stack" }
+
+    - name: wrapper
+      image: localhost/cryptoverse-login/wrapper:test
+      imagePullPolicy: Never
+      env:
+        - { name: PORT, value: "3002" }
+        - { name: DOMAIN, value: "login.cryptoverse.local" }
+        - { name: SENTRY_DSN, value: "" }
+        - { name: SENTRY_ENV, value: "local" }
+        - { name: VERSION, value: "stack" }
+
+    - name: gateway
+      image: localhost/cryptoverse-login/gateway:test
+      imagePullPolicy: Never
+      ports:
+        - { containerPort: 8000, hostPort: 8000 }
+      env:
+        - { name: PORT, value: "8000" }
+        - { name: DOMAIN, value: "login.cryptoverse.local" }
+        - { name: HYDRA_PUBLIC_SERVICE, value: "127.0.0.1:4444" }
+        - { name: HYDRA_ADMIN_SERVICE, value: "127.0.0.1:4445" }
+        - { name: LOGIN_SERVICE, value: "127.0.0.1:3001" }
+        - { name: WRAPPER_SERVICE, value: "127.0.0.1:3002" }
+        - { name: INTROSPECT_ACCESS_USER, value: "introspect" }
+        - { name: INTROSPECT_ACCESS_PASS, value: "introspectpw" } # pragma: allowlist secret

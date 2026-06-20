@@ -11,7 +11,7 @@ const OperaETHAddress = "0x6be450972b30891b16c8588dcbc10c8c2aef04da";
 
 const OperaLoginProvider: ILoginProvider = {
   loginData: {
-    csrf: "csrf",
+    siwe: { domain: "login.cryptoverse.cc", uri: "https://login.cryptoverse.cc/", statement: "Sign in to Cryptoverse Login", version: "1", chainId: 1, nonce: "0123456789abcdef", expirationMinutes: 10 },
     challenge: "challange",
     sourceId: "default",
     clientId: "test-source.com",
@@ -41,7 +41,7 @@ const OperaLoginProvider: ILoginProvider = {
   login: async ({ address }: TLoginRequest) => {
     return {
       signature: "fake-signature",
-      csrf: "fake-csrf",
+      message: "fake-message",
       challenge: "fake-challenge",
       address: address,
     };
@@ -50,7 +50,7 @@ const OperaLoginProvider: ILoginProvider = {
 
 const MissingLoginProvider: ILoginProvider = {
   loginData: {
-    csrf: "csrf",
+    siwe: { domain: "login.cryptoverse.cc", uri: "https://login.cryptoverse.cc/", statement: "Sign in to Cryptoverse Login", version: "1", chainId: 1, nonce: "0123456789abcdef", expirationMinutes: 10 },
     challenge: "challange",
     sourceId: "default",
     clientId: "test-source.com",
@@ -79,7 +79,7 @@ const MissingLoginProvider: ILoginProvider = {
   },
   login: async ({ address }: TLoginRequest) => ({
     signature: "fake-signature",
-    csrf: "fake-csrf",
+    message: "fake-message",
     challenge: "fake-challenge",
     address: address,
   }),

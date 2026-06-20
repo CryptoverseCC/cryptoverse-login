@@ -15,6 +15,18 @@ export type TAppName = string
 export type TCondition = string;
 export type TMessage = string;
 
+// EIP-4361 (Sign-In with Ethereum) parameters supplied by the backend in
+// `loginData.siwe`. The frontend assembles the canonical message from these.
+export type TSiweParams = {
+    domain: string;
+    uri: string;
+    statement: string;
+    version: string;
+    chainId: number;
+    nonce: string;
+    expirationMinutes: number;
+}
+
 export type TRestriction = {
     tokenAddress: TTokenAddress;
     condition: TCondition;
@@ -29,7 +41,7 @@ export type TMetadata = {
 }
 
 export type TLoginData = {
-    csrf: TCSRF
+    siwe: TSiweParams
     challenge: TChallenge
     sourceId: TSourceId
     clientId: TClientId
@@ -37,7 +49,10 @@ export type TLoginData = {
     metadata?: TMetadata
 };
 
-export const loginData = (window as any).loginData as TLoginData;
+// Login data is rendered by the backend into a `<script type="application/json"
+// id="login-data">` block in index.html; parse it here.
+const loginDataElement = typeof document !== "undefined" ? document.getElementById("login-data") : null;
+export const loginData = JSON.parse(loginDataElement?.textContent || "{}") as TLoginData;
 
 export interface IIdentity {
     name: string;
@@ -69,8 +84,10 @@ export type TIdentitiesResponse = {
 
 
 export type TLoginResponse = {
+    // The full EIP-4361 message that was signed, posted to the backend for
+    // verification (which re-derives the expected nonce from the challenge).
+    message: TMessage;
     signature: TSignature;
-    csrf: TCSRF;
     challenge: TChallenge;
     address: TEthereumAddress;
 } | null
@@ -82,7 +99,7 @@ export type TLoginRequest = {
 
 export type TInnerLoginRequest = {
     address: TEthereumAddress
-    csrf: TCSRF
+    siwe: TSiweParams
     challenge: TChallenge
 }
 
@@ -117,7 +134,7 @@ function identities(request: TIdentitiesRequest) {
 function login(request: TLoginRequest) {
     return channel.loginProvider.login({
         address: request.address,
-        csrf: loginData.csrf,
+        siwe: loginData.siwe,
         challenge: loginData.challenge,
     });
 }

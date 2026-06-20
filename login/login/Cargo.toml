@@ -1,0 +1,26 @@
+[package]
+name = "login"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "login"
+path = "src/main.rs"
+
+[dependencies]
+cryptoverse-core.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+minijinja.workspace = true
+sentry.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+alloy.workspace = true
+evalexpr.workspace = true

@@ -1,0 +1,14 @@
+# Build artifacts and deps — never needed in the Docker build context.
+**/target
+**/node_modules
+login/frontend/build
+login/frontend/storybook-static
+
+# Legacy services replaced by this workspace.
+login/backend
+restrictions
+
+# VCS / editor / misc
+.git
+**/*.log
+**/.DS_Store

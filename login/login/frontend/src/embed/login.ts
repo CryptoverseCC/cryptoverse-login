@@ -1,15 +1,38 @@
 import {
-    TInnerLoginRequest, TLoginResponse,
+    TInnerLoginRequest, TLoginResponse, TSiweParams,
 } from "../services/loginProvider";
+import { getAddress } from "ethers";
 import { signers } from "./signers";
 import { Window } from "./utils";
 
+// Assemble a canonical EIP-4361 (Sign-In with Ethereum) message. Both this and
+// the backend's Rust `siwe` verifier implement EIP-4361, so they interoperate.
+// The nonce is supplied by the backend, bound to the Hydra login challenge, so
+// the signature can only be used for this one login flow.
+function buildSiweMessage(address: string, p: TSiweParams): string {
+    const checksummed = getAddress(address);
+    const issuedAt = new Date();
+    const expirationTime = new Date(issuedAt.getTime() + p.expirationMinutes * 60_000);
+    return [
+        `${p.domain} wants you to sign in with your Ethereum account:`,
+        checksummed,
+        "",
+        p.statement,
+        "",
+        `URI: ${p.uri}`,
+        `Version: ${p.version}`,
+        `Chain ID: ${p.chainId}`,
+        `Nonce: ${p.nonce}`,
+        `Issued At: ${issuedAt.toISOString()}`,
+        `Expiration Time: ${expirationTime.toISOString()}`,
+    ].join("\n");
+}
 
-export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): Promise<TLoginResponse> => {
+export const login = async ({ address, siwe, challenge }: TInnerLoginRequest): Promise<TLoginResponse> => {
     const getInjectedProvider = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal-gip" */ "web3modal")).getInjectedProvider;
 
     const sentry = (window as unknown as Window).Sentry;
-    let message = `Cryptoverse Login - auth.cryptoverse.cc|${csrf}|${challenge}`;
+    const message = buildSiweMessage(address, siwe);
     let signer;
 
     const pp = getInjectedProvider();
@@ -24,14 +47,10 @@ export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): P
     }));
 
     if (pp) {
-        console.log(pp);
-        console.log(signers);
         const name = pp.name.toLowerCase();
-        console.log(name);
         signer = signers[name];
-        console.log(signer);
     } else {
-        console.warn("No named signeer")
+        console.warn("No named signer");
     }
 
     if (!signer) {
@@ -50,7 +69,6 @@ export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): P
         return null;
     }
 
-
     try {
         await signer.verify(signature, message, address);
     } catch (error) {
@@ -58,15 +76,10 @@ export const login = async ({ address, csrf, challenge }: TInnerLoginRequest): P
         return null;
     }
 
-    try {
-        return {
-            signature,
-            csrf,
-            challenge,
-            address,
-        };
-    } catch (error) {
-        sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
-        return null;
-    }
+    return {
+        message,
+        signature,
+        challenge,
+        address,
+    };
 };

@@ -1,60 +1,65 @@
-FROM node:alpine AS builder
+# syntax=docker/dockerfile:1
+#
+# Build context is the Cargo workspace root (`login/`), because the `login`
+# binary and the shared `core` crate live in the same workspace.
+#   docker build -f login/Dockerfile <repo>/login
 
-RUN apk add --no-cache \
-  git \
-  python3 \
-  alpine-sdk \
-  make \
-  g++ \
-  jpeg-dev \
-  cairo-dev \
-  giflib-dev \
-  pango-dev
-
-RUN mkdir -p /tmp/builder
-WORKDIR /tmp/builder
-
-FROM builder as devcontainer
-
-WORKDIR /workspace
-
-FROM builder as frontendBuilder
-
+############################################
+# Stage 1 — build the React/TS SPA (thin)  #
+############################################
+FROM node:20-bookworm-slim AS frontend
+# Native build deps kept from the previous image so optional native modules in
+# the production dependency tree still compile.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git python3 make g++ pkg-config \
+    libcairo2-dev libpango1.0-dev libgif-dev libjpeg-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
 ENV NODE_ENV=production
-
-COPY frontend/package.json .
-COPY frontend/yarn.lock .
-RUN yarn install --only=production
-COPY frontend .
-# Workaround for lack of storybook installed
+COPY login/frontend/package.json login/frontend/yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY login/frontend ./
+# Storybook is a dev-only dependency and not installed in this image.
 RUN rm -rf src/stories
 RUN yarn build
+# Output: /build/build/{static/, sentry.min.js, index.html, ...}
 
+############################################
+# Stage 2 — build the Rust `login` binary  #
+############################################
+FROM rust:1.95-bookworm AS backend
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY core ./core
+COPY login/Cargo.toml ./login/Cargo.toml
+COPY login/src ./login/src
+COPY wrapper ./wrapper
+# Compile only the login binary (its deps include the shared core crate).
+RUN cargo build --release -p login
 
-FROM builder as backendBuilder
-
-COPY backend/package.json .
-COPY backend/yarn.lock .
-RUN yarn
-COPY backend .
-RUN npx webpack
-
-
-FROM node:alpine as final
-
-RUN apk add --no-cache dumb-init
-
-ENV NODE_ENV=production
-
-RUN mkdir -p /app
+############################################
+# Stage 3 — runtime                        #
+############################################
+FROM debian:bookworm-slim AS final
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home app
 WORKDIR /app
 
-COPY --chown=node:node --from=backendBuilder /tmp/builder/build/ /app/
-COPY --chown=node:node --from=frontendBuilder /tmp/builder/build/ /app/public/login/
+COPY --from=backend /src/target/release/login /usr/local/bin/login
+# The SPA is served under the `/login` URL prefix, so place the build at
+# public/login. `index.html` is the dynamic minijinja template — move it out of
+# the static tree into templates/.
+COPY --from=frontend /build/build /app/public/login
+RUN mkdir -p /app/templates \
+    && mv /app/public/login/index.html /app/templates/index.html \
+    && chown -R app:app /app
 
-RUN mkdir -p /app/views/
-RUN mv /app/public/login/index.html /app/views/index.html
-
-USER node
-
-CMD ["dumb-init", "node", "--enable-source-maps", "/app/server.js"]
+ENV STATIC_DIR=/app/public \
+    INDEX_TEMPLATE=/app/templates/index.html \
+    PORT=3000
+USER app
+EXPOSE 3000
+ENTRYPOINT ["tini", "--"]
+CMD ["login"]

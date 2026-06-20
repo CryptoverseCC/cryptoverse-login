@@ -89,7 +89,7 @@ const App: React.FC<AppProps> = ({
       return;
     }
     try {
-      let { signature, csrf, challenge, address } = resp;
+      let { message, signature, challenge } = resp;
 
       const addInput = (form: HTMLFormElement, name: string, value: string) => {
         const input = document.createElement("input");
@@ -103,9 +103,8 @@ const App: React.FC<AppProps> = ({
       form.method = "POST";
       form.action = "/login/process";
 
-      addInput(form, "_csrf", csrf);
       addInput(form, "challenge", challenge);
-      addInput(form, "address", address);
+      addInput(form, "message", message);
       addInput(form, "signature", signature);
       addInput(form, "response", "api");
 

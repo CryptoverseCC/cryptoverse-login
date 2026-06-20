@@ -24,14 +24,14 @@ Base.args = {
     init: async () => ({ name: "" }),
     login: async () => ({
       signature: "",
-      csrf: "",
+      message: "",
       address: "",
       challenge: "",
     }),
     connect: async () => ({ identities: [] }),
     identities: async () => ({ identities: [] }),
     loginData: {
-      csrf: "",
+      siwe: { domain: "login.cryptoverse.cc", uri: "https://login.cryptoverse.cc/", statement: "Sign in to Cryptoverse Login", version: "1", chainId: 1, nonce: "0123456789abcdef", expirationMinutes: 10 },
       challenge: "",
       sourceId: "",
       clientId: "web.ethmail.cc",

@@ -4,9 +4,15 @@ services:
     build: login/gateway
     image: "${REGISTRY}/${PROJECT}/gateway:${TAG}"
   login:
-    build: login/login
+    # Context is the Cargo workspace root; the binary and shared `core` crate
+    # live together, so the build must see the whole workspace.
+    build:
+      context: login
+      dockerfile: login/Dockerfile
     image: "${REGISTRY}/${PROJECT}/login:${TAG}"
   wrapper:
-    build: login/wrapper
+    build:
+      context: login
+      dockerfile: wrapper/Dockerfile
     image: "${REGISTRY}/${PROJECT}/wrapper:${TAG}"
 version: "3.7"

@@ -1,3 +1,6 @@
 # PyCharm
 .idea/
 *.code-workspace
+
+# Local environment / secrets
+.env

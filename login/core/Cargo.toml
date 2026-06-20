@@ -1,0 +1,29 @@
+[package]
+name = "cryptoverse-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+sentry.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+siwe.workspace = true
+alloy.workspace = true
+evalexpr.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true }
+alloy = { workspace = true, features = ["signer-local", "signers"] }

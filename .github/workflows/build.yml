@@ -55,7 +55,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: login/login
+          # Context is the Cargo workspace root (shared `core` crate).
+          context: login
+          file: login/login/Dockerfile
           push: true
           tags: "${{ env.REGISTRY }}/${{ env.PROJECT }}/login:${{ github.sha }}"
           cache-from: type=gha
@@ -76,7 +78,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: login/wrapper
+          context: login
+          file: login/wrapper/Dockerfile
           push: true
           tags: "${{ env.REGISTRY }}/${{ env.PROJECT }}/wrapper:${{ github.sha }}"
           cache-from: type=gha
@@ -152,7 +155,7 @@ jobs:
       - name: Helm Dependencies
         run: |
           helm repo add ory https://k8s.ory.sh/helm/charts
-          helm dependency build ./charts/login/
+          helm dependency update ./charts/login/
       - name: Install Cryptoverse Login
         run: |
           helm upgrade --install --wait --timeout 10m \
