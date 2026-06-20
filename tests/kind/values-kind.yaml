@@ -1,6 +1,6 @@
-# Login chart overrides for the local kind cluster.
-# Mirrors the known-working CI config (Hydra dsn=memory, inline secrets,
-# dangerousForceHttp behind the TLS-terminating ingress) with kind specifics.
+# Login chart overrides for the local kind cluster — production-faithful:
+# Postgres-backed Hydra (not in-memory), cert-manager TLS via the chart's
+# cryptoverse-common ClusterIssuer, dangerousForceHttp behind the TLS ingress.
 # Domains use nip.io (resolve to 127.0.0.1, no /etc/hosts needed); the ingress
 # is on standard 443 because the gateway hardcodes the public origin as
 # https://${DOMAIN} (no port).
@@ -24,8 +24,8 @@ alchemyApiKey: ""
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
 introspectAccess:
-  user: "localuser" # pragma: allowlist secret
-  pass: "$5$8kkgRZ7KA7$wYpOtm2YBFDcp.uP8nKMcp1Y9BInU.T9GMpUer.hUE." # pragma: allowlist secret
+  user: "introspect" # pragma: allowlist secret
+  pass: "introspectpw" # pragma: allowlist secret
 
 monitoring:
   enabled: false
@@ -38,8 +38,12 @@ login:
 hydra:
   hydra:
     dangerousForceHttp: true
+    # Production-faithful: a real Postgres (see postgres.yaml), with the chart's
+    # automigration running `hydra migrate sql` before serving.
+    automigration:
+      enabled: true
     config:
-      dsn: "memory"
+      dsn: "postgresql://hydra:hydrapw@postgres:5432/hydra?sslmode=disable" # pragma: allowlist secret
       urls:
         login: https://login.127.0.0.1.nip.io/login
         consent: https://login.127.0.0.1.nip.io/consent

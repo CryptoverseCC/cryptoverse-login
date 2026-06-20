@@ -1,0 +1,59 @@
+# Postgres for Hydra — production uses a real SQL database (managed Postgres),
+# so the local cluster does too (not Hydra's in-memory store). Ephemeral
+# (emptyDir): the goal is engine + migration parity, not data persistence.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres
+  namespace: cryptoverse-login
+stringData:
+  POSTGRES_USER: hydra
+  POSTGRES_PASSWORD: hydrapw # pragma: allowlist secret
+  POSTGRES_DB: hydra
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: cryptoverse-login
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:16-alpine
+          envFrom:
+            - secretRef:
+                name: postgres
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "hydra"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: cryptoverse-login
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
