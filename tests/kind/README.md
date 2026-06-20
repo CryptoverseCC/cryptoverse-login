@@ -9,7 +9,7 @@ with the real deploy and prove correctness:
 - **Postgres-backed Hydra** (not in-memory) with the chart's automigration
 - **cert-manager** issuing the ingress TLS via the `cryptoverse-common`
   ClusterIssuer — the chart annotations work unmodified
-- **ingress-nginx** on `:443`, `nip.io` domains
+- **ingress-nginx** on host `:9443` (→ node `:443`), `nip.io` domains
 - optional Prometheus (`WITH_MONITORING=1`)
 
 Validate it with the [`tests/harness/`](../harness/) suite (fast, no browser) and
@@ -17,26 +17,27 @@ the Selenium browser/wallet test (`../test_full.py`).
 
 ## One-time host prerequisites
 
-A kind node and a rootless `:443` bind need two sysctls (kind nodes are
-inotify-heavy, and rootless podman can't bind ports `<1024`):
+A kind node needs plenty of inotify instances (one sysctl, needs root):
 
 ```bash
 sudo sysctl -w fs.inotify.max_user_instances=512 fs.inotify.max_user_watches=524288
-sudo sysctl -w net.ipv4.ip_unprivileged_port_start=443
 # persist (optional):
-echo -e "fs.inotify.max_user_instances=512\nfs.inotify.max_user_watches=524288\nnet.ipv4.ip_unprivileged_port_start=443" \
+echo -e "fs.inotify.max_user_instances=512\nfs.inotify.max_user_watches=524288" \
   | sudo tee /etc/sysctl.d/99-kind-cryptoverse.conf
 ```
 
-`setup.sh` checks both and exits with the exact command if they're not set.
-`:443` must be free (other kind clusters usually use high ports, so no clash).
+`setup.sh` checks it and exits with the exact command if it isn't set. **No port
+sysctl is needed** — the ingress is published on the high host port `9443` (→
+node `443`), which rootless podman can bind.
 
-### Why :443 (not a high port)
+### Domain/port-agnostic
 
-The gateway rewrites Hydra's consent redirect to `https://${DOMAIN}/oauth2/final`
-with **no port**, and nginx strips the port from the upstream `Host` header — so
-the public origin must be standard `:443`. Keeping it on 443 means the charts run
-**unmodified** (production-faithful).
+The services have no hardcoded domain, port, or scheme: the gateway, login, and
+wrapper all derive the public origin from the request the ingress forwards
+(`X-Forwarded-Host` / `X-Forwarded-Proto`, falling back to `Host`). So the system
+works on whatever host:port the ingress is configured for — here
+`login.127.0.0.1.nip.io:9443`. Hydra's issuer is the one fixed value (an OIDC
+requirement), set in `values-kind.yaml`.
 
 ## Run
 
@@ -53,7 +54,7 @@ prints the exact harness + Selenium commands when it finishes.
 
 | file | purpose |
 |---|---|
-| `cluster.yaml` | kind cluster (ingress-ready node, host `:443` → node `:443`) |
+| `cluster.yaml` | kind cluster (ingress-ready node, host `:9443` → node `:443`) |
 | `postgres.yaml` | Postgres for Hydra |
 | `clusterissuer.yaml` | self-signed `cryptoverse-common` ClusterIssuer (cert-manager) |
 | `values-kind.yaml` | login chart overrides (nip.io domain, local images, Postgres DSN) |

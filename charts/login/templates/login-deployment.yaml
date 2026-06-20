@@ -29,8 +29,8 @@ spec:
               value: {{ .Values.login.hydraAdminUrl }}
             - name: MAILSERVER_DOMAIN
               value: {{ .Values.login.mailserverDomain }}
-            - name: DOMAIN
-              value: {{ .Values.domain }}
+            - name: PROFILE_DOMAIN
+              value: {{ .Values.login.profileDomain | default "cryptoverse.cc" }}
             - name: PORT
               value: {{ .Values.login.deployment.port | quote}}
             - name: VERSION

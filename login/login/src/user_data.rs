@@ -9,7 +9,12 @@ use cryptoverse_core::eth::Eth;
 use serde_json::json;
 
 /// Build the `id_token` claims object for `subject`.
-pub async fn get_data(eth: &Eth, subject: &str, mailserver_domain: &str) -> serde_json::Value {
+pub async fn get_data(
+    eth: &Eth,
+    subject: &str,
+    mailserver_domain: &str,
+    profile_domain: &str,
+) -> serde_json::Value {
     let user = subject;
     let default_email = format!("{user}@{mailserver_domain}");
 
@@ -82,12 +87,12 @@ pub async fn get_data(eth: &Eth, subject: &str, mailserver_domain: &str) -> serd
         "nickname": ens_name_default,
         "phone_number_verified": false,
         "phone_number": "",
-        "picture": format!("https://cryptoverse.cc/{user}.png"),
+        "picture": format!("https://{profile_domain}/{user}.png"),
         "preferred_username": user,
-        "profile": format!("https://cryptoverse.cc/{user}"),
+        "profile": format!("https://{profile_domain}/{user}"),
         "sub": user,
         "updated_at": 0,
-        "website": format!("https://{user}.cryptoverse.cc/"),
+        "website": format!("https://{user}.{profile_domain}/"),
         "zoneinfo": "",
     })
 }

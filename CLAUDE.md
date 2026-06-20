@@ -53,9 +53,9 @@ When editing wallet/connection code, decide which side of this boundary it belon
 
 Replaces the old custom message (`Cryptoverse Login - auth.cryptoverse.cc|csrf|challenge`).
 
-- The backend issues SIWE params in `loginData.siwe` (`domain`, `uri`, `statement`, `version`, `chainId`, `nonce`, `expirationMinutes`). The **nonce is `sha256(login_challenge)[..16]` hex** — deterministically derived from Hydra's one-time login challenge, so verification is **stateless and multi-replica safe** (no shared nonce store) and a signature is bound to exactly one login flow.
+- The backend issues SIWE params in `loginData.siwe` (`domain`, `uri`, `statement`, `version`, `chainId`, `nonce`, `expirationMinutes`). The `domain`/`uri` are **derived per-request** from the headers the ingress forwards (`X-Forwarded-Host`/`X-Forwarded-Proto`, falling back to `Host`/`https`) — there is no hardcoded domain or port, so the IdP works on whatever host the ingress serves (`routes/mod.rs::public_origin`, mirrored in the gateway's `haproxy.conf` and the wrapper). The **nonce is `sha256(login_challenge)[..16]` hex** — deterministically derived from Hydra's one-time login challenge, so verification is **stateless and multi-replica safe** (no shared nonce store) and a signature is bound to exactly one login flow.
 - The frontend assembles the canonical EIP-4361 message in `frontend/src/embed/login.ts::buildSiweMessage` and the backend re-derives + checks the nonce in `core::auth::verify`. **Both sides implement EIP-4361**, so the formats interoperate — but if you touch one builder, keep it spec-compliant. The round-trip is covered by `core/src/auth.rs` tests (`verifies_real_signature_roundtrip`, `rejects_wrong_nonce`).
-- `verify` checks: signature (EIP-191), domain == `DOMAIN`, nonce == derived, and the message's expiry/not-before. CSRF tokens were dropped — the signature + challenge-bound nonce are the protection.
+- `verify` checks: signature (EIP-191), domain == the request's forwarded host, nonce == derived, and the message's expiry/not-before. CSRF tokens were dropped — the signature + challenge-bound nonce are the protection.
 
 ## Conventions & gotchas
 
@@ -72,8 +72,8 @@ cargo build --workspace        # build core + login + wrapper
 cargo test --workspace         # unit tests (SIWE round-trip, evalexpr, namehash, ...)
 cargo clippy --workspace --all-targets
 cargo fmt
-cargo run -p wrapper           # needs env (PORT, DOMAIN, SENTRY_*)
-cargo run -p login             # needs env (HYDRA_ADMIN_URL, DOMAIN, MAILSERVER_DOMAIN, INDEX_TEMPLATE, STATIC_DIR, ...)
+cargo run -p wrapper           # needs env (PORT, SENTRY_*); domain is request-derived
+cargo run -p login             # needs env (HYDRA_ADMIN_URL, MAILSERVER_DOMAIN, INDEX_TEMPLATE, STATIC_DIR, ...)
 ```
 The `login` binary serves the SPA from `STATIC_DIR` and renders `INDEX_TEMPLATE` (the frontend-built `index.html`); without a frontend build those paths are absent and `GET /login` 500s — fine for unit tests.
 

@@ -44,7 +44,7 @@ port-forward it):
 
 ```bash
 kubectl -n cryptoverse-login port-forward svc/cryptoverse-login-hydra-admin 4445:4445 &
-HARNESS_GATEWAY=https://login.127.0.0.1.nip.io \
+HARNESS_GATEWAY=https://login.127.0.0.1.nip.io:9443 \
 HARNESS_HOST= \
 HARNESS_HYDRA_ADMIN=http://127.0.0.1:4445 \
   pytest tests/harness/ -v

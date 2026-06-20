@@ -29,7 +29,9 @@ pub struct AppState {
     pub hydra: Hydra,
     pub eth: Eth,
     pub templates: Environment<'static>,
-    pub domain: String,
+    /// Domain used only for the user's profile/picture/website claims
+    /// (`PROFILE_DOMAIN`); the IdP's own domain is derived per-request.
+    pub profile_domain: String,
     pub mailserver_domain: String,
     pub statement: String,
     pub restrictions_file: String,
@@ -63,7 +65,7 @@ async fn main() {
         hydra,
         eth,
         templates,
-        domain: config::domain(),
+        profile_domain: config::var_or("PROFILE_DOMAIN", "cryptoverse.cc"),
         mailserver_domain: config::var_or("MAILSERVER_DOMAIN", "ethmail.cc"),
         statement: config::var_or("SIWE_STATEMENT", "Sign in to Cryptoverse Login"),
         restrictions_file: config::var_or("RESTRICTIONS_FILE", "/config/restrictions.json"),

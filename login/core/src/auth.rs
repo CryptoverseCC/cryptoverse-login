@@ -36,11 +36,14 @@ pub struct SiweChallenge {
 }
 
 impl SiweChallenge {
-    /// Build the SIWE parameters for a given Hydra login challenge.
-    pub fn new(domain: &str, statement: &str, challenge: &str) -> Self {
+    /// Build the SIWE parameters for a given Hydra login challenge. `host` and
+    /// `scheme` come from the incoming request (forwarded by the ingress), so the
+    /// SIWE domain follows whatever host the user actually visited — no hardcoded
+    /// domain or port.
+    pub fn new(host: &str, scheme: &str, statement: &str, challenge: &str) -> Self {
         Self {
-            domain: domain.to_string(),
-            uri: format!("https://{domain}/"),
+            domain: host.to_string(),
+            uri: format!("{scheme}://{host}/"),
             statement: statement.to_string(),
             version: "1".to_string(),
             chain_id: 1,

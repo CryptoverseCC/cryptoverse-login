@@ -28,8 +28,6 @@ spec:
         - env:
             - name: PORT
               value: {{ .Values.wrapper.deployment.port | quote }}
-            - name: DOMAIN
-              value: {{ .Values.domain }}
             - name: VERSION
               value: {{ .Values.version | quote }}
             - name: SENTRY_DSN

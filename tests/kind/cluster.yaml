@@ -9,10 +9,10 @@ nodes:
         nodeRegistration:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
-    # The gateway hardcodes the public origin as https://${DOMAIN} (no port), so
-    # the ingress must be on standard 443. Rootless podman binding 443 needs
-    # `sudo sysctl net.ipv4.ip_unprivileged_port_start=443` (setup.sh checks it).
+    # The services derive their public origin from the request (X-Forwarded-*),
+    # so any host:port works — no privileged :443 needed. Using a high host port
+    # (9443 → node 443) means rootless podman needs no port sysctl.
     extraPortMappings:
       - containerPort: 443
-        hostPort: 443
+        hostPort: 9443
         protocol: TCP

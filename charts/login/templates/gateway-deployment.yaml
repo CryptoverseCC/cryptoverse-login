@@ -44,8 +44,6 @@ spec:
               value: "{{ include "login.fullname" . }}-hydra-public:{{ .Values.hydra.hydra.config.serve.public.port }}"
             - name: HYDRA_ADMIN_SERVICE
               value: "{{ include "login.fullname" . }}-hydra-admin:{{ .Values.hydra.hydra.config.serve.admin.port }}"
-            - name: DOMAIN
-              value: "{{ .Values.domain }}"
             - name: NAMESPACE
               value: "{{ .Release.Namespace }}"
             - name: INTROSPECT_ACCESS_USER

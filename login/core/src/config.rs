@@ -39,9 +39,3 @@ pub fn sentry_dsn() -> Option<String> {
 pub fn sentry_env() -> String {
     var_or("SENTRY_ENV", "development")
 }
-
-/// Public domain this IdP is served on (`DOMAIN`), e.g. `login.cryptoverse.cc`.
-/// Used as the EIP-4361 `domain` and to build absolute URIs.
-pub fn domain() -> String {
-    var_or("DOMAIN", "login.cryptoverse.cc")
-}

@@ -1,7 +1,6 @@
 FROM haproxy:alpine
 
 ENV PORT=8000
-ENV DOMAIN=localhost
 ENV HYDRA_PUBLIC_SERVICE=localhost
 ENV HYDRA_ADMIN_SERVICE=localhost
 ENV LOGIN_SERVICE=localhost

@@ -16,12 +16,12 @@ monitoring: false
 restrictions: []
 
 demo:
-  oidcRedirectUrl: https://demo.127.0.0.1.nip.io/oidc/callback/
-  logoutRedirectUrl: https://demo.127.0.0.1.nip.io/
+  oidcRedirectUrl: https://demo.127.0.0.1.nip.io:9443/oidc/callback/
+  logoutRedirectUrl: https://demo.127.0.0.1.nip.io:9443/
   secret: "localdemosecret" # pragma: allowlist secret
   oidc:
-    # Browser redirect -> public login domain (via the ingress on :443).
-    authEndpoint: https://login.127.0.0.1.nip.io/oauth2/auth
+    # Browser redirect -> public login domain (via the ingress on :9443).
+    authEndpoint: https://login.127.0.0.1.nip.io:9443/oauth2/auth
     # Server-side -> in-cluster Hydra public service (cross-namespace DNS).
     jwksEndpoint: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/.well-known/jwks.json
     tokenEndpoint: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/oauth2/token

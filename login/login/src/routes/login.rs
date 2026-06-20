@@ -8,7 +8,7 @@ use std::sync::Arc;
 use alloy::primitives::Address;
 use axum::{
     extract::{Form, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     Json,
 };
@@ -26,7 +26,11 @@ pub struct LoginQuery {
 
 /// `GET /login` — fetch the Hydra login request and render the SPA shell with
 /// the challenge, client metadata, restrictions and SIWE parameters.
-pub async fn page(State(st): State<Arc<AppState>>, Query(q): Query<LoginQuery>) -> Response {
+pub async fn page(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<LoginQuery>,
+) -> Response {
     count("login-init", "unknown");
 
     let Some(challenge) = q.login_challenge.filter(|c| !c.is_empty()) else {
@@ -60,7 +64,8 @@ pub async fn page(State(st): State<Arc<AppState>>, Query(q): Query<LoginQuery>) 
         .and_then(|u| query_param(u, "ac"))
         .unwrap_or_else(|| "default".to_string());
 
-    let siwe = auth::SiweChallenge::new(&st.domain, &st.statement, &challenge);
+    let (host, scheme) = super::public_origin(&headers);
+    let siwe = auth::SiweChallenge::new(&host, &scheme, &st.statement, &challenge);
 
     // Single JSON object the SPA reads from a `<script type="application/json">`
     // block (see frontend/services/loginProvider.ts). Embedding as data (not
@@ -115,7 +120,11 @@ pub struct ProcessForm {
 
 /// `POST /login/process` — verify the SIWE signature, run token-gating, and
 /// accept the Hydra login request with `subject = recovered address`.
-pub async fn process(State(st): State<Arc<AppState>>, Form(form): Form<ProcessForm>) -> Response {
+pub async fn process(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Form(form): Form<ProcessForm>,
+) -> Response {
     if form.challenge.is_empty() {
         count("error-missing-challenge", "unknown");
         return (StatusCode::BAD_REQUEST, "Missing Param").into_response();
@@ -132,8 +141,9 @@ pub async fn process(State(st): State<Arc<AppState>>, Form(form): Form<ProcessFo
     let client_id = login_req.client.client_id.clone();
     count("login-start", &client_id);
 
+    let (host, _scheme) = super::public_origin(&headers);
     let verified =
-        match auth::verify(&form.message, &form.signature, &st.domain, &form.challenge).await {
+        match auth::verify(&form.message, &form.signature, &host, &form.challenge).await {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!("SIWE verification failed: {e}");

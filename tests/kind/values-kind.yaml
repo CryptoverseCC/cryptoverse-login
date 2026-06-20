@@ -44,11 +44,13 @@ hydra:
       enabled: true
     config:
       dsn: "postgresql://hydra:hydrapw@postgres:5432/hydra?sslmode=disable" # pragma: allowlist secret
+      # Hydra's issuer is necessarily a fixed config value (OIDC), so it carries
+      # the public port; our own services derive their origin per-request.
       urls:
-        login: https://login.127.0.0.1.nip.io/login
-        consent: https://login.127.0.0.1.nip.io/consent
+        login: https://login.127.0.0.1.nip.io:9443/login
+        consent: https://login.127.0.0.1.nip.io:9443/consent
         self:
-          issuer: https://login.127.0.0.1.nip.io/
+          issuer: https://login.127.0.0.1.nip.io:9443/
       secrets:
         cookie:
           - localsecretttttt # pragma: allowlist secret

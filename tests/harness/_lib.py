@@ -19,6 +19,10 @@ GATEWAY = os.getenv("HARNESS_GATEWAY", "http://127.0.0.1:8000")
 HYDRA_ADMIN = os.getenv("HARNESS_HYDRA_ADMIN", "http://127.0.0.1:4445")
 # Host header sent to the gateway. For real domains (kind) leave empty.
 HOST = os.getenv("HARNESS_HOST", "login.cryptoverse.local")
+# Simulate what a TLS-terminating ingress forwards. Setting these proves the
+# system derives its public origin from the request (any domain/port/scheme).
+XFWD_HOST = os.getenv("HARNESS_XFWD_HOST")
+XFWD_PROTO = os.getenv("HARNESS_XFWD_PROTO")
 SIGNER = os.getenv("HARNESS_SIGNER", os.path.join(REPO, "login/target/debug/examples/sign"))
 MAILSERVER_DOMAIN = os.getenv("HARNESS_MAILSERVER_DOMAIN", "ethmail.cc")
 INTROSPECT_USER = os.getenv("HARNESS_INTROSPECT_USER", "introspect")
@@ -52,6 +56,10 @@ class Http:
         cmd = ["curl", "-sk", "-i", "-b", self.jar, "-c", self.jar, "-X", method]
         if host:
             cmd += ["-H", f"Host: {host}"]
+        if XFWD_HOST:
+            cmd += ["-H", f"X-Forwarded-Host: {XFWD_HOST}"]
+        if XFWD_PROTO:
+            cmd += ["-H", f"X-Forwarded-Proto: {XFWD_PROTO}"]
         if basic:
             cmd += ["-u", basic]
         for h in headers or []:

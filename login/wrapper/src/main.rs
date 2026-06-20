@@ -27,7 +27,24 @@ struct AppState {
     version: String,
     sentry_dsn: String,
     sentry_env: String,
-    domain: String,
+}
+
+/// Derive the public `(host, scheme)` from the request as forwarded by the
+/// TLS-terminating ingress (`X-Forwarded-Host` / `X-Forwarded-Proto`, falling
+/// back to `Host` / `https`). No hardcoded domain, port, or scheme.
+fn public_origin(headers: &HeaderMap) -> (String, String) {
+    let first = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.split(',').next().unwrap_or(v).trim().to_string())
+            .filter(|v| !v.is_empty())
+    };
+    let host = first("x-forwarded-host")
+        .or_else(|| first("host"))
+        .unwrap_or_default();
+    let scheme = first("x-forwarded-proto").unwrap_or_else(|| "https".to_string());
+    (host, scheme)
 }
 
 #[tokio::main]
@@ -46,7 +63,6 @@ async fn main() {
         version: cryptoverse_core::config::version(),
         sentry_dsn: cryptoverse_core::config::sentry_dsn().unwrap_or_default(),
         sentry_env: cryptoverse_core::config::sentry_env(),
-        domain: cryptoverse_core::config::domain(),
     });
 
     let app = Router::new()
@@ -70,14 +86,11 @@ async fn embed(
     headers: HeaderMap,
     RawQuery(query): RawQuery,
 ) -> Html<String> {
-    let host = headers
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or(&st.domain);
+    let (host, scheme) = public_origin(&headers);
 
     let url = match query {
-        Some(q) if !q.is_empty() => format!("https://{host}/oauth2/inner?{q}"),
-        _ => format!("https://{host}/oauth2/inner"),
+        Some(q) if !q.is_empty() => format!("{scheme}://{host}/oauth2/inner?{q}"),
+        _ => format!("{scheme}://{host}/oauth2/inner"),
     };
 
     let tmpl = st.env.get_template("embed.html").expect("embed template");
