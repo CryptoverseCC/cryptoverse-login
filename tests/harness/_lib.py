@@ -141,6 +141,10 @@ def login_data(http, login_redirect):
 
 
 def post_login(http, challenge, message, signature):
+    # HARNESS_CRLF replicates a browser HTML form, which normalises the signed
+    # message's LF to CRLF on submit (the signature is still over the LF form).
+    if os.getenv("HARNESS_CRLF"):
+        message = message.replace("\n", "\r\n")
     return http.request(f"{GATEWAY}/login/process", "POST",
                         data={"challenge": challenge, "message": message,
                               "signature": signature, "response": "api"})

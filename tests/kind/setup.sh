@@ -51,12 +51,15 @@ kubectl config use-context "kind-$CLUSTER" >/dev/null
 
 say "Installing ingress-nginx"
 kubectl apply -f "$INGRESS_NGINX"
-kubectl wait --namespace ingress-nginx --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller --timeout=180s
+# The controller pod isn't created the instant `apply` returns, and `kubectl
+# wait` errors on a not-yet-existing resource — so wait on the Deployment.
+until kubectl -n ingress-nginx get deploy/ingress-nginx-controller >/dev/null 2>&1; do sleep 2; done
+kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
 kubectl annotate ingressclass nginx ingressclass.kubernetes.io/is-default-class=true --overwrite
 
 say "Installing cert-manager + cryptoverse-common ClusterIssuer"
 kubectl apply -f "$CERT_MANAGER"
+until kubectl -n cert-manager get deploy/cert-manager-webhook >/dev/null 2>&1; do sleep 2; done
 kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
 # Retry the issuer until the validating webhook is actually serving.
 until kubectl apply -f "$KIND_DIR/clusterissuer.yaml" 2>/dev/null; do sleep 3; done
@@ -66,6 +69,7 @@ for ns in "$NS_LOGIN" "$NS_DEMO"; do
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
 done
 kubectl apply -f "$KIND_DIR/postgres.yaml"
+until kubectl -n "$NS_LOGIN" get deploy/postgres >/dev/null 2>&1; do sleep 2; done
 kubectl -n "$NS_LOGIN" rollout status deploy/postgres --timeout=120s
 
 MON_FLAGS=()
@@ -79,9 +83,15 @@ if [ "${WITH_MONITORING:-0}" = "1" ]; then
 fi
 
 say "Loading images into kind"
+# `kind load docker-image` doesn't reliably detect podman images, so go via an
+# archive (podman save | kind load image-archive).
+archive=$(mktemp --suffix=.tar)
 for img in login wrapper gateway demo-python-django; do
-  kind load docker-image "localhost/cryptoverse-login/$img:test" --name "$CLUSTER"
+  rm -f "$archive"   # podman save can't overwrite an existing docker-archive
+  podman save -o "$archive" "localhost/cryptoverse-login/$img:test"
+  kind load image-archive "$archive" --name "$CLUSTER"
 done
+rm -f "$archive"
 
 say "Deploying login chart (Postgres-backed Hydra, cert-manager TLS)"
 helm dependency update "$REPO/charts/login" >/dev/null

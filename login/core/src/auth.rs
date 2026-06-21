@@ -96,6 +96,9 @@ pub async fn verify(
     expected_domain: &str,
     challenge: &str,
 ) -> Result<VerifiedLogin, AuthError> {
+    // Browsers normalise a form field's LF to CRLF on submit, but EIP-4361 uses
+    // LF and the wallet signed the LF form — so strip CR before parsing/verifying.
+    let message = message.replace("\r\n", "\n");
     let msg: Message = message.parse().map_err(|e| AuthError::Parse(format!("{e}")))?;
     let sig = decode_signature(signature)?;
 
@@ -180,6 +183,45 @@ mod tests {
         assert_eq!(
             verified.address,
             format!("0x{}", hex::encode(address.as_slice()))
+        );
+    }
+
+    #[tokio::test]
+    async fn verifies_message_with_crlf_line_endings() {
+        // A browser form normalises the signed message's LF to CRLF on submit;
+        // the wallet signed the LF form, so the CRLF version must still verify.
+        use alloy::signers::local::PrivateKeySigner;
+        use alloy::signers::SignerSync;
+
+        let signer: PrivateKeySigner =
+            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" // pragma: allowlist secret
+                .parse()
+                .unwrap();
+        let checksummed = signer.address().to_checksum(None);
+        let challenge = "crlf-challenge";
+        let nonce = nonce_for_challenge(challenge);
+        let lf = format!(
+            "login.cryptoverse.cc wants you to sign in with your Ethereum account:\n\
+             {checksummed}\n\n\
+             Sign in to Cryptoverse Login\n\n\
+             URI: https://login.cryptoverse.cc/\n\
+             Version: 1\n\
+             Chain ID: 1\n\
+             Nonce: {nonce}\n\
+             Issued At: 2020-01-01T00:00:00.000Z\n\
+             Expiration Time: 2100-01-01T00:00:00.000Z"
+        );
+        // Wallet signs the LF form; the browser then POSTs CRLF.
+        let signature = signer.sign_message_sync(lf.as_bytes()).unwrap();
+        let sig_hex = format!("0x{}", hex::encode(signature.as_bytes()));
+        let crlf = lf.replace('\n', "\r\n");
+
+        let verified = verify(&crlf, &sig_hex, "login.cryptoverse.cc", challenge)
+            .await
+            .expect("CRLF-normalised message must verify");
+        assert_eq!(
+            verified.address,
+            format!("0x{}", hex::encode(signer.address().as_slice()))
         );
     }
 

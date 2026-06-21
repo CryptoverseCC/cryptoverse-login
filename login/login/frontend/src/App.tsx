@@ -91,26 +91,18 @@ const App: React.FC<AppProps> = ({
     try {
       let { message, signature, challenge } = resp;
 
-      const addInput = (form: HTMLFormElement, name: string, value: string) => {
-        const input = document.createElement("input");
-        input.value = value;
-        input.name = name;
-        form.appendChild(input);
-      };
+      // Build the body directly. Going via a <form>/FormData normalises the SIWE
+      // message's LF line endings to CRLF, which breaks EIP-4361 parsing on the
+      // backend (the wallet signed the LF form).
+      const body = new URLSearchParams();
+      body.set("challenge", challenge);
+      body.set("message", message);
+      body.set("signature", signature);
+      body.set("response", "api");
 
-      var form = document.createElement("form");
-
-      form.method = "POST";
-      form.action = "/login/process";
-
-      addInput(form, "challenge", challenge);
-      addInput(form, "message", message);
-      addInput(form, "signature", signature);
-      addInput(form, "response", "api");
-
-      const loginResponse = await fetch(form.action, {
-        method: form.method,
-        body: new URLSearchParams([...(new FormData(form) as any)]),
+      const loginResponse = await fetch("/login/process", {
+        method: "POST",
+        body,
       });
 
       const data = await loginResponse.json();
