@@ -7,8 +7,8 @@ with the real deploy and prove correctness:
 - the *same* Helm charts: gateway (HAProxy) + login + wrapper + **Ory Hydra 2.x**
   + hydra-maester + the demo relying party
 - **Postgres-backed Hydra** (not in-memory) with the chart's automigration
-- **cert-manager** issuing the ingress TLS via the `cryptoverse-common`
-  ClusterIssuer — the chart annotations work unmodified
+- **cert-manager** issuing the ingress TLS via the `cryptoverse-common` issuer,
+  backed by a local **mkcert** CA — the chart annotations work unmodified
 - **ingress-nginx** on host `:9443` (→ node `:443`), `nip.io` domains
 - optional Prometheus (`WITH_MONITORING=1`)
 
@@ -56,7 +56,7 @@ prints the exact harness + Selenium commands when it finishes.
 |---|---|
 | `cluster.yaml` | kind cluster (ingress-ready node, host `:9443` → node `:443`) |
 | `postgres.yaml` | Postgres for Hydra |
-| `clusterissuer.yaml` | self-signed `cryptoverse-common` ClusterIssuer (cert-manager) |
+| `clusterissuer.yaml` | `cryptoverse-common` CA ClusterIssuer (cert-manager, mkcert-backed) |
 | `values-kind.yaml` | login chart overrides (nip.io domain, local images, Postgres DSN) |
 | `values-demo-kind.yaml` | demo chart overrides (browser vs in-cluster OIDC endpoints) |
 | `setup.sh` / `teardown.sh` | bring up / tear down |
@@ -64,9 +64,12 @@ prints the exact harness + Selenium commands when it finishes.
 ## Notes
 
 - Domains are `login.127.0.0.1.nip.io` / `demo.127.0.0.1.nip.io` (resolve to
-  127.0.0.1, no `/etc/hosts`). The CA is cert-manager's self-signed issuer; the
-  harness uses `curl -k` and the Selenium test sets `acceptInsecureCerts`. For a
-  fully-trusted local CA, swap in `mkcert` and seed a cert-manager CA Issuer.
+  127.0.0.1, no `/etc/hosts`). TLS is issued by cert-manager from a local
+  **mkcert** CA (one root signs both hosts). Trust that root on the machine
+  running your browser (`mkcert -install`, or import `rootCA.pem` into Firefox)
+  and there are no warnings — important because the login iframe loads the login
+  host and a browser can't prompt for a cert inside an iframe. The harness still
+  uses `curl -k`; the Selenium test sets `acceptInsecureCerts`.
 - ENS / Unstoppable Domains lookups have no RPC key here and resolve to empty for
   the test account — matching the expected ID-token claims.
 - The demo pod only starts once hydra-maester has minted the `demo-oauth2client`

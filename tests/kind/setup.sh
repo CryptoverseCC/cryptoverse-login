@@ -57,10 +57,23 @@ until kubectl -n ingress-nginx get deploy/ingress-nginx-controller >/dev/null 2>
 kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
 kubectl annotate ingressclass nginx ingressclass.kubernetes.io/is-default-class=true --overwrite
 
-say "Installing cert-manager + cryptoverse-common ClusterIssuer"
+say "Installing cert-manager + mkcert-backed cryptoverse-common CA issuer"
 kubectl apply -f "$CERT_MANAGER"
 until kubectl -n cert-manager get deploy/cert-manager-webhook >/dev/null 2>&1; do sleep 2; done
 kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
+# Back the issuer with a local mkcert CA so both hosts' certs chain to one root
+# you can trust on the machine running your browser (no per-host warnings).
+if ! command -v mkcert >/dev/null; then
+  curl -fsSL -o "$HOME/.local/bin/mkcert" \
+    https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
+  chmod +x "$HOME/.local/bin/mkcert"
+fi
+CAROOT=$(mkcert -CAROOT)
+# Create the CA if it doesn't exist yet (issue a throwaway cert; no trust-store install).
+[ -f "$CAROOT/rootCA.pem" ] || mkcert -cert-file /tmp/_mkcert.pem -key-file /tmp/_mkcert-key.pem localhost >/dev/null 2>&1
+kubectl -n cert-manager create secret tls cryptoverse-ca \
+  --cert="$CAROOT/rootCA.pem" --key="$CAROOT/rootCA-key.pem" \
+  --dry-run=client -o yaml | kubectl apply -f -
 # Retry the issuer until the validating webhook is actually serving.
 until kubectl apply -f "$KIND_DIR/clusterissuer.yaml" 2>/dev/null; do sleep 3; done
 
@@ -115,6 +128,14 @@ cat <<EOF
 
 == Ready ==
 Login:  $LOGIN_URL/      Demo: $DEMO_URL/
+
+Trust the local CA on the machine running your browser (one time, no warnings):
+  CA root: $CAROOT/rootCA.pem
+  - same machine: mkcert -install
+  - remote browser (e.g. over VS Code/SSH): copy that file over and, on a Mac,
+      'mkcert -install' (brew install mkcert nss) or import it into Firefox
+      (Settings > Privacy & Security > Certificates > View Certificates >
+       Authorities > Import, trust for websites).
 
 Prove it works (fast, no browser):
   kubectl -n $NS_LOGIN port-forward svc/cryptoverse-login-hydra-admin 4445:4445 &
