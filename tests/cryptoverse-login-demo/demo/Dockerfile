@@ -14,7 +14,10 @@ RUN pip install gunicorn
 RUN pip install mozilla-django-oidc
 RUN pip install django-request-logging
 RUN pip install django-prometheus
-RUN pip install jwt
+# mozilla-django-oidc validates the RS256 ID token via PyJWT (jwt.get_unverified_header).
+# The PyPI package named `jwt` is a DIFFERENT library and lacks that API — use PyJWT,
+# with [crypto] (cryptography) for RS256 signature verification.
+RUN pip install "PyJWT[crypto]"
 
 FROM base as devcontainer
 
