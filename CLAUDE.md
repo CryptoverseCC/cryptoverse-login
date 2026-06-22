@@ -37,17 +37,26 @@ Four containers, all behind the gateway.
     - `GET /consent` (`routes/consent.rs`) → auto-accepts consent and attaches the ID token built by `user_data.rs::get_data` (ENS + Unstoppable Domains).
     - `GET /---/metrics` → Prometheus exposition; keeps the `login_status{status,client}` counter the dashboards expect.
     - everything else → static SPA assets via `tower_http::ServeDir` (rooted at `STATIC_DIR`, files live under `/login/...`).
-    - The **frontend** (`login/login/frontend`, React/CRA via CRACO + MUI v4) is unchanged in structure — still emits three bundles (`main`/`embed`/`final`); see the iframe split below. The login crate lives alongside it in the same directory.
+    - The **frontend** (`login/login/frontend`, React + **Vite**, **MUI v7** on emotion) emits three bundles (`main`/`embed`/`final`); see the iframe split and "Frontend build contract" below. Wallet connectivity is **`@wagmi/core` + `viem`** (EIP-6963 injected discovery + WalletConnect v2 + Coinbase). The login crate lives alongside it in the same directory.
 
 ## The iframe ↔ top-window split (most important non-obvious detail)
 
-A wallet provider (MetaMask injection, WalletConnect, MEW) must live in the **top-level window**, not in an iframe. So the login UI is split across a Comlink RPC boundary:
+A wallet provider (injected/MetaMask, WalletConnect, Coinbase) must live in the **top-level window**, not in an iframe. So the login UI is split across a Comlink RPC boundary:
 
-- The **top window** (`embed.js`, served by wrapper's `embed.html`) owns the wallet. It exposes `init / connect / login / identities / redirect` over Comlink (`frontend/src/embed/*`).
+- The **top window** (`embed.js`, served by wrapper's `embed.html`) owns the wallet via a **`@wagmi/core` config** built in `frontend/src/embed/utils.ts` (EIP-6963 injected discovery + WalletConnect v2 + Coinbase; one viem `signMessage` replaces the old per-wallet signers). It exposes `init / connect / login / identities / redirect` over Comlink (`frontend/src/embed/*`).
 - The **iframe** (`main` bundle, the React app) renders the UI and calls those methods on the parent via `Comlink.wrap(...window.parent)` (`frontend/src/services/loginProvider.ts`). It never touches the wallet directly.
-- Flow: iframe asks parent to `connect` → parent returns addresses → iframe asks parent to `login` → parent builds the SIWE message, signs it, returns `{message, signature, challenge, address}` → iframe `POST`s `message`+`signature`+`challenge` to `/login/process`.
+- Flow: iframe `init`s the parent (passing the WalletConnect project id — the embed page has **no `login-data` block of its own**) and gets back the EIP-6963-discovered wallet list → user picks one → iframe asks parent to `connect` by connector id → parent returns addresses → iframe asks parent to `login` → parent builds + signs the SIWE message (viem), returns `{message, signature, challenge, address}` → iframe `POST`s `message`+`signature`+`challenge` to `/login/process` (as `URLSearchParams`, to preserve the signed message's LF line endings — a `<form>`/FormData would normalise them to CRLF and break EIP-4361 parsing).
 
-When editing wallet/connection code, decide which side of this boundary it belongs to. `loginProvider.ts` defines the shared `IProvider` interface both sides implement.
+When editing wallet/connection code, decide which side of this boundary it belongs to. `loginProvider.ts` defines the shared `IProvider` interface both sides implement (`init`/`connect` payloads now carry the project id and a connector id respectively).
+
+## Frontend build contract (Vite) — preserve this
+
+The SPA builds with **Vite** (`frontend/vite.config.ts`); the backend + gateway depend on the exact output shape, so keep it intact when touching the build:
+
+- **base `/login/`**, output to `build/`. Three entries via `rollupOptions.input`: `main` (= `index.html`), `embed` (`src/embed/index.ts`), `final` (`src/final/index.ts`).
+- `embed.js` / `final.js` MUST stay **unhashed** at `build/static/js/` — the wrapper templates hardcode `/login/static/js/{embed,final}.js`. They are ES modules, so the wrapper loads them with `type="module"` (the inline scripts that set `window.redirectUrl` / await `window.ready` still order correctly because module scripts are deferred).
+- `index.html` (frontend root) is the **minijinja template** the login backend renders; it must keep `{{ title }}` and `<script type="application/json" id="login-data">{{ login_data | safe }}</script>`. **minijinja parses `{{ }}` even inside HTML comments** — never write placeholder examples in comments, it 500s the login pod at template registration.
+- The Docker frontend stage must NOT set `NODE_ENV=production` before `yarn install` (Vite / `@vitejs/plugin-react` / `typescript` are devDependencies and would be skipped). It strips `src/stories` before building, so stories/tests never reach the runtime image.
 
 ## SIWE (EIP-4361) — the auth contract
 
@@ -61,6 +70,9 @@ Replaces the old custom message (`Cryptoverse Login - auth.cryptoverse.cc|csrf|c
 
 - **Token-gating** (`login/login/src/restrictions.rs`): restrictions come from the client's Hydra `metadata.restrictions`, or fall back to `RESTRICTIONS_FILE` (default `/config/restrictions.json`, a ConfigMap) keyed by `client_id`, re-read per request. Each entry has a `tokenAddress` or `contractAliases` plus a `condition` evaluated by **[`evalexpr`]** (replacing mathjs) against on-chain `balanceOf` values. Condition variables are `balanceOf` (single token) or `<Alias>balanceOf` (aliases form). evalexpr works on `f64`, so balances are scaled by `decimals` and coerced to float — keep that in mind for balance math.
 - **alloy API churn**: the http provider is built via `RootProvider::new(ClientBuilder::default().http(url))` and requires alloy's `reqwest-rustls-tls` feature (rustls, no OpenSSL). If you bump alloy, the provider-construction and `.call()` APIs are the things most likely to break.
+- **WalletConnect**: needs a free Reown / WalletConnect Cloud `projectId`, supplied via `WALLETCONNECT_PROJECT_ID` (chart + `tests/kind` values) → `loginData.walletConnectProjectId`. Empty ⇒ the WalletConnect connector is omitted (injected wallets still work); no key is hardcoded.
+- **Hardware wallets (Ledger / Trezor)** — already supported, **no new connectors or dependencies**. Both are WalletConnect v2 wallets (Ledger Live mobile/desktop; **Trezor Suite added WalletConnect support in Aug 2025**), so they ride the existing `walletConnect()` connector in `login/login/frontend/src/embed/utils.ts`. Operationally this requires a provisioned Reown `projectId` (see above) with **mainnet (chainId 1)** and the **`personal_sign`** method enabled in the Reown dashboard; an empty projectId omits the WC connector ⇒ no hardware-wallet path. Do **not** add `@trezor/connect-web` (needs its own hosted iframe/popup, which conflicts with the top-window embed) or `@ledgerhq/connect-kit` (CDN-loaded at runtime, a supply-chain risk) — WalletConnect is the supported route for both. Future option (not implemented): pass `showQrModal:false` to the connector and render the WC `display_uri` QR inside the branded top-window UI instead of WalletConnect's own modal.
+- **Frontend checks**: `yarn typecheck` (tsc, includes stories) + `yarn test` — a vitest/jsdom test (`frontend/src/stories/stories.render.test.tsx`) that mounts **every Storybook story** and asserts it renders (it already caught real DOM-nesting / missing-key bugs). Add a story for any new component state; the render test discovers it automatically. Stories drive the App/background screens with a mock `ILoginProvider` (`frontend/src/stories/mockLoginProvider.ts`).
 - Secrets are guarded by a **detect-secrets** pre-commit hook; annotate intentional matches with `# pragma: allowlist secret`.
 - Production Helm values are GPG-encrypted: `charts/login/values.prod.yaml.gpg`. Don't commit a plaintext `values.prod.yaml`.
 
@@ -79,10 +91,12 @@ The `login` binary serves the SPA from `STATIC_DIR` and renders `INDEX_TEMPLATE`
 
 ### Frontend (`login/login/frontend`)
 ```bash
-yarn start            # CRACO dev server
-yarn build            # production build (emits main/embed/final bundles + index.html template)
-yarn test             # CRA/Jest tests
-yarn storybook        # component stories on :6006
+yarn dev              # Vite dev server
+yarn build            # Vite build → static/js/{embed,final}.js (unhashed) + hashed main + index.html template
+yarn typecheck        # tsc --noEmit (includes stories + tests)
+yarn test             # vitest: mounts every Storybook story in jsdom (render check)
+yarn storybook        # Storybook v8 (react-vite) on :6006
+yarn build-storybook  # static Storybook → storybook-static/
 ```
 
 ### Docker images
@@ -104,22 +118,44 @@ python3 local-stack/smoke_test.py      # asserts id_token sub + enriched email
 podman kube down local-stack/cryptoverse-stack.yaml
 ```
 
+### Local cluster via kind (production-faithful; primary local loop)
+`tests/kind/setup.sh` brings the whole system up on a local **kind** cluster
+(rootless podman), wired like prod: the real Helm charts + Postgres-backed Hydra +
+cert-manager TLS from a local **mkcert** CA + ingress-nginx on host `:9443`, with
+`nip.io` domains (`login.127.0.0.1.nip.io`, `demo.127.0.0.1.nip.io`). Iterate by
+rebuilding images + `helm upgrade` + `kubectl rollout restart`. See `tests/kind/README.md`.
+```bash
+tests/kind/setup.sh            # build images, cluster, ingress, cert-manager, postgres, deploy
+tests/kind/teardown.sh
+```
+Validate the backend fast with the **harness** (curl-driven, no browser; `tests/harness/`):
+```bash
+kubectl -n cryptoverse-login port-forward svc/cryptoverse-login-hydra-admin 4445:4445 &
+HARNESS_GATEWAY=https://login.127.0.0.1.nip.io:9443 HARNESS_HOST= \
+  HARNESS_HYDRA_ADMIN=http://127.0.0.1:4445 pytest tests/harness/ -v
+```
+The harness drives the full OAuth2 + SIWE flow with a Rust signer but **does not
+execute the wallet JS** — the wagmi connect/sign path needs the Selenium suite or a
+real browser. Storybook + the vitest render test cover the components in isolation.
+
 ### Local full-stack (requires microk8s)
 ```bash
 ./setup.sh    # microk8s addons + postgres + Hydra, builds images, helm-installs login + demo app
               # Domains: login.cryptoverse.local, login-demo.cryptoverse.local
 ```
 
-### Selenium end-to-end tests (`tests/`)
-Drive a MetaMask Firefox extension against the demo Django app. Put `geckodriver` in `tests/tools/`. This is the primary end-to-end safety net.
+### Browser/wallet end-to-end tests (`tests/e2e/`)
+Playwright + [`@tenkeylabs/dappwright`](https://github.com/TenKeyLabs/dappwright) drive the real Sign-In-with-Ethereum flow against the demo Django app and assert the issued ID-token claims. Three Playwright projects: the **MetaMask** and **Coinbase** browser extensions (real extensions, headed Chromium → need an X display, so run under **xvfb** on Linux/CI), plus a **headless `@reown/walletkit` WalletConnect** test wallet (needs a Reown **projectId**, self-skips without one). Needs a deployed stack — use the **kind** cluster (`tests/kind/setup.sh`). This is the primary end-to-end safety net; it replaced the retired Selenium + Firefox suite (`test_full.py`). See `tests/e2e/README.md`.
 ```bash
-cd tests && python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt --upgrade
-pytest test_full.py --verbose --log-cli-level=INFO
+cd tests/e2e && yarn install && npx playwright install chromium
+yarn typecheck && yarn test:unit && yarn test:list      # offline sanity (no cluster/display)
+xvfb-run --auto-servernum yarn test:e2e:metamask        # MetaMask extension (no projectId)
+xvfb-run --auto-servernum yarn test:e2e:coinbase        # Coinbase extension
+WALLETCONNECT_PROJECT_ID=<id> yarn test:e2e:walletconnect   # WalletConnect (needs projectId)
 ```
 
 ### CI/CD (GitHub Actions)
-- **`build.yml`** (PRs / pushes to `master`): builds gateway/login/wrapper/demo images (login & wrapper from the `login/` context) → DO registry tagged with git SHA → microk8s → `helm dependency update` + `helm install` → Selenium suite.
+- **`build.yml`** (PRs / pushes to `master`): builds gateway/login/wrapper/demo images (login & wrapper from the `login/` context) → DO registry tagged with git SHA → microk8s → `helm dependency update` + `helm install` → the `tests/e2e/` Playwright + dappwright **MetaMask** project under xvfb (Coinbase/WalletConnect projects aren't wired into CI — WalletConnect needs a Reown projectId secret).
 - **`release.yml`** (tags `v[0-9]+.[0-9]+.[0-9]+`): decrypts prod values and `helm upgrade`s production. Release by pushing a semver tag.
 
 ## Hydra

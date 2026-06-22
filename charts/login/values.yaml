@@ -91,6 +91,8 @@ login:
   mailserverDomain: ethmail.cc
   # WalletConnect Cloud / Reown project id for the SPA's WalletConnect connector.
   # Empty disables WalletConnect (injected wallets still work). Override per env.
+  # Also enables hardware wallets (Ledger Live, Trezor Suite), which connect via
+  # WalletConnect — needs mainnet (chainId 1) + personal_sign in the Reown dashboard.
   walletConnectProjectId: ""
 
 wrapper:
