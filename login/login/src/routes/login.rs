@@ -77,6 +77,7 @@ pub async fn page(
         "siwe": serde_json::to_value(&siwe).unwrap_or(serde_json::Value::Null),
         "restrictions": serde_json::to_value(&restrictions).unwrap_or(serde_json::Value::Null),
         "metadata": metadata.clone(),
+        "walletConnectProjectId": st.wallet_connect_project_id.clone(),
     });
     // Escape `<` so embedded values can't terminate the surrounding <script>.
     let login_data_json = serde_json::to_string(&login_data)

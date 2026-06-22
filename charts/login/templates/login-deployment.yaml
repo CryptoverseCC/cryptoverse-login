@@ -31,6 +31,8 @@ spec:
               value: {{ .Values.login.mailserverDomain }}
             - name: PROFILE_DOMAIN
               value: {{ .Values.login.profileDomain | default "cryptoverse.cc" }}
+            - name: WALLETCONNECT_PROJECT_ID
+              value: {{ .Values.login.walletConnectProjectId | default "" | quote }}
             - name: PORT
               value: {{ .Values.login.deployment.port | quote}}
             - name: VERSION

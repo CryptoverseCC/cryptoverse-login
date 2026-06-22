@@ -8,18 +8,18 @@
 # Stage 1 — build the React/TS SPA (thin)  #
 ############################################
 FROM node:20-bookworm-slim AS frontend
-# Native build deps kept from the previous image so optional native modules in
-# the production dependency tree still compile.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git python3 make g++ pkg-config \
-    libcairo2-dev libpango1.0-dev libgif-dev libjpeg-dev \
+# The Vite/wagmi/MUI toolchain is pure JS (esbuild ships prebuilt binaries), so
+# no native build toolchain is needed — just TLS roots for the registry.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-ENV NODE_ENV=production
+# NB: do NOT set NODE_ENV=production before install — Vite, @vitejs/plugin-react
+# and typescript are devDependencies and yarn would skip them. `vite build`
+# always builds in production mode regardless.
 COPY login/frontend/package.json login/frontend/yarn.lock ./
 RUN yarn install --frozen-lockfile
 COPY login/frontend ./
-# Storybook is a dev-only dependency and not installed in this image.
+# Storybook stories are dev-only and not reachable from the app entry points.
 RUN rm -rf src/stories
 RUN yarn build
 # Output: /build/build/{static/, sentry.min.js, index.html, ...}

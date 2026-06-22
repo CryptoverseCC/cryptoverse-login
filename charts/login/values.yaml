@@ -89,6 +89,9 @@ login:
   # TODO: remember to tie namespace to release namespace
   hydraAdminUrl: http://cryptoverse-login-hydra-admin.cryptoverse-login:4445
   mailserverDomain: ethmail.cc
+  # WalletConnect Cloud / Reown project id for the SPA's WalletConnect connector.
+  # Empty disables WalletConnect (injected wallets still work). Override per env.
+  walletConnectProjectId: ""
 
 wrapper:
   replicaCount: 1

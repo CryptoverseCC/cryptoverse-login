@@ -34,6 +34,10 @@ pub struct AppState {
     pub profile_domain: String,
     pub mailserver_domain: String,
     pub statement: String,
+    /// WalletConnect Cloud / Reown project id forwarded to the SPA so it can
+    /// offer the WalletConnect connector. Empty when unset (the connector is
+    /// then omitted; injected wallets still work). No key is hardcoded.
+    pub wallet_connect_project_id: String,
     pub restrictions_file: String,
     pub metrics_handle: PrometheusHandle,
 }
@@ -68,6 +72,7 @@ async fn main() {
         profile_domain: config::var_or("PROFILE_DOMAIN", "cryptoverse.cc"),
         mailserver_domain: config::var_or("MAILSERVER_DOMAIN", "ethmail.cc"),
         statement: config::var_or("SIWE_STATEMENT", "Sign in to Cryptoverse Login"),
+        wallet_connect_project_id: config::var_or("WALLETCONNECT_PROJECT_ID", ""),
         restrictions_file: config::var_or("RESTRICTIONS_FILE", "/config/restrictions.json"),
         metrics_handle,
     });

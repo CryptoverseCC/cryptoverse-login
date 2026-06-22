@@ -34,6 +34,9 @@ debug: false
 
 login:
   mailserverDomain: ethmail.cc
+  # Set to a WalletConnect Cloud / Reown project id to enable the WalletConnect
+  # connector locally. Empty ⇒ injected wallets (MetaMask/EIP-6963) only.
+  walletConnectProjectId: ""
 
 hydra:
   hydra:
