@@ -1,41 +1,31 @@
-import React from "react";
-import { Story, Meta } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { Restrictions } from "../components/Restrictions";
+import {
+  restrictionWithMessage,
+  restrictionNoMessage,
+  restrictionsMultiple,
+} from "./fixtures";
 
-import { Restrictions, RestrictionsProps } from "../components/Restrictions";
-import theme from "../theme";
-import { ThemeProvider } from "@material-ui/styles";
-
-export default {
-  title: "Base/Restrictions",
+const meta: Meta<typeof Restrictions> = {
+  title: "Components/Restrictions",
   component: Restrictions,
-} as Meta;
+};
+export default meta;
 
-const Template: Story<RestrictionsProps> = (args) => (
-  <ThemeProvider theme={theme}>
-    <Restrictions {...args}></Restrictions>
-  </ThemeProvider>
-);
+type Story = StoryObj<typeof Restrictions>;
 
-export const TokenOwners = Template.bind({});
-TokenOwners.args = {
-  restrictions: [
-    {
-      tokenAddress: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359",
-      condition: "balanceOf >= 1",
-    },
-  ],
+// A custom message supplied by the client metadata.
+export const WithMessage: Story = {
+  args: { restrictions: restrictionWithMessage },
 };
 
-export const MultiTokenOwners = Template.bind({});
-MultiTokenOwners.args = {
-  restrictions: [
-    {
-      tokenAddress: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359",
-      condition: "balanceOf >= 1",
-    },
-    {
-      tokenAddress: "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359",
-      condition: "balanceOf >= 1000",
-    },
-  ],
+// No message → the generated "token owners fulfilling condition" copy.
+export const WithoutMessage: Story = {
+  args: { restrictions: restrictionNoMessage },
 };
+
+export const Multiple: Story = {
+  args: { restrictions: restrictionsMultiple },
+};
+
+export const None: Story = { args: { restrictions: [] } };

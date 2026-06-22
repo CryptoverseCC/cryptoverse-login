@@ -1,45 +1,21 @@
-import React from "react";
-// also exported from '@storybook/react' if you can deal with breaking changes in 6.1
-import { Story, Meta } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
+import { Identity } from "../components/Identity";
+import { identityActive, identityInactive, identityEns } from "./fixtures";
 
-import { Identity, IdentityProps } from "../components/Identity";
-import { ThemeProvider } from "@material-ui/styles";
-import theme from "../theme";
-
-export default {
-  title: "Base/Identity",
+const meta: Meta<typeof Identity> = {
+  title: "Components/Identity",
   component: Identity,
-} as Meta;
-
-const Template: Story<IdentityProps> = (args) => (
-  <ThemeProvider theme={theme}>
-    <Identity {...args}></Identity>
-  </ThemeProvider>
-);
-
-export const Active = Template.bind({});
-Active.args = {
-  identity: {
-    name: "0x6Be450972b30891B16c8588DcBc10c8c2aEf04da",
-    ens: "xunkulapchvatal.eth",
-    active: true,
-  },
+  args: { onClick: fn() },
 };
+export default meta;
 
-export const Inactive = Template.bind({});
-Inactive.args = {
-  identity: {
-    name: "0x6Be450972b30891B16c8588DcBc10c8c2aEf04da",
-    ens: "xunkulapchvatal.eth",
-    active: false,
-  },
-};
+type Story = StoryObj<typeof Identity>;
 
-export const NoENS = Template.bind({});
-NoENS.args = {
-  identity: {
-    name: "0x6Be450972b30891B16c8588DcBc10c8c2aEf04da",
-    ens: null,
-    active: true,
-  },
-};
+// Deterministic gradient avatar derived from the address.
+export const Active: Story = { args: { identity: identityActive } };
+
+// Token-gated out: greyed, with the Select button disabled.
+export const Inactive: Story = { args: { identity: identityInactive } };
+
+export const WithEns: Story = { args: { identity: identityEns } };

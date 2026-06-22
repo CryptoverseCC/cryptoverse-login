@@ -1,97 +1,44 @@
-import React from "react";
-// also exported from '@storybook/react' if you can deal with breaking changes in 6.1
-import { Story, Meta } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
+import { ConnectWalletPage, Modes } from "../components/ConnectWalletPage";
+import { wallets, walletMetaMask, restrictionWithMessage } from "./fixtures";
 
-import {
-  ConnectWalletPage,
-  ConnectWalletPageProps,
-  Modes,
-} from "../components/ConnectWalletPage";
-import { injected } from "web3modal";
-import theme from "../theme";
-import { ThemeProvider } from "@material-ui/styles";
-import { walletProviders } from "../providers";
-
-export default {
-  title: "Pages/Connect Wallet Page",
+const meta: Meta<typeof ConnectWalletPage> = {
+  title: "Pages/ConnectWalletPage",
   component: ConnectWalletPage,
-} as Meta;
+  args: {
+    origin: "demo.app",
+    wallets,
+    mode: Modes.SELECT,
+    onConnect: fn(),
+    switchMode: fn(),
+  },
+};
+export default meta;
 
-const Template: Story<ConnectWalletPageProps> = (args) => (
-  <ThemeProvider theme={theme}>
-    <ConnectWalletPage
-      {...args}
-      switchMode={(m) => alert(`Switching mode to ${m}`)}
-    />
-  </ThemeProvider>
-);
+type Story = StoryObj<typeof ConnectWalletPage>;
 
-export const Opera = Template.bind({});
-Opera.args = {
-  origin: "https://web.ethmail.cc/",
-  onConnect: (provider) => alert(`Hello ${provider}`),
-  providers: [{ provider: injected.OPERA, active: true }, ...walletProviders],
-  mode: Modes.SELECT,
+// EIP-6963 + Coinbase + WalletConnect + an unbranded wallet (icon fallback).
+export const MultipleWallets: Story = {};
+
+export const SingleWallet: Story = { args: { wallets: [walletMetaMask] } };
+
+// Empty list → the "No wallet detected" guidance.
+export const NoWalletsDetected: Story = { args: { wallets: [] } };
+
+// A connect error surfaced as an Alert (e.g. the -32002 already-pending case).
+export const WithError: Story = {
+  args: {
+    error: "A connection request is already pending — open your wallet to approve it.",
+  },
 };
 
-export const Metamask = Template.bind({});
-Metamask.args = {
-  origin: "https://web.ethmail.cc/",
-  onConnect: (provider) => alert(`Hello ${provider}`),
-  providers: [
-    { provider: injected.METAMASK, active: true },
-    ...walletProviders,
-  ],
-  mode: Modes.SELECT,
+export const WithRestrictions: Story = {
+  args: { restrictions: restrictionWithMessage },
 };
 
-export const MissingWeb3Provider = Template.bind({});
-MissingWeb3Provider.args = {
-  origin: "https://web.ethmail.cc/",
-  onConnect: (provider) => alert(`Hello ${provider}`),
-  providers: [
-    {
-      provider: {
-        ...injected.FALLBACK,
-        name: "Wallet Not Detected",
-      },
-      active: false,
-    },
-    ...walletProviders,
-  ],
-  mode: Modes.SELECT,
-};
+export const HelpMode: Story = { args: { mode: Modes.HELP } };
 
-export const Restricted = Template.bind({});
-Restricted.args = {
-  origin: "https://web.ethmail.cc/",
-  onConnect: (provider) => alert(`Hello ${provider}`),
-  providers: [
-    { provider: injected.METAMASK, active: true },
-    ...walletProviders,
-  ],
-  restrictions: [
-    {
-      tokenAddress: "0xTokenAddress",
-      condition: "balanceOf >= 1000",
-    },
-  ],
-  mode: Modes.SELECT,
-};
-
-export const Help = Template.bind({});
-Help.args = {
-  origin: "https://web.ethmail.cc/",
-  onConnect: (provider) => alert(`Hello ${provider}`),
-  providers: [
-    { provider: injected.METAMASK, active: true },
-    ...walletProviders,
-  ],
-  restrictions: [
-    {
-      tokenAddress: "0xTokenAddress",
-      condition: "balanceOf >= 1000",
-    },
-  ],
-  mode: Modes.HELP,
+export const LongOrigin: Story = {
+  args: { origin: "some.really-long-subdomain.example.com" },
 };

@@ -1,41 +1,16 @@
-import React from "react";
-// also exported from '@storybook/react' if you can deal with breaking changes in 6.1
-import { Story, Meta } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { Background } from "../../backgrounds/FwB";
+import { makeMockLoginProvider } from "../mockLoginProvider";
 
-import { Background, BackgroundProps } from "../../backgrounds/FwB";
-import { ThemeProvider } from "@material-ui/styles";
-import theme from "../../theme";
-import { walletProviders } from "../../providers";
-
-export default {
+const meta: Meta<typeof Background> = {
   title: "Backgrounds/FwB",
   component: Background,
-} as Meta;
-
-const Template: Story<BackgroundProps> = (args) => (
-  <ThemeProvider theme={theme}>
-    <Background {...args}></Background>
-  </ThemeProvider>
-);
-
-export const Base = Template.bind({});
-Base.args = {
-  loginProvider: {
-    init: async () => ({ name: "" }),
-    login: async () => ({
-      signature: "",
-      message: "",
-      address: "",
-      challenge: "",
-    }),
-    connect: async () => ({ identities: [] }),
-    identities: async () => ({ identities: [] }),
-    loginData: {
-      siwe: { domain: "login.cryptoverse.cc", uri: "https://login.cryptoverse.cc/", statement: "Sign in to Cryptoverse Login", version: "1", chainId: 1, nonce: "0123456789abcdef", expirationMinutes: 10 },
-      challenge: "",
-      sourceId: "",
-      clientId: "fwb.cryptoverse.cc",
-    },
-  },
-  walletProviders: walletProviders,
+  parameters: { layout: "fullscreen" },
+  args: { loginProvider: makeMockLoginProvider() },
 };
+export default meta;
+
+type Story = StoryObj<typeof Background>;
+
+// The Friends-With-Benefits branded splash.
+export const Splash: Story = {};

@@ -1,15 +1,13 @@
-import React from "react";
-// also exported from '@storybook/react' if you can deal with breaking changes in 6.1
-import { Story, Meta } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react";
+import { Loader } from "../components/Loader";
 
-import { Loader, LoaderProps } from "../components/Loader";
-
-export default {
-  title: "Base/Loader",
+const meta: Meta<typeof Loader> = {
+  title: "Components/Loader",
   component: Loader,
-} as Meta;
+};
+export default meta;
 
-const Template: Story<LoaderProps> = (args) => <Loader {...args}></Loader>;
+type Story = StoryObj<typeof Loader>;
 
-export const Active = Template.bind({});
-Active.args = {};
+// The spinning loader shown during init / connect / sign.
+export const Default: Story = {};
