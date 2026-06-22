@@ -1,14 +1,14 @@
 import React, { useState, lazy, Suspense } from "react";
-import { makeStyles, Theme } from "@material-ui/core/styles";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
 import { ILoginProvider } from "../services/loginProvider";
-import { ProviderList } from "../components/ConnectWalletPage";
 import { Loader } from "../components/Loader";
 
 const App = lazy(
   () => import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "app" */ "../App")
 );
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles()((theme: Theme) => ({
   app: {
     position: "absolute",
     top: 0,
@@ -18,14 +18,10 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 export interface BackgroundProps {
   loginProvider: ILoginProvider;
-  walletProviders: ProviderList;
 }
 
-export const Background: React.FC<BackgroundProps> = ({
-  loginProvider,
-  walletProviders,
-}) => {
-  const classes = useStyles();
+export const Background: React.FC<BackgroundProps> = ({ loginProvider }) => {
+  const { classes } = useStyles();
   const [open, setOpen] = useState(false);
   return (
     <Suspense fallback={<Loader />}>
@@ -176,11 +172,7 @@ export const Background: React.FC<BackgroundProps> = ({
         src="https://freight.cargo.site/w/750/i/05fa11c73bebaec7407875332dc2c3bbe92a26f8a13f53af3cea7fd0230bd755/1082919_SMPNG_776241850T539131C.png"
       />
       {open && (
-        <App
-          className={classes.app}
-          loginProvider={loginProvider}
-          walletProviders={walletProviders}
-        />
+        <App className={classes.app} loginProvider={loginProvider} />
       )}
     </Suspense>
   );

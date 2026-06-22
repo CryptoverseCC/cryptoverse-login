@@ -1,25 +1,26 @@
 import React from "react";
 
-import { IconButton } from "@material-ui/core";
-import AppBar from "@material-ui/core/AppBar";
-import Grid from "@material-ui/core/Grid";
-import { makeStyles, Theme } from "@material-ui/core/styles";
-import Toolbar from "@material-ui/core/Toolbar";
-import Typography from "@material-ui/core/Typography";
-import ArrowBackIcon from "@material-ui/icons/ArrowBack";
-import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
+import { IconButton, Alert } from "@mui/material";
+import AppBar from "@mui/material/AppBar";
+import Grid from "@mui/material/GridLegacy";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
-import { IProviderInfo } from "web3modal";
 import {
   IIdentity,
   TLoginRequest,
   TRestrictions,
+  TWalletInfo,
 } from "../services/loginProvider";
 import { Identity } from "./Identity";
 import { Restrictions } from "./Restrictions";
 import { CryptoverseFamily } from "./CryptoverseFaimily";
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles()((theme: Theme) => ({
   main: {
     padding: theme.spacing(5),
   },
@@ -66,8 +67,9 @@ export interface LoginPageProps {
   onSelectWallet: () => void;
   restrictions?: TRestrictions;
   origin: string;
-  provider: IProviderInfo;
+  wallet: TWalletInfo;
   identities: IIdentity[];
+  error?: string | null;
   mode: Modes;
   switchMode: (mode: Modes) => void;
 }
@@ -77,12 +79,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onSelectWallet,
   restrictions,
   origin,
-  provider,
+  wallet,
   identities,
+  error,
   mode,
   switchMode,
 }) => {
-  const classes = useStyles();
+  const { classes } = useStyles();
   return (
     <>
       {mode === Modes.SELECT && (
@@ -101,7 +104,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </IconButton>
 
                 <Typography color="inherit" className={classes.title}>
-                  Login with {provider.name}
+                  Login with {wallet.name}
                 </Typography>
                 <HelpOutlineIcon onClick={() => switchMode(Modes.HELP)} />
               </Toolbar>
@@ -117,6 +120,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               className={classes.restrictions}
             >
               <Restrictions restrictions={restrictions}></Restrictions>
+            </Grid>
+          )}
+          {error && (
+            <Grid
+              key={"error"}
+              item
+              container
+              xs={12}
+              justifyContent="center"
+              className={classes.restrictions}
+            >
+              <Alert severity="warning" variant="outlined">
+                {error}
+              </Alert>
             </Grid>
           )}
           <Grid

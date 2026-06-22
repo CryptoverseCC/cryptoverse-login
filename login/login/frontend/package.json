@@ -1,75 +1,51 @@
 {
   "name": "login-v2",
   "version": "0.1.0",
-  "homepage": "/login",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@craco/craco": "^7.1.0",
-    "@material-ui/core": "^4.12.4",
-    "@material-ui/icons": "^4.11.3",
-    "@material-ui/lab": "^4.0.0-alpha.61",
-    "@myetherwallet/mewconnect-web-client": "^2.2.0-beta.18",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^14.0.0",
-    "@testing-library/user-event": "^14.4.3",
-    "@types/jest": "^29.5.3",
-    "@types/node": "^20.4.5",
-    "@types/react": "^18.2.17",
-    "@types/react-dom": "^18.2.7",
-    "@walletconnect/web3-provider": "^1.8.0",
-    "axios": "^1.4.0",
-    "buffer": "^6.0.3",
-    "comlink": "^4.4.1",
-    "ethers": "6.6.7",
-    "postcss-normalize": "^10.0.1",
-    "process": "^0.11.10",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "source-map-explorer": "^2.5.3",
-    "stream-browserify": "^3.0.0",
-    "typescript": "^4.0.0",
-    "web3modal": "^1.9.12"
+    "@emotion/react": "^11.13.5",
+    "@emotion/styled": "^11.13.5",
+    "@mui/icons-material": "^7.0.0",
+    "@mui/material": "^7.0.0",
+    "@wagmi/connectors": "^5.7.5",
+    "@wagmi/core": "^2.15.2",
+    "comlink": "^4.4.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tss-react": "^4.9.21",
+    "viem": "^2.21.45"
   },
   "scripts": {
-    "start": "craco start",
-    "build": "craco build",
-    "test": "craco test",
-    "analyze": "source-map-explorer build/static/js/embed.js build/static/js/embed.js.map",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
   "devDependencies": {
-    "@storybook/addon-essentials": "^7.1.1",
-    "@storybook/addon-interactions": "^7.1.1",
-    "@storybook/addon-links": "^7.1.1",
-    "@storybook/blocks": "^7.1.1",
-    "@storybook/preset-create-react-app": "^7.1.1",
-    "@storybook/react": "^7.1.1",
-    "@storybook/react-webpack5": "^7.1.1",
-    "@storybook/testing-library": "^0.2.0",
-    "babel-plugin-named-exports-order": "^0.0.2",
-    "prop-types": "^15.8.1",
-    "responsive-loader": "^3.1.2",
-    "sharp": "^0.32.4",
-    "storybook": "^7.1.1",
-    "webpack-bundle-analyzer": "^4.9.0"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ],
-    "overrides": [
-      {
-        "files": [
-          "**/*.stories.*"
-        ],
-        "rules": {
-          "import/no-anonymous-default-export": "off"
-        }
-      }
-    ]
+    "@storybook/addon-essentials": "^8.4.7",
+    "@storybook/addon-interactions": "^8.4.7",
+    "@storybook/addon-links": "^8.4.7",
+    "@storybook/blocks": "^8.4.7",
+    "@storybook/react": "^8.4.7",
+    "@storybook/react-vite": "^8.4.7",
+    "@storybook/test": "^8.4.7",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "storybook": "^8.4.7",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
   },
   "browserslist": {
     "production": [

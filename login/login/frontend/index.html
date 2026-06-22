@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Sign in with your Ethereum wallet"
+    />
+    <title>{{ title }} - Login with Ethereum Wallet</title>
+    <script
+      id="sentry"
+      async
+      src="/login/sentry.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <!--
+      Login data is delivered as a JSON data block (not executable JS), so the
+      production build's JS minifier never touches it and there are no string-
+      quoting hazards. The backend renders the whole object here; the app reads
+      it via document.getElementById("login-data") (see services/loginProvider).
+      NB: minijinja parses its delimiters even inside HTML comments, so don't put
+      placeholder examples here. Vite only rewrites script/link asset references.
+    -->
+    <script type="application/json" id="login-data">{{ login_data | safe }}</script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>

@@ -116,3 +116,6 @@ dist
 .pnp.*
 
 build/
+
+# Storybook build output
+storybook-static/

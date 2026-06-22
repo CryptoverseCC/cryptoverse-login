@@ -1,54 +1,34 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import CssBaseline from "@material-ui/core/CssBaseline";
-import { ThemeProvider } from "@material-ui/core/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
 import theme from "./theme";
-import {
-  LoginProvider,
-  loginData,
-  ILoginProvider,
-} from "./services/loginProvider";
-import { walletProviders } from "./providers";
+import { LoginProvider, ILoginProvider } from "./services/loginProvider";
 import { Background as FwBBackground } from "./backgrounds/FwB";
 import { Background as DefaultBackground } from "./backgrounds/Default";
-import { ProviderList } from "./components/ConnectWalletPage";
 
 const provider = LoginProvider(null);
 
 interface BackgroundProps {
   loginProvider: ILoginProvider;
-  walletProviders: ProviderList;
 }
 
-const Background: React.FC<BackgroundProps> = ({
-  loginProvider,
-  walletProviders,
-}) => {
+const Background: React.FC<BackgroundProps> = ({ loginProvider }) => {
   let origin =
     loginProvider.loginData.metadata?.app || loginProvider.loginData.clientId;
   switch (origin) {
     case "fwb.cryptoverse.cc":
-      return (
-        <FwBBackground
-          loginProvider={loginProvider}
-          walletProviders={walletProviders}
-        />
-      );
+      return <FwBBackground loginProvider={loginProvider} />;
     default:
-      return (
-        <DefaultBackground
-          loginProvider={loginProvider}
-          walletProviders={walletProviders}
-        />
-      );
+      return <DefaultBackground loginProvider={loginProvider} />;
   }
 };
 
 const container = document.getElementById("root");
-const root = createRoot(container!); // createRoot(container!) if you use TypeScript
+const root = createRoot(container!);
 root.render(
   <ThemeProvider theme={theme}>
     <CssBaseline />
-    <Background loginProvider={provider} walletProviders={walletProviders} />
+    <Background loginProvider={provider} />
   </ThemeProvider>
 );

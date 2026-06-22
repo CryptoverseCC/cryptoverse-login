@@ -1,16 +1,13 @@
 import * as Comlink from "comlink";
 
-export type TProviderID = string;
 export type TProviderName = string;
 export type TEthereumAddress = string;
 export type TTokenAddress = string;
-export type TENS = string;
 export type TSignature = string;
-export type TCSRF = string;
 export type TChallenge = string;
 export type TSourceId = string;
 export type TClientId = string;
-export type TAppName = string
+export type TAppName = string;
 
 export type TCondition = string;
 export type TMessage = string;
@@ -18,141 +15,168 @@ export type TMessage = string;
 // EIP-4361 (Sign-In with Ethereum) parameters supplied by the backend in
 // `loginData.siwe`. The frontend assembles the canonical message from these.
 export type TSiweParams = {
-    domain: string;
-    uri: string;
-    statement: string;
-    version: string;
-    chainId: number;
-    nonce: string;
-    expirationMinutes: number;
-}
+  domain: string;
+  uri: string;
+  statement: string;
+  version: string;
+  chainId: number;
+  nonce: string;
+  expirationMinutes: number;
+};
 
 export type TRestriction = {
-    tokenAddress: TTokenAddress;
-    condition: TCondition;
-    message?: TMessage;
-}
+  tokenAddress: TTokenAddress;
+  condition: TCondition;
+  message?: TMessage;
+};
 
 export type TRestrictions = TRestriction[];
 
 export type TMetadata = {
-    app: TAppName
-    restrictions: TRestrictions
-}
+  app: TAppName;
+  restrictions: TRestrictions;
+};
 
 export type TLoginData = {
-    siwe: TSiweParams
-    challenge: TChallenge
-    sourceId: TSourceId
-    clientId: TClientId
-    restrictions?: TRestrictions
-    metadata?: TMetadata
+  siwe: TSiweParams;
+  challenge: TChallenge;
+  sourceId: TSourceId;
+  clientId: TClientId;
+  restrictions?: TRestrictions;
+  metadata?: TMetadata;
+  // WalletConnect Cloud / Reown project id, injected by the backend (empty when
+  // unset — the WalletConnect connector is then omitted and injected wallets
+  // still work). Kept here so the IdP stays deployment-agnostic (no hardcoded key).
+  walletConnectProjectId?: string;
 };
 
 // Login data is rendered by the backend into a `<script type="application/json"
-// id="login-data">` block in index.html; parse it here.
-const loginDataElement = typeof document !== "undefined" ? document.getElementById("login-data") : null;
-export const loginData = JSON.parse(loginDataElement?.textContent || "{}") as TLoginData;
+// id="login-data">` block in index.html; parse it here. NB: only the iframe
+// (the React app) carries this block — the top-window embed receives what it
+// needs (e.g. the WalletConnect project id) over Comlink via `init`.
+const loginDataElement =
+  typeof document !== "undefined" ? document.getElementById("login-data") : null;
+export const loginData = JSON.parse(
+  loginDataElement?.textContent || "{}"
+) as TLoginData;
 
 export interface IIdentity {
-    name: string;
-    ens: string | null;
-    active: boolean;
+  name: string;
+  ens: string | null;
+  active: boolean;
 }
 
-export type TInitRequest = {}
+// A wallet the user can connect with. Derived from a wagmi connector
+// (EIP-6963-discovered injected wallets, WalletConnect, Coinbase). `id` is the
+// connector's runtime uid; `logo` is its icon when the wallet advertises one.
+export type TWalletInfo = {
+  id: string;
+  name: TProviderName;
+  logo?: string;
+};
+
+export type TInitRequest = {
+  walletConnectProjectId?: string;
+  appName?: string;
+};
 
 export type TInitResponse = {
-    name: TProviderName | null;
-}
+  wallets: TWalletInfo[];
+};
 
 export type TConnectRequest = {
-    name: TProviderName
-}
+  id: string;
+};
 
 export type TConnectResponse = {
-    identities: IIdentity[]
-}
+  identities: IIdentity[];
+  // Human-readable reason when a connection couldn't complete (rejected,
+  // already-pending, etc.) so the UI can show it instead of failing silently.
+  error?: string;
+};
 
-export type TIdentitiesRequest = {
-
-}
+export type TIdentitiesRequest = {};
 
 export type TIdentitiesResponse = {
-    identities: IIdentity[]
-} | null
-
+  identities: IIdentity[];
+} | null;
 
 export type TLoginResponse = {
-    // The full EIP-4361 message that was signed, posted to the backend for
-    // verification (which re-derives the expected nonce from the challenge).
-    message: TMessage;
-    signature: TSignature;
-    challenge: TChallenge;
-    address: TEthereumAddress;
-} | null
+  // The full EIP-4361 message that was signed, posted to the backend for
+  // verification (which re-derives the expected nonce from the challenge).
+  message: TMessage;
+  signature: TSignature;
+  challenge: TChallenge;
+  address: TEthereumAddress;
+} | null;
 
 export type TLoginRequest = {
-    address: TEthereumAddress
-}
-
+  address: TEthereumAddress;
+};
 
 export type TInnerLoginRequest = {
-    address: TEthereumAddress
-    siwe: TSiweParams
-    challenge: TChallenge
-}
+  address: TEthereumAddress;
+  siwe: TSiweParams;
+  challenge: TChallenge;
+};
 
 export interface IProvider {
-    init: (request: TInitRequest) => Promise<TInitResponse>;
-    connect: (request: TConnectRequest) => Promise<TConnectResponse>,
-    identities: (request: TIdentitiesRequest) => Promise<TIdentitiesResponse>;
-    login: (request: TInnerLoginRequest) => Promise<TLoginResponse>;
-    redirect: (url: string) => void;
+  init: (request: TInitRequest) => Promise<TInitResponse>;
+  connect: (request: TConnectRequest) => Promise<TConnectResponse>;
+  identities: (request: TIdentitiesRequest) => Promise<TIdentitiesResponse>;
+  login: (request: TInnerLoginRequest) => Promise<TLoginResponse>;
+  redirect: (url: string) => void;
 }
 
 interface CommunicationChannel {
-    loginProvider: Comlink.Remote<IProvider> | IProvider;
+  loginProvider: Comlink.Remote<IProvider> | IProvider;
 }
 
 let channel = {
-    loginProvider: Comlink.wrap(Comlink.windowEndpoint(window.parent)),
+  loginProvider: Comlink.wrap(Comlink.windowEndpoint(window.parent)),
 } as CommunicationChannel;
 
-function init(request: TInitRequest) {
-    return channel.loginProvider.init(request);
+function init(_request: TInitRequest) {
+  // The embed lives in a separate top-window page without the login-data block,
+  // so hand it the request-derived config it needs to build the wagmi config.
+  return channel.loginProvider.init({
+    walletConnectProjectId: loginData.walletConnectProjectId,
+    appName: loginData.metadata?.app,
+  });
 }
 
 function connect(request: TConnectRequest) {
-    return channel.loginProvider.connect(request);
+  return channel.loginProvider.connect(request);
 }
 
 function identities(request: TIdentitiesRequest) {
-    return channel.loginProvider.identities(request);
+  return channel.loginProvider.identities(request);
 }
 
 function login(request: TLoginRequest) {
-    return channel.loginProvider.login({
-        address: request.address,
-        siwe: loginData.siwe,
-        challenge: loginData.challenge,
-    });
+  return channel.loginProvider.login({
+    address: request.address,
+    siwe: loginData.siwe,
+    challenge: loginData.challenge,
+  });
 }
 
 export interface ILoginProvider {
-    loginData: TLoginData
-    init: (reqeust: TInitRequest) => Promise<TInitResponse>;
-    connect: (request: TConnectRequest) => Promise<TConnectResponse>,
-    login: (request: TLoginRequest) => Promise<TLoginResponse>;
-    identities: (request: TIdentitiesRequest) => Promise<TIdentitiesResponse>;
+  loginData: TLoginData;
+  init: (request: TInitRequest) => Promise<TInitResponse>;
+  connect: (request: TConnectRequest) => Promise<TConnectResponse>;
+  login: (request: TLoginRequest) => Promise<TLoginResponse>;
+  identities: (request: TIdentitiesRequest) => Promise<TIdentitiesResponse>;
 }
 
-export function LoginProvider(channel: CommunicationChannel | null): ILoginProvider {
-    return {
-        loginData: loginData,
-        init: init,
-        connect: connect,
-        login: login,
-        identities: identities,
-    }
+export function LoginProvider(
+  _channel: CommunicationChannel | null
+): ILoginProvider {
+  return {
+    loginData: loginData,
+    init: init,
+    connect: connect,
+    login: login,
+    identities: identities,
+  };
 }

@@ -1,16 +1,16 @@
 import React, { useState, lazy, Suspense, StrictMode } from "react";
 
-import Avatar from "@material-ui/core/Avatar";
-import Box from "@material-ui/core/Box";
-import Button from "@material-ui/core/Button";
-import CssBaseline from "@material-ui/core/CssBaseline";
-import Grid from "@material-ui/core/Grid";
-import Link from "@material-ui/core/Link";
-import Paper from "@material-ui/core/Paper";
-import { makeStyles, Theme } from "@material-ui/core/styles";
-import Typography from "@material-ui/core/Typography";
-import LockOutlinedIcon from "@material-ui/icons/LockOutlined";
-import { ProviderList } from "../components/ConnectWalletPage";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CssBaseline from "@mui/material/CssBaseline";
+import Grid from "@mui/material/GridLegacy";
+import Link from "@mui/material/Link";
+import Paper from "@mui/material/Paper";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
+import Typography from "@mui/material/Typography";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { ILoginProvider } from "../services/loginProvider";
 import { Loader } from "../components/Loader";
 
@@ -21,7 +21,7 @@ const App = lazy(
     )
 );
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles()((theme: Theme) => ({
   root: {
     height: "100vh",
   },
@@ -29,7 +29,7 @@ const useStyles = makeStyles((theme: Theme) => ({
     backgroundImage: "url(/login/ethereum-logo.png)",
     backgroundRepeat: "no-repeat",
     backgroundColor:
-      theme.palette.type === "light"
+      theme.palette.mode === "light"
         ? theme.palette.grey[50]
         : theme.palette.grey[900],
     backgroundSize: "60%",
@@ -69,7 +69,7 @@ const useStyles = makeStyles((theme: Theme) => ({
 }));
 
 function Info() {
-  const classes = useStyles();
+  const { classes } = useStyles();
   return (
     <Typography
       variant="body2"
@@ -92,14 +92,10 @@ function Info() {
 
 export interface BackgroundProps {
   loginProvider: ILoginProvider;
-  walletProviders: ProviderList;
 }
 
-export const Background: React.FC<BackgroundProps> = ({
-  loginProvider,
-  walletProviders,
-}) => {
-  const classes = useStyles();
+export const Background: React.FC<BackgroundProps> = ({ loginProvider }) => {
+  const { classes } = useStyles();
   const [open, setOpen] = useState(false);
   let origin = loginProvider.loginData.metadata?.app || loginProvider.loginData.clientId;
   return (
@@ -164,11 +160,7 @@ export const Background: React.FC<BackgroundProps> = ({
       )}
       {open && (
         <Suspense fallback={<Loader />}>
-          <App
-            className={classes.app}
-            loginProvider={loginProvider}
-            walletProviders={walletProviders}
-          />
+          <App className={classes.app} loginProvider={loginProvider} />
         </Suspense>
       )}
     </StrictMode>

@@ -1,16 +1,21 @@
 import * as Comlink from "comlink";
 
 interface Redirector {
-  redirect(url: string): void
+  redirect(url: string): void;
 }
 
+// The `final` bundle is a dedicated Vite entry loaded ONLY by the wrapper's
+// final.html, which sets `window.redirectUrl` in an inline script beforehand.
+// It asks the top window (the embed, over Comlink) to perform the final
+// redirect back to the relying party. The `if (url)` guard is defensive.
 async function main() {
-  let loginProvider = Comlink.wrap<Redirector>(Comlink.windowEndpoint(window.parent));
-  let url = (window as any).redirectUrl as string;
-  // TODO: fix, this file is included in main index.html by mistake and causing redirectwith undefined url
+  const loginProvider = Comlink.wrap<Redirector>(
+    Comlink.windowEndpoint(window.parent)
+  );
+  const url = (window as unknown as { redirectUrl?: string }).redirectUrl;
   if (url) {
     loginProvider.redirect(url);
   }
-
 }
+
 main();

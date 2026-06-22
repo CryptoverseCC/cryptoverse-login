@@ -1,11 +1,12 @@
 import React from "react";
 
-import Grid from "@material-ui/core/Grid";
-import { makeStyles, Theme } from "@material-ui/core/styles";
-import Typography from "@material-ui/core/Typography";
-import { Divider } from "@material-ui/core";
+import Grid from "@mui/material/GridLegacy";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
+import Typography from "@mui/material/Typography";
+import { Divider } from "@mui/material";
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles()((theme: Theme) => ({
   divider: {
     marginTop: 10,
     marginBottom: 10,
@@ -31,7 +32,7 @@ const useStyles = makeStyles((theme: Theme) => ({
 export interface CryptoverseFamilyProps {}
 
 export const CryptoverseFamily: React.FC<CryptoverseFamilyProps> = () => {
-  const classes = useStyles();
+  const { classes } = useStyles();
   return (
     <Grid key={"family"} item container xs={12}>
       <Grid key={"divider"} item xs={12} className={classes.divider}>
@@ -41,7 +42,7 @@ export const CryptoverseFamily: React.FC<CryptoverseFamilyProps> = () => {
         <Typography variant="h6">Cryptoverse Family</Typography>
       </Grid>
       <Grid key={"items"} item container xs={12} className={classes.help}>
-        <Typography className={classes.helpText}>
+        <Typography component="div" className={classes.helpText}>
           <a target="_blank" rel="noreferrer" href="https://cryptoauth.io/">
             Cryptoauth.io
           </a>{" "}

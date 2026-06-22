@@ -1,25 +1,25 @@
 import React from "react";
 
-import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
-import { makeStyles, Theme } from "@material-ui/core/styles";
-import Typography from "@material-ui/core/Typography";
-import AppBar from "@material-ui/core/AppBar";
-import Toolbar from "@material-ui/core/Toolbar";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
+import Typography from "@mui/material/Typography";
+import AppBar from "@mui/material/AppBar";
+import Toolbar from "@mui/material/Toolbar";
 import { Wallet } from "./Wallet";
-import Grid from "@material-ui/core/Grid";
-import { IProviderInfo } from "web3modal";
+import Grid from "@mui/material/GridLegacy";
 import { Nav } from "./Nav";
 import { Restrictions } from "./Restrictions";
-import { TRestrictions } from "../services/loginProvider";
-import ArrowBackIcon from "@material-ui/icons/ArrowBack";
-import { IconButton } from "@material-ui/core";
+import { TRestrictions, TWalletInfo } from "../services/loginProvider";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { IconButton, Alert } from "@mui/material";
 
 import metamaskImage from "./images/metamask.png";
 import operaImage from "./images/opera.png";
 import othersImage from "./images/others.png";
 import { CryptoverseFamily } from "./CryptoverseFaimily";
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles()((theme: Theme) => ({
   main: {
     [theme.breakpoints.up("sm")]: {
       padding: theme.spacing(3),
@@ -70,36 +70,31 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
 }));
 
-export interface ProviderItem {
-  provider: IProviderInfo;
-  active: boolean;
-}
-
 export enum Modes {
   SELECT = "select",
   HELP = "help",
 }
 
-export type ProviderList = ProviderItem[];
-
 export interface ConnectWalletPageProps {
-  onConnect: (provider: IProviderInfo) => void;
-  providers: ProviderList;
+  onConnect: (wallet: TWalletInfo) => void;
+  wallets: TWalletInfo[];
   restrictions?: TRestrictions;
   origin: string;
+  error?: string | null;
   mode: Modes;
   switchMode: (mode: Modes) => void;
 }
 
 export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
   onConnect,
-  providers,
+  wallets,
   restrictions,
   origin,
+  error,
   mode,
   switchMode,
 }) => {
-  const classes = useStyles();
+  const { classes } = useStyles();
   return (
     <>
       {mode === Modes.SELECT && (
@@ -124,9 +119,23 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
           >
             <Grid key={"header"} item container xs={12} justifyContent="center">
               <Typography variant="h6">
-                Which wallet you want to use?
+                Which wallet do you want to use?
               </Typography>
             </Grid>
+            {error && (
+              <Grid
+                key={"error"}
+                item
+                container
+                xs={12}
+                justifyContent="center"
+                className={classes.main}
+              >
+                <Alert severity="warning" variant="outlined">
+                  {error}
+                </Alert>
+              </Grid>
+            )}
             {restrictions && (
               <Grid
                 key={"restrictions"}
@@ -146,14 +155,20 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               className={classes.main}
               justifyContent="center"
             >
-              {providers.map((providerItem, index) => (
-                <Wallet
-                  key={providerItem.provider.id + index}
-                  onClick={() => onConnect(providerItem.provider)}
-                  active={providerItem.active}
-                  provider={providerItem.provider}
-                ></Wallet>
-              ))}
+              {wallets.length === 0 ? (
+                <Typography className={classes.helpText}>
+                  No wallet detected. Install a browser wallet (e.g. MetaMask or
+                  Rabby), or use WalletConnect to connect a mobile wallet.
+                </Typography>
+              ) : (
+                wallets.map((wallet) => (
+                  <Wallet
+                    key={wallet.id}
+                    onClick={onConnect}
+                    wallet={wallet}
+                  ></Wallet>
+                ))
+              )}
             </Grid>
           </Grid>
         </Grid>
@@ -204,9 +219,9 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
 
               <Typography className={classes.helpText}>
                 In this step you should select a wallet you want to use to login
-                into {origin}. If you are using mobile wallet with dapp browser
-                or Metamask extension you should see the logo of your wallet as
-                the first choice. You should select it.
+                into {origin}. If you are using a mobile wallet with a dapp
+                browser or a browser-extension wallet (MetaMask, Rabby, …) you
+                should see it listed here — select it.
               </Typography>
 
               <img
@@ -224,10 +239,9 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               />
 
               <Typography className={classes.helpText}>
-                If you are using a browser witch doesn't provide wallet
-                capabilities you can use Wallet Connect to connect to many
-                mobile browsers or MyEtherWallet to connect to MyEtherWallet
-                mobile wallet
+                If your browser doesn't provide a wallet, use WalletConnect to
+                connect a mobile wallet by scanning a QR code, or use Coinbase
+                Wallet.
               </Typography>
 
               <img

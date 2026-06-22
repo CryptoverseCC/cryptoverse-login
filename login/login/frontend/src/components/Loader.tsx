@@ -1,32 +1,24 @@
 import React from "react";
 
-import { makeStyles, Theme } from "@material-ui/core/styles";
-
-const useStyles = makeStyles((theme: Theme) => {
-  return {
-    loader: {
-      position: "relative",
-      left: "50%",
-      top: "50%",
-      zIndex: 1,
-      width: 120,
-      height: 120,
-      margin: "0 0 0 -76px",
-      border: "16px solid #f3f3f3",
-      borderRadius: "50%",
-      borderTop: `16px solid ${theme.palette.primary.main}`,
-      animation: "$spin 2s linear infinite",
-    },
-    "@keyframes spin": {
-      "0%": { transform: "rotate(0deg)" },
-      "100%": { transform: "rotate(360deg)" },
-    },
-  };
-});
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
 
 export interface LoaderProps {}
 
-export const Loader: React.FC<LoaderProps> = () => {
-  let classes = useStyles();
-  return <div className={classes.loader} role="progressbar"></div>;
-};
+// MUI's CircularProgress carries its own (working) animation — the previous
+// hand-rolled spinner used JSS's `$spin` keyframes reference, which emotion /
+// tss-react don't resolve, so it never actually spun.
+export const Loader: React.FC<LoaderProps> = () => (
+  <Box
+    role="progressbar"
+    sx={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      width: "100%",
+      minHeight: "60vh",
+    }}
+  >
+    <CircularProgress size={96} thickness={4} />
+  </Box>
+);

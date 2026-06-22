@@ -1,92 +1,71 @@
-
 import {
-  TConnectRequest,
-  TConnectResponse,
-  TEthereumAddress
-} from "../services/loginProvider";
-import { Window, setIdentities, getProvider, setProvider } from "./utils";
+  connect as wagmiConnect,
+  disconnect,
+  getAccount,
+} from "@wagmi/core";
+import { TConnectRequest, TConnectResponse } from "../services/loginProvider";
+import {
+  Window,
+  getConfig,
+  findConnector,
+  setIdentities,
+  getIdentities,
+} from "./utils";
 
-export const connect = async ({ name }: TConnectRequest): Promise<TConnectResponse> => {
-  const MewConnect = (await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "mew" */ '@myetherwallet/mewconnect-web-client')).default;
-  const WalletConnectProvider = (await import(/* webpackMode: "lazy", webpackPreload: true, webpackChunkName: "wc" */ "@walletconnect/web3-provider")).default;
-  const BrowserProvider = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "ethers" */ 'ethers')).BrowserProvider;
-  const Web3Modal = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal" */ "web3modal")).default;
-  const getProviderInfoByName = (await import(/* webpackMode: "eager", webpackPreload: true, webpackChunkName: "web3modal-gpi" */ "web3modal")).getProviderInfoByName;
-
-  console.info(`Connect: name: ${name}`);
-
-  let providerOptions: any = {}
-
-  //TODO: make better condition
-  if (name === "WalletConnect") {
-    providerOptions["walletconnect"] = {
-      package: WalletConnectProvider,
-      options: {
-        infuraId: "b14cd69b84584cc39ec753dfaf245d63", // TODO: Move to some settings
-      },
-    }
+// Map wallet/RPC errors to something a user can act on.
+function humanize(error: unknown): string {
+  const e = error as { code?: number; name?: string; cause?: { code?: number } };
+  const code = e?.code ?? e?.cause?.code;
+  if (code === 4001 || e?.name === "UserRejectedRequestError") {
+    return "Connection request rejected in your wallet.";
   }
-
-  //TODO: make better condition
-  if (name === "MEW wallet") {
-    providerOptions["mewconnect"] = {
-      package: MewConnect,
-      options: {
-        infuraId: "b14cd69b84584cc39ec753dfaf245d63", // TODO: Move to some settings
-      }
-    }
+  if (code === -32002) {
+    return "A connection request is already pending — open your wallet to approve it.";
   }
+  return "Couldn't connect to the wallet. Please try again.";
+}
 
+// A single connect can be in flight at a time (a wallet only handles one
+// `eth_requestAccounts` prompt). A second click while one is pending must not
+// fire another request — that's what produced the silent -32002 in the console.
+let inflight: Promise<TConnectResponse> | null = null;
+
+export const connect = async ({
+  id,
+}: TConnectRequest): Promise<TConnectResponse> => {
   const sentry = (window as unknown as Window).Sentry;
 
-  const web3Modal = new Web3Modal({
-    network: "mainnet",
-    //cacheProvider: true,
-    providerOptions,
-  });
-
-  sentry.onLoad(() => sentry?.setContext("providerName", { name }));
-
-  const pi = getProviderInfoByName(name)
-
-  let prvder: any;
-
-  try {
-    prvder = await web3Modal.connectTo(pi.id);
-  } catch (error) {
-    sentry.onLoad(() => sentry?.setContext("providerInstance", { prvder }));
-    sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter
-    return { identities: [] };
+  if (inflight) {
+    return {
+      identities: getIdentities(),
+      error: "A wallet request is already in progress — check your wallet.",
+    };
   }
 
-  setProvider(new BrowserProvider(prvder));
-
-  let addresses: TEthereumAddress[];
-
-  try {
-    addresses = await getProvider().send("eth_requestAccounts", []);
-  } catch (error) {
-    sentry?.captureException(error); // TODO: wrap Sentry in some service eg. ErrorReporter
-    return { identities: [] };
+  const config = getConfig();
+  const connector = findConnector(config, id);
+  if (!connector) {
+    return { identities: [], error: "That wallet is no longer available." };
   }
 
-  sentry.onLoad(() => sentry?.setContext("user", { addresses }));
-
-  if (!addresses) {
+  inflight = (async (): Promise<TConnectResponse> => {
     try {
-      await (prvder as unknown as any).enable();
-      addresses = await getProvider().listAccounts();
+      // A lingering connection makes wagmi throw "already connected"; drop it so
+      // re-selecting a wallet (or switching wallets) starts a clean request.
+      if (getAccount(config).isConnected) {
+        await disconnect(config).catch(() => {});
+      }
+      const result = await wagmiConnect(config, { connector });
+      return { identities: setIdentities(result.accounts) };
     } catch (error) {
-      sentry.onLoad(() => sentry?.captureException(error)); // TODO: wrap Sentry in some service eg. ErrorReporter
-      return { identities: [] };
+      sentry?.captureException?.(error);
+      return { identities: [], error: humanize(error) };
     }
+  })();
+
+  try {
+    return await inflight;
+  } finally {
+    inflight = null;
   }
-
-  sentry.onLoad(() => sentry?.setContext("user", { addresses }));
-
-  if (!addresses) {
-    return { identities: [] }
-  }
-
-  return { identities: setIdentities(addresses) };
 };

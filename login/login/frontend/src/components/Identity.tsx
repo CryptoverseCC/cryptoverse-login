@@ -1,14 +1,33 @@
 import React from "react";
 
-import { makeStyles, Theme } from "@material-ui/core/styles";
-import Typography from "@material-ui/core/Typography";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
+import Typography from "@mui/material/Typography";
 
-import Grid from "@material-ui/core/Grid";
-import { Avatar, Button, Paper, Tooltip } from "@material-ui/core";
+import Grid from "@mui/material/GridLegacy";
+import { Avatar, Button, Paper, Tooltip } from "@mui/material";
 
 import { IIdentity } from "../services/loginProvider";
 
-const useStyles = makeStyles((theme: Theme) => {
+// A deterministic, dependency-free gradient avatar derived from the address —
+// always renders (unlike the old my.cryptoverse.cc profile URL, which 404s for
+// most addresses) and is visually unique per account.
+function gradientAvatar(address: string): string {
+  const a = address.toLowerCase().replace(/^0x/, "").padEnd(40, "0");
+  const c1 = `#${a.slice(0, 6)}`;
+  const c2 = `#${a.slice(10, 16)}`;
+  const c3 = `#${a.slice(30, 36)}`;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0%" stop-color="${c1}"/>` +
+    `<stop offset="50%" stop-color="${c2}"/>` +
+    `<stop offset="100%" stop-color="${c3}"/></linearGradient></defs>` +
+    `<rect width="80" height="80" fill="url(#g)"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const useStyles = makeStyles()((theme: Theme) => {
   const identity = {
     paddingLeft: theme.spacing(1),
     paddingRight: theme.spacing(1),
@@ -47,7 +66,7 @@ export interface IdentityProps {
 }
 
 export const Identity: React.FC<IdentityProps> = ({ identity, onClick }) => {
-  const classes = useStyles();
+  const { classes } = useStyles();
   return (
     <Grid
       item
@@ -66,7 +85,7 @@ export const Identity: React.FC<IdentityProps> = ({ identity, onClick }) => {
           <Paper elevation={3} className={classes.paper}>
             <Grid item container xs={12} justifyContent="center">
               <Avatar
-                src={`https://my.cryptoverse.cc/profile/${identity.name}.png`}
+                src={gradientAvatar(identity.name)}
                 alt={identity.name}
                 className={classes.avatar}
                 variant="rounded"

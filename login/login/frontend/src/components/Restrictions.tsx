@@ -1,11 +1,12 @@
 import React from "react";
 
-import { makeStyles, Theme } from "@material-ui/core/styles";
-import { Alert, AlertTitle } from "@material-ui/lab";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
+import { Alert, AlertTitle } from "@mui/material";
 
 import { TRestrictions } from "../services/loginProvider";
 
-const useStyles = makeStyles((theme: Theme) => {
+const useStyles = makeStyles()((theme: Theme) => {
   return {
     root: {},
   };
@@ -16,11 +17,11 @@ export interface RestrictionsProps {
 }
 
 export const Restrictions: React.FC<RestrictionsProps> = ({ restrictions }) => {
-  const classes = useStyles();
+  const { classes } = useStyles();
   return (
     <div className={classes.root}>
-      {restrictions.map((restriction) => (
-        <Alert severity="info">
+      {restrictions.map((restriction, i) => (
+        <Alert key={`${restriction.tokenAddress}-${restriction.condition}-${i}`} severity="info">
           <AlertTitle>Restricted access</AlertTitle>
           {restriction.message || (
             <>
