@@ -16,6 +16,15 @@ export const Default: Story = {
   args: { loginProvider: makeMockLoginProvider() },
 };
 
+// The live wallet-list-update path: init returns the initial snapshot, then the
+// mock fires the `onWalletsChanged` callback to mimic an EIP-6963 wallet (Rabby)
+// announcing late — the picker re-renders with the expanded list. The default
+// mock already drives this whenever a callback is supplied (which App does), so
+// this is just the explicit story for the post-discovery state.
+export const WalletListUpdatesAfterDiscovery: Story = {
+  args: { loginProvider: makeMockLoginProvider() },
+};
+
 // init never resolves → the neutral loading (StatusView "loading") state.
 export const Loading: Story = {
   args: {

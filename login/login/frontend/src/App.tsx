@@ -222,7 +222,16 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
     );
     (async () => {
       try {
-        const resp = await loginProvider.init({});
+        // Pass a live-update callback so wallets that announce (EIP-6963) after
+        // the initial snapshot still appear in the picker. The embed pushes the
+        // refreshed list across the Comlink boundary as connectors arrive/leave;
+        // we replace the wallet-list state with each push. (`cancelled` guards
+        // against late callbacks after unmount.)
+        const resp = await loginProvider.init({
+          onWalletsChanged: (updated: TWalletInfo[]) => {
+            if (!cancelled) setWallets(updated);
+          },
+        });
         if (!cancelled) {
           window.clearTimeout(guard);
           setWallets(resp.wallets);

@@ -4,6 +4,8 @@ import { ConnectWalletPage, Modes } from "../components/ConnectWalletPage";
 import {
   wallets,
   walletMetaMask,
+  walletBrowserFallback,
+  walletsAfterDiscovery,
   restrictionWithMessage,
   restrictionsMultiple,
 } from "./fixtures";
@@ -27,6 +29,18 @@ type Story = StoryObj<typeof ConnectWalletPage>;
 export const MultipleWallets: Story = {};
 
 export const SingleWallet: Story = { args: { wallets: [walletMetaMask] } };
+
+// The list after a late EIP-6963 announcement (Rabby joins via the live
+// `onWalletsChanged` push) — the post-discovery picker state.
+export const AfterLateDiscovery: Story = {
+  args: { wallets: walletsAfterDiscovery },
+};
+
+// No EIP-6963 wallet was discovered, so the generic injected() fallback surfaces
+// as a single "Browser Wallet" tile (mobile dapp-browser WebViews, etc.).
+export const BrowserWalletFallbackOnly: Story = {
+  args: { wallets: [walletBrowserFallback] },
+};
 
 // Empty list → the "No wallet detected" guidance.
 export const NoWalletsDetected: Story = { args: { wallets: [] } };

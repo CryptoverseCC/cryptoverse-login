@@ -57,6 +57,26 @@ export const wallets: TWalletInfo[] = [
   walletNoLogo,
 ];
 
+// A second injected wallet that "announces" (EIP-6963) only after init — used to
+// exercise the live wallet-list-update path (the embed re-pushes the list via
+// the `onWalletsChanged` Comlink callback when a connector arrives).
+export const walletRabby: TWalletInfo = {
+  id: "io.rabby",
+  name: "Rabby Wallet",
+  logo: FOX,
+};
+
+// The "Browser Wallet" tile the generic injected() fallback maps to when NO
+// EIP-6963 wallet was discovered (single-`window.ethereum` environments).
+export const walletBrowserFallback: TWalletInfo = {
+  id: "injected",
+  name: "Browser Wallet",
+};
+
+// The list after a late EIP-6963 announcement (Rabby joins). The live-update
+// callback pushes this once a connector arrives post-init.
+export const walletsAfterDiscovery: TWalletInfo[] = [...wallets, walletRabby];
+
 // --- identities (IIdentity) ---------------------------------------------------
 export const identityActive: IIdentity = {
   name: "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",

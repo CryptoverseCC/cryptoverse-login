@@ -75,9 +75,19 @@ export type TWalletInfo = {
   logo?: string;
 };
 
+// Pushed by the embed (top window) over Comlink whenever the live connector set
+// changes — EIP-6963 wallets announce asynchronously, so the list can grow (or
+// shrink) after the initial snapshot. The iframe passes this as a
+// `Comlink.proxy`'d function so the embed can invoke it across the boundary.
+export type TWalletsChangedCallback = (wallets: TWalletInfo[]) => void;
+
 export type TInitRequest = {
   walletConnectProjectId?: string;
   appName?: string;
+  // Optional live-update channel. When supplied, the embed keeps watching the
+  // connector set and re-pushes the wallet list as it changes. When omitted, the
+  // embed returns a single settled snapshot instead (backward-safe).
+  onWalletsChanged?: TWalletsChangedCallback;
 };
 
 export type TInitResponse = {
@@ -136,12 +146,19 @@ let channel = {
   loginProvider: Comlink.wrap(Comlink.windowEndpoint(window.parent)),
 } as CommunicationChannel;
 
-function init(_request: TInitRequest) {
+function init(request: TInitRequest) {
   // The embed lives in a separate top-window page without the login-data block,
   // so hand it the request-derived config it needs to build the wagmi config.
+  // If the caller (the React app) supplied an `onWalletsChanged` callback, wrap
+  // it with `Comlink.proxy` so the top-window embed can invoke it across the
+  // iframe boundary as connectors are discovered / removed.
+  const onWalletsChanged = request.onWalletsChanged
+    ? Comlink.proxy(request.onWalletsChanged)
+    : undefined;
   return channel.loginProvider.init({
     walletConnectProjectId: loginData.walletConnectProjectId,
     appName: loginData.metadata?.app,
+    onWalletsChanged,
   });
 }
 

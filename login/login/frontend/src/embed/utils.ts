@@ -8,9 +8,16 @@ import {
   type CreateConnectorFn,
 } from "@wagmi/core";
 import { mainnet } from "@wagmi/core/chains";
-import { coinbaseWallet, walletConnect } from "@wagmi/connectors";
+import { coinbaseWallet, injected, walletConnect } from "@wagmi/connectors";
 import { IIdentity, TWalletInfo } from "../services/loginProvider";
 import { connectorIcon } from "./walletIcons";
+
+// The wagmi id of the generic, EIP-6963-agnostic `injected()` connector. It
+// talks to whatever `window.ethereum` is present without announcing an `rdns`.
+// EIP-6963-discovered injected connectors instead carry `id === <rdns>` (wagmi
+// builds them via `injected({ target: { id: info.rdns } })`) plus a populated
+// `rdns`. We use this to dedupe the bare fallback against discovered wallets.
+const GENERIC_INJECTED_ID = "injected";
 
 export interface Window {
   Sentry: any;
@@ -34,8 +41,10 @@ let config: Config | null = null;
 
 // Build the wagmi config once, on first `init`. EIP-6963 multi-injected
 // discovery surfaces browser wallets (MetaMask, Rabby, …) as connectors
-// automatically; the non-injected transports (Coinbase, WalletConnect) are
-// added explicitly. WalletConnect is only included when a project id is given.
+// automatically; a generic `injected()` fallback covers wallets that expose
+// `window.ethereum` without announcing (mobile dapp-browser WebViews); the
+// non-injected transports (Coinbase, WalletConnect) are added explicitly.
+// WalletConnect is only included when a project id is given.
 // The app only connects + signs — there are no on-chain reads here (balance
 // gating is enforced server-side) — so a public HTTP transport is enough and
 // no RPC key is needed in the browser.
@@ -46,7 +55,23 @@ export function ensureConfig(opts: {
   if (config) return config;
 
   const connectors: CreateConnectorFn[] = [
-    coinbaseWallet({ appName: opts.appName || "Cryptoverse Login" }),
+    // Coinbase Wallet is ALWAYS present (mobile + extension + Smart Wallet). We
+    // deliberately keep Coinbase Smart Wallet enabled (no `preference: 'eoaOnly'`):
+    // the backend gains ERC-1271/6492 verification this campaign, so smart-contract
+    // wallet signatures are accepted. `'all'` is the wagmi default; we set it
+    // explicitly to document the intent and guard against a future default flip.
+    coinbaseWallet({
+      appName: opts.appName || "Cryptoverse Login",
+      preference: { options: "all" },
+    }),
+    // Generic injected fallback. EIP-6963 discovery (below) only catches wallets
+    // that *announce* themselves; wallets that expose only `window.ethereum`
+    // without an EIP-6963 announcement — notably mobile in-app dapp-browser
+    // WebViews — would otherwise produce ZERO injected connectors. This bare
+    // `injected()` connector ensures such a wallet is still selectable. It is
+    // deduped against discovered wallets in `listWallets()` so it never shows up
+    // as a second tile alongside an EIP-6963 wallet.
+    injected(),
   ];
   if (opts.walletConnectProjectId) {
     connectors.push(
@@ -81,12 +106,49 @@ export function getConfig(): Config {
   return config;
 }
 
-export const listWallets = (cfg: Config): TWalletInfo[] =>
-  getConnectors(cfg).map((c: Connector) => ({
-    id: c.uid,
-    name: c.name,
-    logo: connectorIcon(c),
-  }));
+// True for an EIP-6963-discovered injected connector. wagmi builds these via
+// `injected({ target: { id: info.rdns } })`, so they carry a populated `rdns`
+// (and `id === rdns`). The generic `injected()` fallback has neither.
+const isDiscoveredInjected = (c: Connector): boolean =>
+  Boolean((c as Connector & { rdns?: string | readonly string[] }).rdns);
+
+// The mapped wallet list shown in the picker. Two concerns are handled here:
+//
+//  1. Dedupe the generic `injected()` fallback against EIP-6963-discovered
+//     wallets. If at least one announced injected wallet exists, the bare
+//     fallback is redundant (it would point at the same `window.ethereum`) and
+//     is hidden so the user doesn't see a duplicate / ambiguous "Injected" tile.
+//     When NO injected wallet was discovered, the fallback IS surfaced (relabeled
+//     "Browser Wallet") so single-`window.ethereum` environments stay usable.
+//  2. Dedupe discovered wallets among themselves by rdns/name, in case two
+//     providers announce under the same identity.
+export const listWallets = (cfg: Config): TWalletInfo[] => {
+  const connectors = getConnectors(cfg);
+  const hasDiscoveredInjected = connectors.some(isDiscoveredInjected);
+
+  const seen = new Set<string>();
+  const wallets: TWalletInfo[] = [];
+
+  for (const c of connectors) {
+    // Hide the generic injected fallback when a real injected wallet announced.
+    if (c.id === GENERIC_INJECTED_ID && hasDiscoveredInjected) continue;
+
+    // Relabel the bare fallback so the lone tile reads sensibly when shown.
+    const name = c.id === GENERIC_INJECTED_ID ? "Browser Wallet" : c.name;
+
+    // Dedup key: rdns (most stable, for discovered injected wallets) else name.
+    const rdns = (c as Connector & { rdns?: string | readonly string[] }).rdns;
+    const key = (
+      typeof rdns === "string" && rdns ? rdns : name
+    ).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    wallets.push({ id: c.uid, name, logo: connectorIcon(c) });
+  }
+
+  return wallets;
+};
 
 export const findConnector = (cfg: Config, id: string): Connector | undefined =>
   getConnectors(cfg).find((c: Connector) => c.uid === id);
