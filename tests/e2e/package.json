@@ -7,6 +7,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:picker": "playwright test --project=picker",
     "test:e2e:metamask": "playwright test --project=metamask",
     "test:e2e:coinbase": "playwright test --project=coinbase",
     "test:e2e:walletconnect": "playwright test --project=walletconnect",

@@ -1,5 +1,9 @@
 import { getConnectors, watchConnectors } from "@wagmi/core";
-import { TInitRequest, TInitResponse } from "../services/loginProvider";
+import {
+  TInitRequest,
+  TInitResponse,
+  TWalletsChangedCallback,
+} from "../services/loginProvider";
 import { ensureConfig, listWallets, Window } from "./utils";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -25,7 +29,16 @@ let onChangeCallback: (() => void) | null = null;
 //      the connector set changes (a wallet announces / is removed).
 // If no callback was supplied we fall back to a single settled snapshot — the
 // old behaviour — so the path stays backward-safe.
-export const init = async (request: TInitRequest): Promise<TInitResponse> => {
+// The live-update callback arrives as a SEPARATE positional argument (a
+// top-level `Comlink.proxy`), not nested in `request` — Comlink can only
+// transfer a proxy at the top level (see services/loginProvider.ts::init).
+// `request.onWalletsChanged` is kept in the type for the call site but is no
+// longer the wire channel; we read the 2nd arg, falling back to the field for
+// safety.
+export const init = async (
+  request: TInitRequest,
+  onWalletsChangedArg?: TWalletsChangedCallback
+): Promise<TInitResponse> => {
   const sentry = (window as unknown as Window).Sentry;
   try {
     const config = ensureConfig({
@@ -45,7 +58,7 @@ export const init = async (request: TInitRequest): Promise<TInitResponse> => {
       }))
     );
 
-    const onWalletsChanged = request.onWalletsChanged;
+    const onWalletsChanged = onWalletsChangedArg ?? request.onWalletsChanged;
 
     if (onWalletsChanged) {
       // Live mode: push the current list now, then keep pushing as connectors

@@ -64,6 +64,20 @@ export default defineConfig({
 
   projects: [
     {
+      // Plain headless Chromium (NO wallet extension, NO xvfb, NO projectId).
+      // Drives the demo -> IdP flow and asserts the wallet picker tiles render
+      // — a regression guard for the Comlink iframe<->parent startup race
+      // (see specs/picker-loads.spec.ts). Runnable anywhere headless.
+      name: "picker",
+      testMatch: /picker-loads\.spec\.ts/,
+      use: {
+        headless: true,
+        // Belt-and-suspenders with the top-level `ignoreHTTPSErrors` for the
+        // kind stack's self-signed mkcert TLS.
+        launchOptions: { args: ["--ignore-certificate-errors"] },
+      },
+    },
+    {
       name: "metamask",
       testMatch: /metamask\.spec\.ts/,
     },
