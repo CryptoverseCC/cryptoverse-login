@@ -25,6 +25,59 @@
       src="/login/static/js/final.js"
       crossorigin="anonymous"
     ></script>
+    <style>
+      /* First-paint Vault styling for the brief moment before final.js performs
+         the redirect. Visuals only — no script/contract changes. */
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1020 0%, #0e1426 100%);
+        background-attachment: fixed;
+        color: #e8eaf2;
+      }
+
+      #loader {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        box-sizing: border-box;
+        width: 96px;
+        height: 96px;
+        margin: -48px 0 0 -48px;
+        border: 4px solid #232b42;
+        border-radius: 50%;
+        border-top: 4px solid #7c6cf0;
+        -webkit-animation: spin 1s linear infinite;
+        animation: spin 1s linear infinite;
+      }
+
+      @-webkit-keyframes spin {
+        0% {
+          -webkit-transform: rotate(0deg);
+        }
+        100% {
+          -webkit-transform: rotate(360deg);
+        }
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #loader {
+          -webkit-animation: none;
+          animation: none;
+        }
+      }
+    </style>
   </head>
-  <body></body>
+  <body>
+    <div id="loader"></div>
+  </body>
 </html>

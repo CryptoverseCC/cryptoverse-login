@@ -1,75 +1,110 @@
 import React from "react";
 
-import Grid from "@mui/material/GridLegacy";
 import { Theme } from "@mui/material/styles";
 import { makeStyles } from "tss-react/mui";
 import Typography from "@mui/material/Typography";
-import { Divider } from "@mui/material";
+import { Box, Divider, Link, Stack } from "@mui/material";
 
 const useStyles = makeStyles()((theme: Theme) => ({
+  root: {
+    width: "100%",
+  },
   divider: {
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(2),
   },
-  help: {
+  footer: {
     [theme.breakpoints.up("sm")]: {
       padding: theme.spacing(3),
     },
     [theme.breakpoints.down("sm")]: {
-      padding: theme.spacing(1),
+      padding: theme.spacing(2),
     },
   },
-  helpText: {
-    [theme.breakpoints.up("sm")]: {
-      padding: theme.spacing(3),
-    },
-    [theme.breakpoints.down("sm")]: {
-      padding: theme.spacing(1),
+  heading: {
+    marginBottom: theme.spacing(1.5),
+  },
+  list: {
+    margin: 0,
+    paddingLeft: theme.spacing(2),
+    listStyle: "none",
+  },
+  item: {
+    "& + &": {
+      marginTop: theme.spacing(1),
     },
   },
 }));
+
+const FAMILY = [
+  {
+    name: "ETHMail.cc",
+    href: "https://ethmail.cc/",
+    desc: "Email for the Ethereum community.",
+  },
+  {
+    name: "CallETH.me",
+    href: "https://calleth.me/",
+    desc: "Voice, video, and messaging for the Ethereum community.",
+  },
+];
 
 export interface CryptoverseFamilyProps {}
 
 export const CryptoverseFamily: React.FC<CryptoverseFamilyProps> = () => {
   const { classes } = useStyles();
   return (
-    <Grid key={"family"} item container xs={12}>
-      <Grid key={"divider"} item xs={12} className={classes.divider}>
+    <Box className={classes.root}>
+      <Box className={classes.divider}>
         <Divider />
-      </Grid>
-      <Grid key={"header"} item container xs={12} justifyContent="center">
-        <Typography variant="h6">Cryptoverse Family</Typography>
-      </Grid>
-      <Grid key={"items"} item container xs={12} className={classes.help}>
-        <Typography component="div" className={classes.helpText}>
-          <a target="_blank" rel="noreferrer" href="https://cryptoauth.io/">
-            Cryptoauth.io
-          </a>{" "}
-          belongs to{" "}
-          <a target="_blank" rel="noreferrer" href="https://cryptoverse.cc/">
-            Cryptoverse Family
-          </a>{" "}
-          together with:
-          <div>
-            <ul>
-              <li>
-                <a target="_blank" rel="noreferrer" href="https://ethmail.cc/">
-                  ETHMail.cc
-                </a>{" "}
-                - Email services for Ethereum community
+      </Box>
+      <Box className={classes.footer}>
+        <Stack spacing={1.5}>
+          <Typography
+            variant="subtitle2"
+            color="text.secondary"
+            className={classes.heading}
+          >
+            Part of the{" "}
+            <Link
+              href="https://cryptoverse.cc/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Cryptoverse Family
+            </Link>{" "}
+            — along with{" "}
+            <Link
+              href="https://cryptoauth.io/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Cryptoauth.io
+            </Link>
+            .
+          </Typography>
+          <ul className={classes.list}>
+            {FAMILY.map((entry) => (
+              <li key={entry.name} className={classes.item}>
+                <Typography variant="body2" component="span">
+                  <Link href={entry.href} target="_blank" rel="noreferrer">
+                    {entry.name}
+                  </Link>{" "}
+                  <Typography
+                    component="span"
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    — {entry.desc}
+                  </Typography>
+                </Typography>
               </li>
-              <li>
-                <a target="_blank" rel="noreferrer" href="https://calleth.me/">
-                  CallETH.me
-                </a>{" "}
-                - Communication platform for Ethereum community (Voice and Video
-                calls, instant messaging)
-              </li>
-            </ul>
-          </div>
-        </Typography>
-      </Grid>
-    </Grid>
+            ))}
+          </ul>
+        </Stack>
+      </Box>
+    </Box>
   );
 };
+
+export default CryptoverseFamily;

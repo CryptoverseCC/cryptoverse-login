@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { ConnectWalletPage, Modes } from "../components/ConnectWalletPage";
-import { wallets, walletMetaMask, restrictionWithMessage } from "./fixtures";
+import {
+  wallets,
+  walletMetaMask,
+  restrictionWithMessage,
+  restrictionsMultiple,
+} from "./fixtures";
 
 const meta: Meta<typeof ConnectWalletPage> = {
   title: "Pages/ConnectWalletPage",
@@ -35,6 +40,10 @@ export const WithError: Story = {
 
 export const WithRestrictions: Story = {
   args: { restrictions: restrictionWithMessage },
+};
+
+export const WithRestrictionsMultiple: Story = {
+  args: { restrictions: restrictionsMultiple },
 };
 
 export const HelpMode: Story = { args: { mode: Modes.HELP } };

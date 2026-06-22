@@ -6,6 +6,9 @@
   "dependencies": {
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource-variable/space-grotesk": "^5.2.10",
     "@mui/icons-material": "^7.0.0",
     "@mui/material": "^7.0.0",
     "@wagmi/connectors": "^5.7.5",

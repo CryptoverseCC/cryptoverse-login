@@ -16,7 +16,7 @@ export const Default: Story = {
   args: { loginProvider: makeMockLoginProvider() },
 };
 
-// init never resolves → the loading spinner state.
+// init never resolves → the neutral loading (StatusView "loading") state.
 export const Loading: Story = {
   args: {
     loginProvider: makeMockLoginProvider({ init: () => new Promise(() => {}) }),
@@ -32,7 +32,18 @@ export const NoWallets: Story = {
   },
 };
 
-// A rejected connect surfaces the error Alert on the wallet picker.
+// init rejects → the terminal error surface with a Try again action.
+export const InitFailed: Story = {
+  args: {
+    loginProvider: makeMockLoginProvider({
+      init: async () => {
+        throw new Error("init failed");
+      },
+    }),
+  },
+};
+
+// A rejected connect surfaces a recoverable inline error on the wallet picker.
 export const ConnectRejected: Story = {
   args: {
     loginProvider: makeMockLoginProvider({
@@ -40,6 +51,17 @@ export const ConnectRejected: Story = {
         identities: [],
         error: "Connection request rejected in your wallet.",
       }),
+    }),
+  },
+};
+
+// A connect that throws dead-ends into the terminal error surface.
+export const ConnectFailed: Story = {
+  args: {
+    loginProvider: makeMockLoginProvider({
+      connect: async () => {
+        throw new Error("connect threw");
+      },
     }),
   },
 };

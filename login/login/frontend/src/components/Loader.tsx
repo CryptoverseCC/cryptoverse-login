@@ -1,24 +1,15 @@
 import React from "react";
 
-import Box from "@mui/material/Box";
-import CircularProgress from "@mui/material/CircularProgress";
+import { StatusView } from "./StatusView";
 
 export interface LoaderProps {}
 
-// MUI's CircularProgress carries its own (working) animation — the previous
-// hand-rolled spinner used JSS's `$spin` keyframes reference, which emotion /
-// tss-react don't resolve, so it never actually spun.
+// The Suspense fallback (used as a bare `<Suspense fallback={<Loader />}`) and
+// the app's neutral "warming up" state. It delegates to StatusView's "loading"
+// mode so the very first React paint already matches the Vault status surface
+// (seal motif + accent), rather than a lone spinner.
 export const Loader: React.FC<LoaderProps> = () => (
-  <Box
-    role="progressbar"
-    sx={{
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      width: "100%",
-      minHeight: "60vh",
-    }}
-  >
-    <CircularProgress size={96} thickness={4} />
-  </Box>
+  <StatusView kind="loading" title="Getting things ready…" />
 );
+
+export default Loader;

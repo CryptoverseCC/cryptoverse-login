@@ -2,6 +2,10 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
+// Self-hosted Vault typefaces (no external CDNs — important for an IdP).
+import "@fontsource-variable/inter";
+import "@fontsource-variable/space-grotesk";
+import "@fontsource-variable/jetbrains-mono";
 import theme from "./theme";
 import { LoginProvider, ILoginProvider } from "./services/loginProvider";
 import { Background as FwBBackground } from "./backgrounds/FwB";
