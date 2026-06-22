@@ -13,7 +13,7 @@ with the real deploy and prove correctness:
 - optional Prometheus (`WITH_MONITORING=1`)
 
 Validate it with the [`tests/harness/`](../harness/) suite (fast, no browser) and
-the Selenium browser/wallet test (`../test_full.py`).
+the browser/wallet [`tests/e2e/`](../e2e/README.md) suite (Playwright + dappwright).
 
 ## One-time host prerequisites
 

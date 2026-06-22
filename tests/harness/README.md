@@ -8,7 +8,7 @@ re-run for confidence in seconds.
 
 It signs SIWE messages with a fixed test key (via the Rust `sign` example), so
 there's no wallet/MetaMask in the critical path. The browser/wallet dimension is
-covered separately by `../test_full.py` (Selenium).
+covered separately by the [`../e2e/`](../e2e/README.md) suite (Playwright + dappwright).
 
 ## What it checks
 

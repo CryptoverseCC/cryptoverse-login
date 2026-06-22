@@ -8,7 +8,8 @@
 #   - ingress-nginx on :443, nip.io domains
 #   - the demo relying party
 #
-# Then validate it with the harness (tests/harness/) and/or the Selenium suite.
+# Then validate it with the harness (tests/harness/) and/or the browser/wallet
+# end-to-end suite (tests/e2e/, Playwright + dappwright).
 #
 set -euo pipefail
 export KIND_EXPERIMENTAL_PROVIDER=podman
@@ -142,8 +143,9 @@ Prove it works (fast, no browser):
   HARNESS_GATEWAY=$LOGIN_URL HARNESS_HOST= HARNESS_HYDRA_ADMIN=http://127.0.0.1:4445 \\
     pytest tests/harness/ -v
 
-Full browser/wallet e2e:
-  DOMAIN_LOGIN=$LOGIN_DOMAIN:$PORT DOMAIN_DEMO_APP=$DEMO_DOMAIN:$PORT pytest tests/test_full.py -v
+Full browser/wallet e2e (Playwright + dappwright; see tests/e2e/README.md):
+  cd tests/e2e && yarn install && npx playwright install chromium
+  xvfb-run --auto-servernum yarn test:e2e:metamask
 
 Tear down: tests/kind/teardown.sh
 EOF

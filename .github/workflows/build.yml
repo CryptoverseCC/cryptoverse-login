@@ -218,12 +218,25 @@ jobs:
       #######################
       # Test using Demo App #
       #######################
-      - name: Selenium Tests
+      # Browser/wallet end-to-end via Playwright + dappwright (tests/e2e/), which
+      # replaces the retired Selenium + Firefox + MetaMask suite (test_full.py).
+      # Only the MetaMask project runs in CI: it drives a real extension under a
+      # virtual framebuffer (xvfb) and needs no projectId. The Coinbase and
+      # WalletConnect projects are intentionally not wired here — WalletConnect
+      # needs a Reown projectId secret; see tests/e2e/README.md.
+      # TODO: wire Coinbase / WalletConnect projects once a projectId secret is available.
+      - name: Browser e2e (MetaMask, Playwright + dappwright)
+        env:
+          # Point the suite at the demo RP deployed above (CI uses the
+          # cryptoverse.local domains, not the kind-cluster nip.io defaults).
+          DEMO_URL: https://${{ env.DOMAIN_DEMO_APP }}
+          LOGIN_URL: https://${{ env.DOMAIN_LOGIN }}
         run: |
           mkdir -p ${ASSETS_PATH}
-          cd tests
-          pip install -r requirements.txt
-          pytest test_full.py --junitxml=${ASSETS_PATH}/junit.xml --verbose --log-level=INFO --capture=no --log-cli-level=INFO
+          cd tests/e2e
+          yarn install --frozen-lockfile
+          npx playwright install --with-deps chromium
+          xvfb-run --auto-servernum yarn test:e2e:metamask
       - name: Pods
         if: always()
         run: |

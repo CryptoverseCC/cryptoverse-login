@@ -1,0 +1,30 @@
+{
+  "name": "cryptoverse-login-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser/wallet end-to-end tests for Cryptoverse Login (dappwright + Playwright for the MetaMask & Coinbase extensions, plus a headless @reown/walletkit test wallet for the WalletConnect path).",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:metamask": "playwright test --project=metamask",
+    "test:e2e:coinbase": "playwright test --project=coinbase",
+    "test:e2e:walletconnect": "playwright test --project=walletconnect",
+    "test:list": "playwright test --list",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0",
+    "@tenkeylabs/dappwright": "2.13.5",
+    "@types/node": "22.10.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.9"
+  },
+  "dependencies": {
+    "@reown/walletkit": "1.5.5",
+    "@walletconnect/core": "2.23.9",
+    "@walletconnect/utils": "2.23.9",
+    "viem": "2.53.1"
+  }
+}
