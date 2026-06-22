@@ -13,10 +13,13 @@
 //! challenge is already high-entropy and server-issued, so binding the nonce to
 //! it ties a signature to exactly one login flow while staying fully stateless.
 
+use alloy::primitives::Address;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use siwe::{Message, VerificationOpts};
 use time::OffsetDateTime;
+
+use crate::eth::Eth;
 
 /// Parameters handed to the frontend (via `loginData`) so it can assemble the
 /// canonical EIP-4361 message with the connected wallet address.
@@ -88,18 +91,37 @@ fn decode_signature(sig: &str) -> Result<Vec<u8>, AuthError> {
 }
 
 /// Verify a SIWE message + signature against the expected domain and the nonce
-/// bound to the originating Hydra challenge. Validates the signature (EIP-191),
-/// the nonce, the domain, and the message's time bounds (expiry / not-before).
+/// bound to the originating Hydra challenge. Validates the nonce, the domain,
+/// the message's time bounds (expiry / not-before) and the signature.
+///
+/// ## Signature verification: EOA → ERC-1271 → ERC-6492
+///
+/// 1. **EOA fast path (no network):** try EIP-191 `ecrecover`. If the recovered
+///    address matches the SIWE `address`, we're done — purely local, so the
+///    common case stays stateless and offline.
+/// 2. **Contract wallets:** if the fast path doesn't match (recovery failed, or
+///    the wallet is a smart contract whose signature isn't a 65-byte ECDSA sig),
+///    fall through to on-chain validation via [`Eth::verify_signature`]. That
+///    one `eth_call` covers both **ERC-1271** (already-deployed contract wallet)
+///    and **ERC-6492** (counterfactual / not-yet-deployed wallet, e.g. a fresh
+///    Coinbase Smart Wallet) — see its docs. This needs the RPC, hence `eth`.
+///
+/// The domain / nonce / time checks are enforced *before and regardless of*
+/// which signature path matches, so a contract-wallet signature is held to the
+/// same replay/expiry/domain binding as an EOA one.
 pub async fn verify(
     message: &str,
     signature: &str,
     expected_domain: &str,
     challenge: &str,
+    eth: &Eth,
 ) -> Result<VerifiedLogin, AuthError> {
     // Browsers normalise a form field's LF to CRLF on submit, but EIP-4361 uses
     // LF and the wallet signed the LF form — so strip CR before parsing/verifying.
     let message = message.replace("\r\n", "\n");
-    let msg: Message = message.parse().map_err(|e| AuthError::Parse(format!("{e}")))?;
+    let msg: Message = message
+        .parse()
+        .map_err(|e| AuthError::Parse(format!("{e}")))?;
     let sig = decode_signature(signature)?;
 
     // Domain is checked explicitly (string compare) in addition to the library
@@ -112,24 +134,68 @@ pub async fn verify(
         });
     }
 
+    // Nonce + time bounds are independent of the signature scheme, so enforce
+    // them up front for both the EOA and the contract-wallet path.
+    let now = OffsetDateTime::now_utc();
+    if !msg.valid_at(&now) {
+        return Err(AuthError::Verify("message expired or not yet valid".into()));
+    }
+    let expected_nonce = nonce_for_challenge(challenge);
+    if msg.nonce != expected_nonce {
+        return Err(AuthError::Verify(format!(
+            "nonce mismatch: expected `{expected_nonce}`, got `{}`",
+            msg.nonce
+        )));
+    }
+
+    // 1. EOA fast path — EIP-191 ecrecover, no network. `verify_eip191` already
+    //    checks the recovered address equals the SIWE address.
     let opts = VerificationOpts {
-        nonce: Some(nonce_for_challenge(challenge)),
-        timestamp: Some(OffsetDateTime::now_utc()),
+        nonce: Some(expected_nonce),
+        timestamp: Some(now),
         ..Default::default()
     };
+    if msg.verify(&sig, &opts).await.is_ok() {
+        return Ok(VerifiedLogin {
+            address: format!("0x{}", hex::encode(msg.address)),
+        });
+    }
 
-    msg.verify(&sig, &opts)
-        .await
-        .map_err(|e| AuthError::Verify(format!("{e}")))?;
+    // 2. Contract wallet — ERC-1271 (deployed) / ERC-6492 (counterfactual).
+    //    `_hash` is the EIP-191 personal_sign hash of the SIWE message string,
+    //    which siwe computes for us, identical to what the wallet signed over.
+    let hash = msg
+        .eip191_hash()
+        .map_err(|e| AuthError::Verify(format!("hashing message failed: {e}")))?;
+    let signer = Address::from(msg.address);
+    if eth.verify_signature(signer, hash.into(), &sig).await {
+        return Ok(VerifiedLogin {
+            address: format!("0x{}", hex::encode(msg.address)),
+        });
+    }
 
-    Ok(VerifiedLogin {
-        address: format!("0x{}", hex::encode(msg.address)),
-    })
+    Err(AuthError::Verify(
+        "signature is not a valid EOA (EIP-191), ERC-1271 or ERC-6492 signature".into(),
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An `Eth` whose RPC is a non-routable address, so the contract-wallet
+    /// (ERC-1271/6492) fallback fails fast with a connection error (→ `false`)
+    /// instead of reaching the network. Tests that hit the EOA fast path never
+    /// touch it; tests of *rejection* use it to prove no signature slips through
+    /// the contract path either — all without real network access.
+    fn offline_eth() -> Eth {
+        // Point at a closed local port so the contract-path `eth_call` fails fast
+        // with connection-refused (no real network, no timeout wait).
+        std::env::remove_var("ALCHEMY_API_KEY");
+        std::env::remove_var("INFURA_API_KEY");
+        std::env::set_var("ETH_RPC_URL", "http://127.0.0.1:1");
+        Eth::from_env().expect("build offline Eth")
+    }
 
     #[test]
     fn nonce_is_deterministic_and_valid() {
@@ -177,9 +243,15 @@ mod tests {
         let signature = signer.sign_message_sync(message.as_bytes()).unwrap();
         let sig_hex = format!("0x{}", hex::encode(signature.as_bytes()));
 
-        let verified = verify(&message, &sig_hex, "login.cryptoverse.cc", challenge)
-            .await
-            .expect("valid SIWE message must verify");
+        let verified = verify(
+            &message,
+            &sig_hex,
+            "login.cryptoverse.cc",
+            challenge,
+            &offline_eth(),
+        )
+        .await
+        .expect("valid SIWE message must verify");
         assert_eq!(
             verified.address,
             format!("0x{}", hex::encode(address.as_slice()))
@@ -216,9 +288,15 @@ mod tests {
         let sig_hex = format!("0x{}", hex::encode(signature.as_bytes()));
         let crlf = lf.replace('\n', "\r\n");
 
-        let verified = verify(&crlf, &sig_hex, "login.cryptoverse.cc", challenge)
-            .await
-            .expect("CRLF-normalised message must verify");
+        let verified = verify(
+            &crlf,
+            &sig_hex,
+            "login.cryptoverse.cc",
+            challenge,
+            &offline_eth(),
+        )
+        .await
+        .expect("CRLF-normalised message must verify");
         assert_eq!(
             verified.address,
             format!("0x{}", hex::encode(signer.address().as_slice()))
@@ -251,7 +329,14 @@ mod tests {
         let signature = signer.sign_message_sync(message.as_bytes()).unwrap();
         let sig_hex = format!("0x{}", hex::encode(signature.as_bytes()));
 
-        let result = verify(&message, &sig_hex, "login.cryptoverse.cc", "the-real-challenge").await;
+        let result = verify(
+            &message,
+            &sig_hex,
+            "login.cryptoverse.cc",
+            "the-real-challenge",
+            &offline_eth(),
+        )
+        .await;
         assert!(result.is_err(), "nonce bound to wrong challenge must fail");
     }
 
@@ -274,6 +359,7 @@ mod tests {
             "0xdeadbeef",
             "login.cryptoverse.cc",
             "chal",
+            &offline_eth(),
         )
         .await;
         assert!(result.is_err());

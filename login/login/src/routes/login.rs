@@ -143,19 +143,29 @@ pub async fn process(
     count("login-start", &client_id);
 
     let (host, _scheme) = super::public_origin(&headers);
-    let verified =
-        match auth::verify(&form.message, &form.signature, &host, &form.challenge).await {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::warn!("SIWE verification failed: {e}");
-                count("error-siwe-verify", &client_id);
-                return error_response(
-                    &form.response,
-                    StatusCode::UNAUTHORIZED,
-                    &format!("Login error: {e}"),
-                );
-            }
-        };
+    // `&st.eth` is threaded in so SIWE verification can fall back from the EOA
+    // (EIP-191) path to on-chain ERC-1271 / ERC-6492 validation for smart-contract
+    // and counterfactual wallets (e.g. Coinbase Smart Wallet).
+    let verified = match auth::verify(
+        &form.message,
+        &form.signature,
+        &host,
+        &form.challenge,
+        &st.eth,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("SIWE verification failed: {e}");
+            count("error-siwe-verify", &client_id);
+            return error_response(
+                &form.response,
+                StatusCode::UNAUTHORIZED,
+                &format!("Login error: {e}"),
+            );
+        }
+    };
     let subject = verified.address;
 
     // Token-gating: `None` (or empty) means unrestricted.
@@ -183,7 +193,11 @@ pub async fn process(
         }
     }
 
-    match st.hydra.accept_login_request(&form.challenge, &subject).await {
+    match st
+        .hydra
+        .accept_login_request(&form.challenge, &subject)
+        .await
+    {
         Ok(resp) => {
             tracing::info!("LOGIN {client_id} {subject}");
             count("success", &client_id);

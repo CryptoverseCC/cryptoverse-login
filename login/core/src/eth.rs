@@ -6,14 +6,58 @@
 //! blocks a login. We preserve that — lookups return `Option`/default on error
 //! and log at `warn`.
 
-use alloy::primitives::{address, keccak256, Address, FixedBytes, U256};
+use alloy::primitives::{address, keccak256, Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{DynProvider, Provider, RootProvider};
 use alloy::rpc::client::ClientBuilder;
+use alloy::rpc::types::TransactionRequest;
 use alloy::sol;
+use alloy::sol_types::SolValue;
 
 // ENS registry (mainnet) and the Unstoppable Domains UNS ProxyReader (mainnet).
 const ENS_REGISTRY: Address = address!("00000000000C2E074eC69A0dFb2997BA6C7d2e1e");
 const UD_PROXY_READER: Address = address!("049aba7510f45BA5b64ea9E658E342F904DB358D");
+
+/// ERC-6492 detection suffix: a wrapped (counterfactual) signature ends with
+/// these 32 bytes (`0x6492…6492`). See <https://eips.ethereum.org/EIPS/eip-6492>.
+pub const ERC6492_MAGIC_SUFFIX: [u8; 32] =
+    hex_literal_suffix(b"6492649264926492649264926492649264926492649264926492649264926492");
+
+/// `bytes4(keccak256("isValidSignature(bytes32,bytes)"))` — the ERC-1271 magic
+/// value returned by a contract wallet for a *valid* signature.
+pub const ERC1271_MAGIC_VALUE: [u8; 4] = [0x16, 0x26, 0xba, 0x7e];
+
+/// Creation bytecode of the ERC-6492 `ValidateSigOffchain` helper (which embeds
+/// `UniversalSigValidator`). This is the canonical, deployless universal
+/// signature validator: an `eth_call` with **no `to`** runs this contract's
+/// constructor, which validates the signature and `return`s a single byte —
+/// `0x01` for valid, `0x00` for invalid. The constructor handles all three
+/// cases internally — plain EOA `ecrecover`, deployed ERC-1271, and
+/// counterfactual ERC-6492 (it runs the CREATE2 factory deploy, then 1271).
+///
+/// This is byte-for-byte the constant viem ships as
+/// `erc6492SignatureValidatorByteCode` (`src/constants/contracts.ts`), so our
+/// behaviour matches viem's `verifyHash`. Source: EIP-6492 reference contracts.
+const UNIVERSAL_VALIDATOR_BYTECODE: &str = "608060405234801561001057600080fd5b5060405161069438038061069483398101604081905261002f9161051e565b600061003c848484610048565b9050806000526001601ff35b60007f64926492649264926492649264926492649264926492649264926492649264926100748361040c565b036101e7576000606080848060200190518101906100929190610577565b60405192955090935091506000906001600160a01b038516906100b69085906105dd565b6000604051808303816000865af19150503d80600081146100f3576040519150601f19603f3d011682016040523d82523d6000602084013e6100f8565b606091505b50509050876001600160a01b03163b60000361016057806101605760405162461bcd60e51b815260206004820152601e60248201527f5369676e617475726556616c696461746f723a206465706c6f796d656e74000060448201526064015b60405180910390fd5b604051630b135d3f60e11b808252906001600160a01b038a1690631626ba7e90610190908b9087906004016105f9565b602060405180830381865afa1580156101ad573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906101d19190610633565b6001600160e01b03191614945050505050610405565b6001600160a01b0384163b1561027a57604051630b135d3f60e11b808252906001600160a01b03861690631626ba7e9061022790879087906004016105f9565b602060405180830381865afa158015610244573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906102689190610633565b6001600160e01b031916149050610405565b81516041146102df5760405162461bcd60e51b815260206004820152603a602482015260008051602061067483398151915260448201527f3a20696e76616c6964207369676e6174757265206c656e6774680000000000006064820152608401610157565b6102e7610425565b5060208201516040808401518451859392600091859190811061030c5761030c61065d565b016020015160f81c9050601b811480159061032b57508060ff16601c14155b1561038c5760405162461bcd60e51b815260206004820152603b602482015260008051602061067483398151915260448201527f3a20696e76616c6964207369676e617475726520762076616c756500000000006064820152608401610157565b60408051600081526020810180835289905260ff83169181019190915260608101849052608081018390526001600160a01b0389169060019060a0016020604051602081039080840390855afa1580156103ea573d6000803e3d6000fd5b505050602060405103516001600160a01b0316149450505050505b9392505050565b600060208251101561041d57600080fd5b508051015190565b60405180606001604052806003906020820280368337509192915050565b6001600160a01b038116811461045857600080fd5b50565b634e487b7160e01b600052604160045260246000fd5b60005b8381101561048c578181015183820152602001610474565b50506000910152565b600082601f8301126104a657600080fd5b81516001600160401b038111156104bf576104bf61045b565b604051601f8201601f19908116603f011681016001600160401b03811182821017156104ed576104ed61045b565b60405281815283820160200185101561050557600080fd5b610516826020830160208701610471565b949350505050565b60008060006060848603121561053357600080fd5b835161053e81610443565b6020850151604086015191945092506001600160401b0381111561056157600080fd5b61056d86828701610495565b9150509250925092565b60008060006060848603121561058c57600080fd5b835161059781610443565b60208501519093506001600160401b038111156105b357600080fd5b6105bf86828701610495565b604086015190935090506001600160401b0381111561056157600080fd5b600082516105ef818460208701610471565b9190910192915050565b828152604060208201526000825180604084015261061e816060850160208701610471565b601f01601f1916919091016060019392505050565b60006020828403121561064557600080fd5b81516001600160e01b03198116811461040557600080fd5b634e487b7160e01b600052603260045260246000fdfe5369676e617475726556616c696461746f72237265636f7665725369676e6572";
+
+/// Compile-time conversion of an ASCII-hex byte string into the 32-byte suffix.
+const fn hex_literal_suffix(s: &[u8; 64]) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    let mut i = 0;
+    while i < 32 {
+        out[i] = (hex_nibble(s[i * 2]) << 4) | hex_nibble(s[i * 2 + 1]);
+        i += 1;
+    }
+    out
+}
+
+const fn hex_nibble(c: u8) -> u8 {
+    match c {
+        b'0'..=b'9' => c - b'0',
+        b'a'..=b'f' => c - b'a' + 10,
+        b'A'..=b'F' => c - b'A' + 10,
+        _ => 0,
+    }
+}
 
 sol! {
     #[sol(rpc)]
@@ -36,6 +80,26 @@ sol! {
     interface IUDProxyReader {
         function reverseOf(address addr) external view returns (uint256);
     }
+}
+
+/// The ABI tuple of an ERC-6492 wrapper payload (everything before the magic
+/// suffix): `(address create2Factory, bytes factoryCalldata, bytes signature)`.
+type Erc6492Wrapper = (Address, Bytes, Bytes);
+
+/// True if `signature` is an ERC-6492 wrapped (counterfactual) signature, i.e.
+/// its last 32 bytes equal the magic suffix.
+pub fn is_erc6492_wrapped(signature: &[u8]) -> bool {
+    signature.len() >= 32 && signature[signature.len() - 32..] == ERC6492_MAGIC_SUFFIX
+}
+
+/// Decode an ERC-6492 wrapper into `(factory, factoryCalldata, innerSignature)`.
+/// Returns `None` if `signature` is not 6492-wrapped or the payload is malformed.
+pub fn decode_erc6492_wrapper(signature: &[u8]) -> Option<(Address, Bytes, Bytes)> {
+    if !is_erc6492_wrapped(signature) {
+        return None;
+    }
+    let payload = &signature[..signature.len() - 32];
+    <Erc6492Wrapper as SolValue>::abi_decode_params(payload).ok()
 }
 
 #[derive(Clone)]
@@ -84,6 +148,61 @@ impl Eth {
             Err(e) => {
                 tracing::warn!("format_units failed: {e}");
                 0.0
+            }
+        }
+    }
+
+    /// Validate a signature for `signer` over the 32-byte `hash`, covering
+    /// **contract wallets** (ERC-1271) and **counterfactual / pre-deploy**
+    /// wallets (ERC-6492) in addition to plain EOAs.
+    ///
+    /// This performs the canonical ERC-6492 *deployless* universal validation:
+    /// an `eth_call` with **no `to`** whose calldata is the
+    /// [`UNIVERSAL_VALIDATOR_BYTECODE`] (the `ValidateSigOffchain` creation code)
+    /// concatenated with the ABI-encoded constructor args
+    /// `(address signer, bytes32 hash, bytes signature)`. The contract's
+    /// constructor validates the signature and returns a single byte — `0x01`
+    /// (valid) or `0x00` (invalid). Internally it branches on
+    /// `signer.code.length`:
+    ///
+    /// - already-deployed contract → ERC-1271 `isValidSignature`;
+    /// - 6492-wrapped + not yet deployed → runs the CREATE2 factory deploy in
+    ///   the (discarded) call state, then ERC-1271;
+    /// - otherwise → `ecrecover`.
+    ///
+    /// This is exactly viem's `verifyHash` strategy, so the full ERC-6492
+    /// counterfactual case **is** handled, not just the already-deployed one.
+    ///
+    /// `signature` should be the raw signature bytes (a 65-byte ECDSA sig, an
+    /// ERC-1271 contract sig, or an ERC-6492-wrapped sig — all accepted).
+    ///
+    /// Returns `false` (never an error) if the call reverts or the RPC is
+    /// unreachable: like the rest of this module a flaky RPC must not let an
+    /// invalid signature through, and a failed validation is simply "not valid".
+    pub async fn verify_signature(&self, signer: Address, hash: B256, signature: &[u8]) -> bool {
+        // calldata = creation bytecode ++ abi.encode(address, bytes32, bytes)
+        let mut data = match hex::decode(UNIVERSAL_VALIDATOR_BYTECODE) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::error!("universal validator bytecode is not valid hex: {e}");
+                return false;
+            }
+        };
+        let args = (signer, hash, Bytes::from(signature.to_vec())).abi_encode_params();
+        data.extend_from_slice(&args);
+
+        // Deployless call: no `to`, the bytecode runs as a constructor.
+        let tx = TransactionRequest::default().input(Bytes::from(data).into());
+
+        match self.provider.call(tx).await {
+            // `ValidateSigOffchain` returns 1 byte: 0x01 = valid.
+            Ok(out) => out.first() == Some(&1),
+            Err(e) => {
+                // A revert here means "not valid" (e.g. deploy failed or 1271
+                // threw); a transport error means we couldn't check. Both are
+                // treated as not-validated — we never pass an unverified sig.
+                tracing::warn!("ERC-1271/6492 validation call failed for {signer}: {e}");
+                false
             }
         }
     }
@@ -194,5 +313,99 @@ mod tests {
         // Well-known EIP-137 test vector for "eth".
         let expected = "93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae";
         assert_eq!(hex::encode(namehash("eth").as_slice()), expected);
+    }
+
+    #[test]
+    fn erc6492_magic_suffix_const_is_correct() {
+        // The suffix is `0x6492` repeated 16 times.
+        assert_eq!(
+            hex::encode(ERC6492_MAGIC_SUFFIX),
+            "6492649264926492649264926492649264926492649264926492649264926492"
+        );
+    }
+
+    #[test]
+    fn detects_erc6492_wrapped_signature() {
+        // A short payload followed by the magic suffix is "wrapped".
+        let mut sig = vec![0xaa; 10];
+        sig.extend_from_slice(&ERC6492_MAGIC_SUFFIX);
+        assert!(is_erc6492_wrapped(&sig));
+
+        // A plain 65-byte ECDSA signature is not wrapped.
+        let eoa = vec![0u8; 65];
+        assert!(!is_erc6492_wrapped(&eoa));
+
+        // Too short to even contain the suffix.
+        assert!(!is_erc6492_wrapped(&[0u8; 4]));
+
+        // Right length but wrong trailing bytes.
+        let mut wrong = vec![0u8; 64];
+        wrong[63] = 0x91;
+        assert!(!is_erc6492_wrapped(&wrong));
+    }
+
+    #[test]
+    fn decodes_erc6492_wrapper_roundtrip() {
+        // Build a wrapper exactly as a wallet would: abi.encode((factory,
+        // calldata, innerSig)) ++ magic suffix.
+        let factory = address!("00000000000000000000000000000000DeaDBeef");
+        let calldata = Bytes::from(vec![0x12, 0x34, 0x56]);
+        let inner = Bytes::from(vec![0xab; 65]);
+
+        let mut wrapped = (factory, calldata.clone(), inner.clone()).abi_encode_params();
+        wrapped.extend_from_slice(&ERC6492_MAGIC_SUFFIX);
+
+        let (f, c, s) = decode_erc6492_wrapper(&wrapped).expect("must decode wrapper");
+        assert_eq!(f, factory);
+        assert_eq!(c, calldata);
+        assert_eq!(s, inner);
+
+        // A non-wrapped signature decodes to None.
+        assert!(decode_erc6492_wrapper(&[0u8; 65]).is_none());
+    }
+
+    #[test]
+    fn universal_validator_bytecode_is_valid_hex_and_well_formed() {
+        // The embedded bytecode must decode and carry the recognisable markers
+        // (PUSH32 of the magic suffix, the trailing "SignatureValidator#..."
+        // ASCII) so an accidental truncation/edit is caught at test time.
+        let bytes = hex::decode(UNIVERSAL_VALIDATOR_BYTECODE)
+            .expect("universal validator bytecode must be valid hex");
+        // Contains the 32-byte 6492 magic as a constant (PUSH32 operand).
+        assert!(
+            bytes.windows(32).any(|w| w == ERC6492_MAGIC_SUFFIX),
+            "bytecode must embed the 6492 magic constant"
+        );
+        // Ends with the "SignatureValidator#recoverSigner" revert string.
+        assert!(
+            UNIVERSAL_VALIDATOR_BYTECODE
+                .ends_with("5369676e617475726556616c696461746f72237265636f7665725369676e6572"),
+            "bytecode tail (recoverSigner ASCII) is missing — likely truncated"
+        );
+    }
+
+    /// Live ERC-1271 / ERC-6492 validation against a real RPC.
+    ///
+    /// Ignored by default so `cargo test` never needs network. To run it:
+    ///
+    /// ```bash
+    /// # against mainnet (set a real RPC; a Coinbase Smart Wallet address + the
+    /// # hash/signature it produced):
+    /// ETH_RPC_URL=https://eth.llamarpc.com \
+    ///   cargo test -p cryptoverse-core -- --ignored live_contract_signature
+    /// ```
+    ///
+    /// Without fixtures wired in, this just exercises the call path against a
+    /// known deployed ERC-1271 wallet; flip the `assert` once you have a vector.
+    #[tokio::test]
+    #[ignore = "requires a live RPC (set ETH_RPC_URL); see doc comment"]
+    async fn live_contract_signature() {
+        let eth = Eth::from_env().expect("build provider from env");
+        // Placeholder: a random EOA hash/sig should NOT validate as a contract
+        // sig, proving the call path returns a sane `false` rather than erroring.
+        let signer = address!("0000000000000000000000000000000000000001");
+        let hash = B256::ZERO;
+        let valid = eth.verify_signature(signer, hash, &[0u8; 65]).await;
+        assert!(!valid, "a zero signature must not validate");
     }
 }

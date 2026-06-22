@@ -99,7 +99,10 @@ async fn check_one(eth: &Eth, restriction: &Restriction, owner: Address) -> Chec
     let passed = match evalexpr::eval_boolean_with_context(&restriction.condition, &context) {
         Ok(result) => result,
         Err(e) => {
-            tracing::warn!("condition `{}` failed to evaluate: {e}", restriction.condition);
+            tracing::warn!(
+                "condition `{}` failed to evaluate: {e}",
+                restriction.condition
+            );
             false
         }
     };
@@ -155,7 +158,8 @@ mod tests {
     #[test]
     fn parses_restriction_shapes() {
         let single: Restriction =
-            serde_json::from_str(r#"{"tokenAddress":"0xabc","condition":"balanceOf > 0"}"#).unwrap();
+            serde_json::from_str(r#"{"tokenAddress":"0xabc","condition":"balanceOf > 0"}"#)
+                .unwrap();
         assert_eq!(single.token_address.as_deref(), Some("0xabc"));
 
         let aliased: Restriction = serde_json::from_str(

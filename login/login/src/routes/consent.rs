@@ -38,8 +38,13 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
         }
     };
 
-    let id_token =
-        user_data::get_data(&st.eth, &req.subject, &st.mailserver_domain, &st.profile_domain).await;
+    let id_token = user_data::get_data(
+        &st.eth,
+        &req.subject,
+        &st.mailserver_domain,
+        &st.profile_domain,
+    )
+    .await;
 
     let body = AcceptConsent {
         grant_scope: req.requested_scope,
