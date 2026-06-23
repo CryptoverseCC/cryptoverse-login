@@ -34,6 +34,10 @@ ingressClassName: nginx
 # 0.0.0.0 / :: from this cluster's resolver, so it can never connect. That is the
 # "public default was unreachable from the pod" the earlier benchmark hit. We
 # therefore point ETH_RPC_URL at a host that both resolves and responds here.
+#
+# setup.sh overrides this with ALCHEMY_URL from the gitignored root .env when that
+# file sets it (the key stays out of git), so local test/benchmark runs can use a
+# real keyed RPC instead of the public fallback below.
 infuraApiKey: ""
 alchemyApiKey: ""
 ethRpcUrl: "https://ethereum-rpc.publicnode.com"

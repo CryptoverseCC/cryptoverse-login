@@ -107,10 +107,20 @@ for img in login wrapper gateway demo-python-django; do
 done
 rm -f "$archive"
 
+# Use a real mainnet RPC from the gitignored root .env (e.g. an Alchemy URL) when
+# present, overriding the public fallback in values-kind.yaml. ALCHEMY_URL is a
+# full URL so it maps to ETH_RPC_URL; the key never enters git (.env is ignored).
+RPC_FLAGS=()
+if [ -f "$REPO/.env" ]; then set +e; . "$REPO/.env"; set -e; fi
+if [ -n "${ALCHEMY_URL:-}" ]; then
+  say "Using ALCHEMY_URL from .env as ETH_RPC_URL"
+  RPC_FLAGS=(--set-string "ethRpcUrl=$ALCHEMY_URL")
+fi
+
 say "Deploying login chart (Postgres-backed Hydra, cert-manager TLS)"
 helm dependency update "$REPO/charts/login" >/dev/null
 helm upgrade --install cryptoverse-login "$REPO/charts/login" \
-  -n "$NS_LOGIN" -f "$KIND_DIR/values-kind.yaml" "${MON_FLAGS[@]}" --wait --timeout 6m
+  -n "$NS_LOGIN" -f "$KIND_DIR/values-kind.yaml" "${RPC_FLAGS[@]}" "${MON_FLAGS[@]}" --wait --timeout 6m
 
 say "Deploying demo chart"
 helm upgrade --install demo "$REPO/tests/cryptoverse-login-demo/charts/demo" \
