@@ -68,6 +68,11 @@ introspectAccess:
   pass: "!!! CHANGE THIS !!!"
 infuraApiKey: "!!! CHANGE THIS !!!"
 alchemyApiKey: "!!! CHANGE THIS !!!"
+# Optional full mainnet JSON-RPC URL. Used by the core eth client only when
+# neither alchemyApiKey nor infuraApiKey is set (precedence: Alchemy > Infura >
+# ETH_RPC_URL > built-in public default). Leave empty in production and supply a
+# dedicated Alchemy/Infura key instead.
+ethRpcUrl: ""
 
 gateway:
   replicaCount: 1

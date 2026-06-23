@@ -45,6 +45,13 @@ spec:
               value: {{ .Values.infuraApiKey }}
             - name: ALCHEMY_API_KEY
               value: {{ .Values.alchemyApiKey }}
+            {{- if .Values.ethRpcUrl }}
+            # Full mainnet JSON-RPC URL. The core eth client prefers
+            # ALCHEMY_API_KEY, then INFURA_API_KEY, then ETH_RPC_URL, then a
+            # public default. Only rendered when set, so it never shadows a key.
+            - name: ETH_RPC_URL
+              value: {{ .Values.ethRpcUrl | quote }}
+            {{- end }}
             - name: DEBUG
               value: "{{ .Values.debug }}"
           securityContext:

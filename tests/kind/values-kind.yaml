@@ -16,10 +16,27 @@ imagePullSecrets: []
 
 ingressClassName: nginx
 
-# No mainnet RPC keys locally; ENS/Unstoppable Domains lookups are best-effort
-# and resolve to empty for the test account.
+# No private mainnet RPC keys locally. Instead we point the core eth client at a
+# reliable public mainnet endpoint via ETH_RPC_URL so the kind env CAN exercise
+# the on-chain enrichment (ENS / Unstoppable Domains) and token-gating
+# (balanceOf) paths end-to-end. This value belongs here (and not in the chart
+# default) precisely because the kind cluster otherwise has no way to reach
+# mainnet — there is no key to fall back on.
+#
+# Real deployments should leave this empty and supply their own dedicated
+# Alchemy/Infura key (alchemyApiKey / infuraApiKey), which take precedence over
+# ETH_RPC_URL. Public endpoints are rate-limited and not for production.
+#
+# NOTE on reachability: the kind pod DOES have outbound egress (verified: raw
+# HTTPS to public IPs and to cloudflare-eth.com / publicnode / drpc all return
+# 200 from inside the cluster). The core eth client's built-in default,
+# https://eth.llamarpc.com, fails here for a *DNS* reason — that host resolves to
+# 0.0.0.0 / :: from this cluster's resolver, so it can never connect. That is the
+# "public default was unreachable from the pod" the earlier benchmark hit. We
+# therefore point ETH_RPC_URL at a host that both resolves and responds here.
 infuraApiKey: ""
 alchemyApiKey: ""
+ethRpcUrl: "https://ethereum-rpc.publicnode.com"
 
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
