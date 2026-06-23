@@ -7,7 +7,15 @@
 //! Base URL is Hydra's admin service (`HYDRA_ADMIN_URL`), and in Hydra 2.x the
 //! admin endpoints live under `/admin/...`.
 
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
+
+/// Per-request timeout for Hydra admin calls. Hydra is co-located (in-cluster)
+/// so it's normally sub-millisecond, but a stuck connection must not block a
+/// login indefinitely — the route handlers already map a client error to a
+/// `502`/`401`, so a timeout surfaces as the existing Hydra-error path.
+const HYDRA_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// The OAuth2 client (relying party) as returned by Hydra. `metadata` is kept
 /// opaque so callers can interpret app name / restrictions however they like.
@@ -82,6 +90,7 @@ impl Hydra {
         );
         let http = reqwest::Client::builder()
             .default_headers(headers)
+            .timeout(HYDRA_TIMEOUT)
             .build()
             .expect("failed to build reqwest client");
         Self {

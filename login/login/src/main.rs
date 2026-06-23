@@ -16,18 +16,71 @@ mod user_data;
 use std::sync::Arc;
 
 use axum::{
-    extract::State,
+    extract::{Request, State},
+    http::header::{HeaderValue, CACHE_CONTROL},
+    middleware::Next,
+    response::Response,
     routing::{get, post},
     Router,
 };
 use cryptoverse_core::{config, eth::Eth, hydra::Hydra, telemetry};
 use metrics_exporter_prometheus::PrometheusHandle;
 use minijinja::Environment;
+use tower::ServiceBuilder;
 use tower_http::{services::ServeDir, trace::TraceLayer};
+
+/// `Cache-Control` for Vite content-hashed assets (hashed JS/CSS, `*.woff2`
+/// fonts): the filename changes whenever the bytes do, so they're safe to cache
+/// forever and skip revalidation.
+const CACHE_IMMUTABLE: &str = "public, max-age=31536000, immutable";
+
+/// `Cache-Control` for the two stable-name entrypoints (`embed.js`/`final.js`):
+/// the URL is fixed but the bytes change per deploy, so the browser must
+/// revalidate (a 304 when unchanged) rather than serve a stale module.
+const CACHE_NO_CACHE: &str = "no-cache";
+
+/// True if `path` is a Vite content-hashed asset whose name encodes its bytes.
+/// Hashed bundles live under `/login/static/` (JS/CSS) with a `-<hash>` or
+/// `.<hash>` infix, and fonts are emitted as `*.woff2`. The two **unhashed**
+/// entrypoints `embed.js`/`final.js` (stable names) are deliberately excluded.
+fn is_hashed_asset(path: &str) -> bool {
+    if path.ends_with("/embed.js") || path.ends_with("/final.js") {
+        return false;
+    }
+    path.ends_with(".woff2") || path.ends_with(".js") || path.ends_with(".css")
+}
+
+/// Adds a `Cache-Control` header to static-asset responses based on the request
+/// path: long-lived `immutable` for content-hashed assets, `no-cache` for the
+/// stable-name entrypoints. Only sets the header when it isn't already present
+/// and only for successful responses, so error pages and the SPA index (served
+/// by the `/login` route, not this middleware) are untouched.
+async fn cache_control(req: Request, next: Next) -> Response {
+    let path = req.uri().path().to_string();
+    let mut resp = next.run(req).await;
+
+    if !resp.status().is_success() || resp.headers().contains_key(CACHE_CONTROL) {
+        return resp;
+    }
+
+    let policy = if is_hashed_asset(&path) {
+        CACHE_IMMUTABLE
+    } else if path.ends_with("/embed.js") || path.ends_with("/final.js") {
+        CACHE_NO_CACHE
+    } else {
+        return resp;
+    };
+    resp.headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static(policy));
+    resp
+}
 
 pub struct AppState {
     pub hydra: Hydra,
     pub eth: Eth,
+    /// TTL cache of per-address ENS/UD enrichment, shared across requests so
+    /// repeat logins for the same address skip the on-chain reverse lookups.
+    pub enrichment_cache: user_data::EnrichmentCache,
     pub templates: Environment<'static>,
     /// Domain used only for the user's profile/picture/website claims
     /// (`PROFILE_DOMAIN`); the IdP's own domain is derived per-request.
@@ -68,6 +121,7 @@ async fn main() {
     let state = Arc::new(AppState {
         hydra,
         eth,
+        enrichment_cache: user_data::EnrichmentCache::new(),
         templates,
         profile_domain: config::var_or("PROFILE_DOMAIN", "cryptoverse.cc"),
         mailserver_domain: config::var_or("MAILSERVER_DOMAIN", "ethmail.cc"),
@@ -77,13 +131,21 @@ async fn main() {
         metrics_handle,
     });
 
+    // Static SPA assets, with a `Cache-Control` policy applied per request path
+    // (immutable for hashed assets, no-cache for the stable entrypoints). The
+    // middleware is scoped to this service so the API/SPA-index routes above are
+    // untouched.
+    let static_service = ServiceBuilder::new()
+        .layer(axum::middleware::from_fn(cache_control))
+        .service(ServeDir::new(&static_dir));
+
     let app = Router::new()
         .route("/login", get(routes::login::page))
         .route("/login/process", post(routes::login::process))
         .route("/consent", get(routes::consent::consent))
         .route("/---/metrics", get(metrics))
         .route("/healthz", get(|| async { "ok" }))
-        .fallback_service(ServeDir::new(&static_dir))
+        .fallback_service(static_service)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
@@ -96,4 +158,31 @@ async fn main() {
 
 async fn metrics(State(st): State<Arc<AppState>>) -> String {
     st.metrics_handle.render()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_hashed_asset;
+
+    #[test]
+    fn hashed_assets_are_immutable() {
+        // Vite content-hashed bundles + fonts → immutable.
+        assert!(is_hashed_asset("/login/static/js/main-a1b2c3d4.js"));
+        assert!(is_hashed_asset("/login/static/css/main-deadbeef.css"));
+        assert!(is_hashed_asset("/login/static/media/inter-9f8e7d.woff2"));
+    }
+
+    #[test]
+    fn stable_entrypoints_are_not_hashed() {
+        // The two unhashed, stable-name entrypoints must NOT be marked immutable.
+        assert!(!is_hashed_asset("/login/static/js/embed.js"));
+        assert!(!is_hashed_asset("/login/static/js/final.js"));
+    }
+
+    #[test]
+    fn non_asset_paths_are_not_hashed() {
+        assert!(!is_hashed_asset("/login"));
+        assert!(!is_hashed_asset("/login/index.html"));
+        assert!(!is_hashed_asset("/favicon.ico"));
+    }
 }

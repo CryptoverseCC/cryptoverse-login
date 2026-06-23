@@ -6,16 +6,28 @@
 //! blocks a login. We preserve that — lookups return `Option`/default on error
 //! and log at `warn`.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
 use alloy::primitives::{address, keccak256, Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{DynProvider, Provider, RootProvider};
 use alloy::rpc::client::ClientBuilder;
 use alloy::rpc::types::TransactionRequest;
 use alloy::sol;
 use alloy::sol_types::SolValue;
+use tokio::sync::RwLock;
 
 // ENS registry (mainnet) and the Unstoppable Domains UNS ProxyReader (mainnet).
 const ENS_REGISTRY: Address = address!("00000000000C2E074eC69A0dFb2997BA6C7d2e1e");
 const UD_PROXY_READER: Address = address!("049aba7510f45BA5b64ea9E658E342F904DB358D");
+
+/// Per-request timeout for JSON-RPC calls (ENS / ERC-20 reads, the deployless
+/// signature-validation `eth_call`) and the UD metadata HTTP fetch. A hung RPC
+/// must never block a login indefinitely; on timeout the call surfaces as the
+/// usual best-effort error (enrichment → `None`/`0.0`, sig-validation → not
+/// valid), so login still proceeds for enrichment and fails closed for auth.
+const RPC_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// ERC-6492 detection suffix: a wrapped (counterfactual) signature ends with
 /// these 32 bytes (`0x6492…6492`). See <https://eips.ethereum.org/EIPS/eip-6492>.
@@ -106,6 +118,11 @@ pub fn decode_erc6492_wrapper(signature: &[u8]) -> Option<(Address, Bytes, Bytes
 pub struct Eth {
     provider: DynProvider,
     http: reqwest::Client,
+    /// Per-token cache of the immutable ERC-20 `decimals()`. The value never
+    /// changes for a deployed token, so it is cached for the process lifetime
+    /// (no TTL needed) — this removes one RPC round-trip from every
+    /// `balance_of` (i.e. every token-gating check).
+    decimals: Arc<RwLock<HashMap<Address, u8>>>,
 }
 
 impl Eth {
@@ -114,28 +131,52 @@ impl Eth {
     pub fn from_env() -> anyhow::Result<Self> {
         let url = mainnet_rpc_url();
         let provider = RootProvider::new(ClientBuilder::default().http(url.parse()?)).erased();
+        // The UD metadata HTTP client gets an explicit timeout. The alloy
+        // provider's own reqwest version is internal (and differs from the
+        // workspace's), so JSON-RPC `.call()`s are bounded with
+        // `tokio::time::timeout` at each call site instead — see `rpc_timeout`.
+        let http = reqwest::Client::builder()
+            .timeout(RPC_TIMEOUT)
+            .build()
+            .expect("failed to build HTTP client");
         Ok(Self {
             provider,
-            http: reqwest::Client::new(),
+            http,
+            decimals: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
     /// ERC-20 balance of `owner` for `token`, scaled by the token's `decimals`
     /// and returned as `f64` (so it can be fed to the token-gating expression
     /// evaluator, which can't handle `U256`). Returns `0.0` on any error.
-    pub async fn balance_of(&self, token: Address, owner: Address) -> f64 {
-        let erc = IERC20::new(token, &self.provider);
-
-        // Most tokens implement `decimals`; default to 18 if not.
-        let decimals: u8 = match erc.decimals().call().await {
-            Ok(d) => d,
+    /// Read the ERC-20 `decimals()` for `token`, caching the (immutable) result
+    /// per token address. Most tokens implement `decimals`; a failure defaults
+    /// to 18 and is **not** cached, so a transient RPC error doesn't pin a wrong
+    /// value — the next call retries.
+    async fn decimals_of(&self, token: Address, erc: &IERC20::IERC20Instance<&DynProvider>) -> u8 {
+        if let Some(&d) = self.decimals.read().await.get(&token) {
+            return d;
+        }
+        match rpc_timeout("decimals()", erc.decimals().call()).await {
+            Ok(d) => {
+                self.decimals.write().await.insert(token, d);
+                d
+            }
             Err(e) => {
                 tracing::warn!("decimals() failed for {token}: {e}; defaulting to 18");
                 18
             }
-        };
+        }
+    }
 
-        let raw: U256 = match erc.balanceOf(owner).call().await {
+    pub async fn balance_of(&self, token: Address, owner: Address) -> f64 {
+        let erc = IERC20::new(token, &self.provider);
+
+        // `decimals()` is immutable for a deployed token, so it is cached per
+        // token address — saving one RPC round-trip on every repeat check.
+        let decimals = self.decimals_of(token, &erc).await;
+
+        let raw: U256 = match rpc_timeout("balanceOf()", erc.balanceOf(owner).call()).await {
             Ok(b) => b,
             Err(e) => {
                 tracing::warn!("balanceOf() failed for {token}/{owner}: {e}");
@@ -194,7 +235,7 @@ impl Eth {
         // Deployless call: no `to`, the bytecode runs as a constructor.
         let tx = TransactionRequest::default().input(Bytes::from(data).into());
 
-        match self.provider.call(tx).await {
+        match rpc_timeout("ERC-1271/6492 validation", self.provider.call(tx)).await {
             // `ValidateSigOffchain` returns 1 byte: 0x01 = valid.
             Ok(out) => out.first() == Some(&1),
             Err(e) => {
@@ -214,19 +255,23 @@ impl Eth {
         let node = namehash(&reverse_name);
 
         let registry = ENSRegistry::new(ENS_REGISTRY, &self.provider);
-        let resolver = match registry.resolver(node).call().await {
-            Ok(addr) => addr,
-            Err(e) => {
-                tracing::warn!("ENS registry.resolver failed for {owner}: {e}");
-                return None;
-            }
-        };
+        let resolver =
+            match rpc_timeout("ENS registry.resolver", registry.resolver(node).call()).await {
+                Ok(addr) => addr,
+                Err(e) => {
+                    tracing::warn!("ENS registry.resolver failed for {owner}: {e}");
+                    return None;
+                }
+            };
         if resolver.is_zero() {
             return None;
         }
 
+        // NOTE: this second call is data-dependent on the first (the resolver
+        // address came from `registry.resolver`), so the two CANNOT be collapsed
+        // into a single Multicall3 batch — they are deliberately sequential.
         let resolver = ENSNameResolver::new(resolver, &self.provider);
-        match resolver.name(node).call().await {
+        match rpc_timeout("ENS resolver.name", resolver.name(node).call()).await {
             Ok(name) if !name.is_empty() => Some(name),
             Ok(_) => None,
             Err(e) => {
@@ -240,7 +285,8 @@ impl Eth {
     /// the UNS ProxyReader, then resolves its name via the UD metadata API.
     pub async fn ud_reverse(&self, owner: Address) -> Option<String> {
         let reader = IUDProxyReader::new(UD_PROXY_READER, &self.provider);
-        let token_id: U256 = match reader.reverseOf(owner).call().await {
+        let token_id: U256 = match rpc_timeout("UD reverseOf", reader.reverseOf(owner).call()).await
+        {
             Ok(id) => id,
             Err(e) => {
                 tracing::warn!("UD reverseOf failed for {owner}: {e}");
@@ -270,6 +316,24 @@ impl Eth {
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
+    }
+}
+
+/// Await `fut`, bounding it by [`RPC_TIMEOUT`]. On timeout returns `Err` with a
+/// descriptive message so each caller can fall back to its usual best-effort
+/// path (enrichment → `None`/`0.0`, signature validation → not valid). `label`
+/// names the call for the log line.
+async fn rpc_timeout<F, T, E>(label: &str, fut: F) -> Result<T, String>
+where
+    // alloy's `EthCall`/`CallBuilder` are `IntoFuture`, not `Future` directly,
+    // so accept anything awaitable.
+    F: std::future::IntoFuture<Output = Result<T, E>>,
+    E: std::fmt::Display,
+{
+    match tokio::time::timeout(RPC_TIMEOUT, fut.into_future()).await {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e.to_string()),
+        Err(_) => Err(format!("{label} timed out after {RPC_TIMEOUT:?}")),
     }
 }
 
@@ -306,6 +370,35 @@ mod tests {
     #[test]
     fn namehash_empty_is_zero() {
         assert_eq!(namehash(""), FixedBytes::<32>::ZERO);
+    }
+
+    /// The per-token `decimals` cache returns the seeded value with no RPC.
+    /// Builds an `Eth` whose provider points at an unroutable URL so any
+    /// accidental network call would error/hang — the test passing proves the
+    /// cached read path is taken (no provider call is made).
+    #[tokio::test]
+    async fn decimals_cache_hit_avoids_rpc() {
+        // Provider URL is never dialled on a cache hit.
+        let provider =
+            RootProvider::new(ClientBuilder::default().http("http://127.0.0.1:1".parse().unwrap()))
+                .erased();
+        let eth = Eth {
+            provider,
+            http: reqwest::Client::new(),
+            decimals: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        let token = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"); // USDC
+        eth.decimals.write().await.insert(token, 6);
+
+        let erc = IERC20::new(token, &eth.provider);
+        // Returns the cached 6 immediately; the unroutable provider is untouched.
+        let d = eth.decimals_of(token, &erc).await;
+        assert_eq!(d, 6, "cached decimals must be returned without an RPC");
+
+        // A second token is not in the cache.
+        let other = address!("dAC17F958D2ee523a2206206994597C13D831ec7"); // USDT
+        assert!(eth.decimals.read().await.get(&other).is_none());
     }
 
     #[test]
