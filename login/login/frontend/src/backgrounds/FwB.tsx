@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -13,13 +13,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { ILoginProvider } from "../services/loginProvider";
 import { Loader } from "../components/Loader";
 import BrandMark from "../components/BrandMark";
-
-const App = lazy(
-  () =>
-    import(
-      /* webpackMode: "eager", webpackPreload: true, webpackChunkName: "app" */ "../App"
-    )
-);
+import { App, warmApp } from "./lazyApp";
 
 const UNISWAP_FWB =
   "https://app.uniswap.org/#/swap?outputCurrency=0x7d91e637589EC3Bb54D8213a9e92Dc6E8D12da91";
@@ -117,6 +111,9 @@ export interface BackgroundProps {
 export const Background: React.FC<BackgroundProps> = ({ loginProvider }) => {
   const { classes } = useStyles();
   const [open, setOpen] = useState(false);
+  // Warm the lazy `App` chunk while the user reads the landing, so the click is
+  // instant. See backgrounds/lazyApp.ts.
+  useEffect(() => warmApp(), []);
   return (
     <Suspense fallback={<Loader />}>
       {!open && (

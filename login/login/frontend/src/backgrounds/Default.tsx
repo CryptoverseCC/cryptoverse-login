@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, StrictMode } from "react";
+import React, { useState, useEffect, Suspense, StrictMode } from "react";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -13,13 +13,7 @@ import { ILoginProvider } from "../services/loginProvider";
 import { Loader } from "../components/Loader";
 import BrandMark from "../components/BrandMark";
 import { vault } from "../theme";
-
-const App = lazy(
-  () =>
-    import(
-      /* webpackMode: "eager", webpackPreload: true, webpackChunkName: "app" */ "../App"
-    )
-);
+import { App, warmApp } from "./lazyApp";
 
 const useStyles = makeStyles()((theme: Theme) => ({
   root: {
@@ -134,6 +128,9 @@ export interface BackgroundProps {
 export const Background: React.FC<BackgroundProps> = ({ loginProvider }) => {
   const { classes } = useStyles();
   const [open, setOpen] = useState(false);
+  // Warm the lazy `App` chunk while the user reads the landing, so the click is
+  // instant. See backgrounds/lazyApp.ts.
+  useEffect(() => warmApp(), []);
   const origin =
     loginProvider.loginData.metadata?.app || loginProvider.loginData.clientId;
   return (
