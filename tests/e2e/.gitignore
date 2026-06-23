@@ -4,3 +4,5 @@ playwright-report/
 blob-report/
 .playwright/
 *.log
+# Perf-harness run artifacts (raw CDP dumps) — regenerable, not versioned.
+perf/out/
