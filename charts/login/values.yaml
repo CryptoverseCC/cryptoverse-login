@@ -17,6 +17,11 @@ djangoSecrets: "!!! CHANGE THIS !!!"
 
 ingressClassName: nginx
 
+# cert-manager ClusterIssuer for the ingress TLS cert. Set empty to omit the
+# cert-manager.io/cluster-issuer annotation entirely (e.g. local/kind, where the
+# TLS secret is supplied out-of-band as a self-signed cert).
+certManagerIssuer: cryptoverse-common
+
 hydra:
   hydra-maester:
     forwardedProto: https

@@ -121,11 +121,13 @@ podman kube down local-stack/cryptoverse-stack.yaml
 ### Local cluster via kind (production-faithful; primary local loop)
 `tests/kind/setup.sh` brings the whole system up on a local **kind** cluster
 (rootless podman), wired like prod: the real Helm charts + Postgres-backed Hydra +
-cert-manager TLS from a local **mkcert** CA + ingress-nginx on host `:9443`, with
+self-signed TLS seeded per ingress host (openssl, no cert-manager; the charts'
+`certManagerIssuer` value defaults to `cryptoverse-common` for prod but is `""`
+in `values-kind.yaml`) + ingress-nginx on host `:9443`, with
 `nip.io` domains (`login.cv.127.0.0.1.nip.io`, `login-demo.cv.127.0.0.1.nip.io`). Iterate by
 rebuilding images + `helm upgrade` + `kubectl rollout restart`. See `tests/kind/README.md`.
 ```bash
-tests/kind/setup.sh            # build images, cluster, ingress, cert-manager, postgres, deploy
+tests/kind/setup.sh            # build images, cluster, ingress, self-signed TLS, postgres, deploy
 tests/kind/teardown.sh
 ```
 Validate the backend fast with the **harness** (curl-driven, no browser; `tests/harness/`):

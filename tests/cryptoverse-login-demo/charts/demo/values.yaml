@@ -1,5 +1,8 @@
 domain: login-demo.cryptoverse.cc
 tlsSecretName: login-demo-tls
+# cert-manager ClusterIssuer for the ingress TLS cert. Empty omits the
+# cert-manager.io/cluster-issuer annotation (e.g. local/kind self-signed certs).
+certManagerIssuer: cryptoverse-common
 version: ---TAG---
 registry: registry.digitalocean.com/cryptoverse
 

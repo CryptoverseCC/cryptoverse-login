@@ -5,8 +5,10 @@ metadata:
   {{- if .Release.Namespace }}
   namespace: {{ .Release.Namespace }}
   {{- end }}
+  {{- if .Values.certManagerIssuer }}
   annotations:
-    cert-manager.io/cluster-issuer: cryptoverse-common
+    cert-manager.io/cluster-issuer: {{ .Values.certManagerIssuer }}
+  {{- end }}
   labels:
 {{ include "demo.labels" . | indent 4 }}
 spec:

@@ -4,7 +4,7 @@
 # podman), wired and exposed like production:
 #   - the real Helm charts (gateway + login + wrapper + Ory Hydra 2.x + maester)
 #   - Postgres-backed Hydra (not in-memory)
-#   - cert-manager issuing the ingress TLS via the cryptoverse-common ClusterIssuer
+#   - self-signed TLS certs seeded per ingress host (no cert-manager; TokenTube-style)
 #   - ingress-nginx on :443, nip.io domains
 #   - the demo relying party
 #
@@ -25,7 +25,6 @@ PORT=9443   # host port mapped to the ingress (node :443); services are port-agn
 LOGIN_URL="https://$LOGIN_DOMAIN:$PORT"
 DEMO_URL="https://$DEMO_DOMAIN:$PORT"
 INGRESS_NGINX="https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.1/deploy/static/provider/kind/deploy.yaml"
-CERT_MANAGER="https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml"
 
 say() { printf '\n\033[1;36m== %s ==\033[0m\n' "$*"; }
 die() { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -58,30 +57,35 @@ until kubectl -n ingress-nginx get deploy/ingress-nginx-controller >/dev/null 2>
 kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
 kubectl annotate ingressclass nginx ingressclass.kubernetes.io/is-default-class=true --overwrite
 
-say "Installing cert-manager + mkcert-backed cryptoverse-common CA issuer"
-kubectl apply -f "$CERT_MANAGER"
-until kubectl -n cert-manager get deploy/cert-manager-webhook >/dev/null 2>&1; do sleep 2; done
-kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
-# Back the issuer with a local mkcert CA so both hosts' certs chain to one root
-# you can trust on the machine running your browser (no per-host warnings).
-if ! command -v mkcert >/dev/null; then
-  curl -fsSL -o "$HOME/.local/bin/mkcert" \
-    https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
-  chmod +x "$HOME/.local/bin/mkcert"
-fi
-CAROOT=$(mkcert -CAROOT)
-# Create the CA if it doesn't exist yet (issue a throwaway cert; no trust-store install).
-[ -f "$CAROOT/rootCA.pem" ] || mkcert -cert-file /tmp/_mkcert.pem -key-file /tmp/_mkcert-key.pem localhost >/dev/null 2>&1
-kubectl -n cert-manager create secret tls cryptoverse-ca \
-  --cert="$CAROOT/rootCA.pem" --key="$CAROOT/rootCA-key.pem" \
-  --dry-run=client -o yaml | kubectl apply -f -
-# Retry the issuer until the validating webhook is actually serving.
-until kubectl apply -f "$KIND_DIR/clusterissuer.yaml" 2>/dev/null; do sleep 3; done
-
 say "Namespaces + Postgres for Hydra"
 for ns in "$NS_LOGIN" "$NS_DEMO"; do
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
 done
+
+# TLS: a self-signed cert per ingress host, seeded straight into the secret the
+# chart's ingress references — no cert-manager (same approach as TokenTube's
+# infra/up.sh). values-kind.yaml sets certManagerIssuer="" so the ingress carries
+# no cert-manager annotation and nothing reissues/overwrites these. The cert is
+# kept across runs once present; delete the secret to regenerate (e.g. after a
+# domain change — the SAN check below also regenerates if the host no longer matches).
+seed_selfsigned_tls() {  # $1=host  $2=namespace  $3=secretName
+  if kubectl -n "$2" get secret "$3" -o jsonpath='{.data.tls\.crt}' 2>/dev/null \
+       | base64 -d 2>/dev/null | openssl x509 -noout -ext subjectAltName 2>/dev/null \
+       | grep -q "DNS:$1"; then
+    echo "  $2/$3: keeping existing self-signed cert for $1"; return
+  fi
+  local d; d=$(mktemp -d)
+  openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
+    -keyout "$d/tls.key" -out "$d/tls.crt" \
+    -subj "/CN=$1" -addext "subjectAltName=DNS:$1" >/dev/null 2>&1
+  kubectl create secret tls "$3" -n "$2" --cert="$d/tls.crt" --key="$d/tls.key" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  rm -rf "$d"
+  echo "  $2/$3: new self-signed cert (CN/SAN=$1)"
+}
+say "Self-signed TLS certs for the ingress hosts (no cert-manager)"
+seed_selfsigned_tls "$LOGIN_DOMAIN" "$NS_LOGIN" cryptoverse-login
+seed_selfsigned_tls "$DEMO_DOMAIN"  "$NS_DEMO"  login-demo-tls
 kubectl apply -f "$KIND_DIR/postgres.yaml"
 until kubectl -n "$NS_LOGIN" get deploy/postgres >/dev/null 2>&1; do sleep 2; done
 kubectl -n "$NS_LOGIN" rollout status deploy/postgres --timeout=120s
@@ -117,7 +121,7 @@ if [ -n "${ALCHEMY_URL:-}" ]; then
   RPC_FLAGS=(--set-string "ethRpcUrl=$ALCHEMY_URL")
 fi
 
-say "Deploying login chart (Postgres-backed Hydra, cert-manager TLS)"
+say "Deploying login chart (Postgres-backed Hydra, self-signed TLS)"
 helm dependency update "$REPO/charts/login" >/dev/null
 helm upgrade --install cryptoverse-login "$REPO/charts/login" \
   -n "$NS_LOGIN" -f "$KIND_DIR/values-kind.yaml" "${RPC_FLAGS[@]}" "${MON_FLAGS[@]}" --wait --timeout 6m
@@ -140,13 +144,12 @@ cat <<EOF
 == Ready ==
 Login:  $LOGIN_URL/      Demo: $DEMO_URL/
 
-Trust the local CA on the machine running your browser (one time, no warnings):
-  CA root: $CAROOT/rootCA.pem
-  - same machine: mkcert -install
-  - remote browser (e.g. over VS Code/SSH): copy that file over and, on a Mac,
-      'mkcert -install' (brew install mkcert nss) or import it into Firefox
-      (Settings > Privacy & Security > Certificates > View Certificates >
-       Authorities > Import, trust for websites).
+TLS is a self-signed cert per host (no CA). Over a port-forward the browser warns
+once per host — accept it. The login UI also loads inside an iframe on the demo,
+and a browser can't show a cert prompt inside an iframe, so trust the LOGIN host
+first: open $LOGIN_URL/ directly and accept (or import) its cert, then the demo's
+iframe loads. Export a cert to import into your OS/browser trust store with:
+  kubectl -n $NS_LOGIN get secret cryptoverse-login -o jsonpath='{.data.tls\\.crt}' | base64 -d > login.crt
 
 Prove it works (fast, no browser):
   kubectl -n $NS_LOGIN port-forward svc/cryptoverse-login-hydra-admin 4445:4445 &

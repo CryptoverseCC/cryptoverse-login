@@ -16,6 +16,11 @@ imagePullSecrets: []
 
 ingressClassName: nginx
 
+# No cert-manager locally: setup.sh seeds the ingress TLS secret with a
+# self-signed cert (openssl, like TokenTube's infra/up.sh). Empty issuer omits
+# the cert-manager.io/cluster-issuer annotation so nothing reissues/clobbers it.
+certManagerIssuer: ""
+
 # No private mainnet RPC keys locally. Instead we point the core eth client at a
 # reliable public mainnet endpoint via ETH_RPC_URL so the kind env CAN exercise
 # the on-chain enrichment (ENS / Unstoppable Domains) and token-gating

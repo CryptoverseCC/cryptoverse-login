@@ -5,6 +5,8 @@
 
 domain: login-demo.cv.127.0.0.1.nip.io
 tlsSecretName: login-demo-tls
+# No cert-manager locally — setup.sh seeds login-demo-tls with a self-signed cert.
+certManagerIssuer: ""
 
 registry: localhost
 version: test
