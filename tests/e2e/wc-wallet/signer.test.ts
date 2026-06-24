@@ -13,12 +13,12 @@ import { ACCOUNT_ADDRESS, SEED_PHRASE } from "../fixtures/wallet.js";
  */
 
 const A_SIWE_MESSAGE = [
-  "login.127.0.0.1.nip.io wants you to sign in with your Ethereum account:",
+  "login.cv.127.0.0.1.nip.io wants you to sign in with your Ethereum account:",
   ACCOUNT_ADDRESS,
   "",
   "Sign in to the demo relying party.",
   "",
-  "URI: https://login.127.0.0.1.nip.io:9443",
+  "URI: https://login.cv.127.0.0.1.nip.io:9443",
   "Version: 1",
   "Chain ID: 1",
   "Nonce: 0123456789abcdef",

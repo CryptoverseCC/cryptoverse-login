@@ -48,7 +48,7 @@ function fcpOf(f) {
 // captured frameUrl, which can resolve to the demo origin for embed assets).
 function docByPath(url) {
   const u = url || "";
-  if (u.includes("demo.127.0.0.1.nip.io") && !u.includes("/login/") && !u.includes("/oauth2/"))
+  if (u.includes("login-demo.cv.127.0.0.1.nip.io") && !u.includes("/login/") && !u.includes("/oauth2/"))
     return "demo";
   if (u.includes("/oauth2/")) return "embed-doc";
   if (u.includes("embed.js") || u.includes("sentry.min.js") || (u.includes("comlink") && u.includes("/static/")))

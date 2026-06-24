@@ -43,8 +43,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, "out");
 mkdirSync(OUT_DIR, { recursive: true });
 
-const DEMO_URL = process.env.DEMO_URL ?? "https://demo.127.0.0.1.nip.io:9443";
-const LOGIN_URL = process.env.LOGIN_URL ?? "https://login.127.0.0.1.nip.io:9443";
+const DEMO_URL = process.env.DEMO_URL ?? "https://login-demo.cv.127.0.0.1.nip.io:9443";
+const LOGIN_URL = process.env.LOGIN_URL ?? "https://login.cv.127.0.0.1.nip.io:9443";
 
 const argv = process.argv.slice(2);
 function flag(name, def) {
@@ -64,14 +64,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function docOf(url, frameUrl) {
   const u = url || "";
   const f = frameUrl || "";
-  if (u.includes("demo.127.0.0.1.nip.io") || f.includes("demo.127.0.0.1.nip.io"))
+  if (u.includes("login-demo.cv.127.0.0.1.nip.io") || f.includes("login-demo.cv.127.0.0.1.nip.io"))
     return "demo";
   // The login host serves BOTH the wrapper embed page (top window) AND the
   // /login SPA + assets (iframe). Split by the frame the request belongs to:
   // the embed top doc lives at /oauth2/auth; the SPA + its assets at /login/.
   if (u.includes("/oauth2/")) return "embed-doc"; // wrapper embed html + hydra authorize
   if (f.includes("/oauth2/")) return "embed-assets"; // embed.js, sentry.min.js, comlink
-  if (u.includes("login.127.0.0.1.nip.io") || f.includes("/login"))
+  if (u.includes("login.cv.127.0.0.1.nip.io") || f.includes("/login"))
     return "login-spa"; // /login html + main bundle + css + fonts + lazy chunks
   return "other";
 }

@@ -25,9 +25,9 @@ import { defineConfig } from "@playwright/test";
 // match `tests/kind/setup.sh` (host port 9443, nip.io domains). Override for a
 // differently-exposed stack.
 const DEMO_URL =
-  process.env.DEMO_URL ?? "https://demo.127.0.0.1.nip.io:9443";
+  process.env.DEMO_URL ?? "https://login-demo.cv.127.0.0.1.nip.io:9443";
 const LOGIN_URL =
-  process.env.LOGIN_URL ?? "https://login.127.0.0.1.nip.io:9443";
+  process.env.LOGIN_URL ?? "https://login.cv.127.0.0.1.nip.io:9443";
 
 // The WalletConnect project (Reown Cloud) id. Empty => the IdP omits the WC
 // connector and the WC spec self-skips.

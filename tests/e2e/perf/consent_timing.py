@@ -12,7 +12,7 @@ HITS (no RPC).
 READ-ONLY measurement. No product code is touched.
 
 Usage:
-  HARNESS_GATEWAY=https://login.127.0.0.1.nip.io:9443 HARNESS_HOST= \
+  HARNESS_GATEWAY=https://login.cv.127.0.0.1.nip.io:9443 HARNESS_HOST= \
     HARNESS_HYDRA_ADMIN=http://127.0.0.1:4445 \
     python3 consent_timing.py --rounds 6 --key <hex>
 """

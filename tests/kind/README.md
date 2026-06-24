@@ -36,7 +36,7 @@ The services have no hardcoded domain, port, or scheme: the gateway, login, and
 wrapper all derive the public origin from the request the ingress forwards
 (`X-Forwarded-Host` / `X-Forwarded-Proto`, falling back to `Host`). So the system
 works on whatever host:port the ingress is configured for — here
-`login.127.0.0.1.nip.io:9443`. Hydra's issuer is the one fixed value (an OIDC
+`login.cv.127.0.0.1.nip.io:9443`. Hydra's issuer is the one fixed value (an OIDC
 requirement), set in `values-kind.yaml`.
 
 ## Run
@@ -63,7 +63,7 @@ prints the exact harness + Selenium commands when it finishes.
 
 ## Notes
 
-- Domains are `login.127.0.0.1.nip.io` / `demo.127.0.0.1.nip.io` (resolve to
+- Domains are `login.cv.127.0.0.1.nip.io` / `login-demo.cv.127.0.0.1.nip.io` (resolve to
   127.0.0.1, no `/etc/hosts`). TLS is issued by cert-manager from a local
   **mkcert** CA (one root signs both hosts). Trust that root on the machine
   running your browser (`mkcert -install`, or import `rootCA.pem` into Firefox)

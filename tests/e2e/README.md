@@ -79,8 +79,8 @@ yarn test:list
 tests/kind/setup.sh        # real charts + Hydra + the demo RP on a local kind cluster
 ```
 
-It serves the demo at `https://demo.127.0.0.1.nip.io:9443` and the IdP at
-`https://login.127.0.0.1.nip.io:9443`, with TLS from a local **mkcert** CA. The
+It serves the demo at `https://login-demo.cv.127.0.0.1.nip.io:9443` and the IdP at
+`https://login.cv.127.0.0.1.nip.io:9443`, with TLS from a local **mkcert** CA. The
 suite sets `ignoreHTTPSErrors`, so you do **not** need to trust the CA for the
 tests (you do for a manual browser).
 
@@ -125,8 +125,8 @@ WALLETCONNECT_PROJECT_ID=<id> xvfb-run --auto-servernum yarn test:e2e
 
 | var | default | meaning |
 |---|---|---|
-| `DEMO_URL` | `https://demo.127.0.0.1.nip.io:9443` | demo RP base URL (Playwright `baseURL`) |
-| `LOGIN_URL` | `https://login.127.0.0.1.nip.io:9443` | IdP host (informational) |
+| `DEMO_URL` | `https://login-demo.cv.127.0.0.1.nip.io:9443` | demo RP base URL (Playwright `baseURL`) |
+| `LOGIN_URL` | `https://login.cv.127.0.0.1.nip.io:9443` | IdP host (informational) |
 | `WALLETCONNECT_PROJECT_ID` | _(empty)_ | enables the `walletconnect` project |
 | `MAILSERVER_DOMAIN` | `ethmail.cc` | for the email claim assertions (kind default) |
 | `PROFILE_DOMAIN` | `cryptoverse.cc` | for the picture/profile/website claim assertions (kind default) |

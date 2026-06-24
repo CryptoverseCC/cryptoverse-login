@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, "out");
-const DEMO_URL = process.env.DEMO_URL ?? "https://demo.127.0.0.1.nip.io:9443";
+const DEMO_URL = process.env.DEMO_URL ?? "https://login-demo.cv.127.0.0.1.nip.io:9443";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await chromium.launch({ args: ["--ignore-certificate-errors"] });

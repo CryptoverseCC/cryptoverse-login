@@ -30,7 +30,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, "out");
 mkdirSync(OUT, { recursive: true });
-const DEMO = process.env.DEMO_URL ?? "https://demo.127.0.0.1.nip.io:9443";
+const DEMO = process.env.DEMO_URL ?? "https://login-demo.cv.127.0.0.1.nip.io:9443";
 const CONNECTOR = (process.env.CONNECTOR ?? "metamask").toLowerCase();
 const ITERS = Number(process.env.ITERS ?? 1);
 const DO_SIGN = process.env.DO_SIGN === "1";

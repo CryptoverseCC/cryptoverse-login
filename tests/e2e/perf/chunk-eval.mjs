@@ -26,7 +26,7 @@ import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, "out");
 mkdirSync(OUT, { recursive: true });
-const LOGIN = process.env.LOGIN_URL ?? "https://login.127.0.0.1.nip.io:9443";
+const LOGIN = process.env.LOGIN_URL ?? "https://login.cv.127.0.0.1.nip.io:9443";
 // The embed page URL needs OAuth params; any valid authorize URL works, but the
 // page only needs to LOAD embed.js + be same-origin as the chunks. We use a
 // minimal /oauth2/auth — it 200s and serves embed.js even without a live flow.

@@ -47,7 +47,7 @@ function frameMetric(results, frameMatch, key) {
 
 const isEmbed = (u) => u.includes("/oauth2/auth");
 const isLogin = (u) => u.includes("/login?");
-const isDemo = (u) => u.includes("demo.127.0.0.1.nip.io") && !u.includes("/oauth2");
+const isDemo = (u) => u.includes("login-demo.cv.127.0.0.1.nip.io") && !u.includes("/oauth2");
 
 function report(tag) {
   const data = loadFile(tag);

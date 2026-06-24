@@ -7,7 +7,7 @@
 
 sentryDSN: ""
 sentryEnv: "kind"
-domain: login.127.0.0.1.nip.io
+domain: login.cv.127.0.0.1.nip.io
 
 registry: localhost
 version: test
@@ -71,10 +71,10 @@ hydra:
       # Hydra's issuer is necessarily a fixed config value (OIDC), so it carries
       # the public port; our own services derive their origin per-request.
       urls:
-        login: https://login.127.0.0.1.nip.io:9443/login
-        consent: https://login.127.0.0.1.nip.io:9443/consent
+        login: https://login.cv.127.0.0.1.nip.io:9443/login
+        consent: https://login.cv.127.0.0.1.nip.io:9443/consent
         self:
-          issuer: https://login.127.0.0.1.nip.io:9443/
+          issuer: https://login.cv.127.0.0.1.nip.io:9443/
       secrets:
         cookie:
           - localsecretttttt # pragma: allowlist secret

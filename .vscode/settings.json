@@ -1,13 +1,52 @@
 {
-    "python.analysis.extraPaths": [
-        "./tests/.venv/lib/python3.8/site-packages/"
-    ],
-    "python.linting.mypyEnabled": true,
-    "python.linting.mypyArgs": [
-        "--follow-imports=silent",
-        "--ignore-missing-imports",
-        "--show-column-numbers",
-        "--no-pretty",
-        "--strict"
-    ]
+  // ── Port forwarding for the local kind cluster ──────────────────────────────
+  // Applies when this repo is opened over Remote-SSH / a dev container / a VS Code
+  // tunnel. The kind extraPortMappings (tests/kind/cluster.yaml) publish the
+  // ingress on 127.0.0.1:9443 of the host running the cluster; the attributes
+  // below label the forwarded ports and pin each LOCAL port to the same number
+  // (requireLocalPort).
+  //
+  // IMPORTANT — open the apps via their Ingress hosts, not plain localhost:
+  //     IdP (OIDC):  https://login.cv.127.0.0.1.nip.io:9443/
+  //     Demo app:    https://login-demo.cv.127.0.0.1.nip.io:9443/
+  // nip.io resolves those names to 127.0.0.1 → the forwarded local :9443, which
+  // keeps the HTTP Host header intact so ingress-nginx routes to the right vhost.
+  // Opening https://localhost:9443 reaches the Ingress with the wrong Host and
+  // returns 404 (expected). The local port MUST stay 9443: it is baked into
+  // Hydra's issuer (https://login.cv.127.0.0.1.nip.io:9443/) and the per-request
+  // SIWE domain/uri derivation, so a remapped port breaks OIDC + signature checks.
+  // That's why 9443 is forwarded "silent" — an auto-openBrowser would open the
+  // wrong-Host 404 URL.
+  "remote.autoForwardPorts": true,
+  "remote.autoForwardPortsSource": "hybrid",
+  "remote.restoreForwardedPorts": true,
+  "remote.portsAttributes": {
+    "9443": {
+      "label": "Cryptoverse Ingress (IdP + demo) — open https://login.cv.127.0.0.1.nip.io:9443",
+      "protocol": "https",
+      "onAutoForward": "silent",
+      "requireLocalPort": true
+    },
+    "4445": {
+      "label": "Hydra admin API (kubectl port-forward svc/cryptoverse-login-hydra-admin 4445:4445; harness)",
+      "protocol": "http",
+      "onAutoForward": "silent",
+      "requireLocalPort": true
+    },
+    "5432": {
+      "label": "Hydra Postgres (kind)",
+      "onAutoForward": "silent",
+      "requireLocalPort": true
+    },
+    "5173": {
+      "label": "Login frontend (vite dev server — yarn dev)",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    }
+  },
+  // Keep the PORTS panel clean — don't auto-forward the random kube-apiserver port
+  // or other incidental listeners. Forward those manually if ever needed.
+  "remote.otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  }
 }

@@ -34,8 +34,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, "out");
 mkdirSync(OUT_DIR, { recursive: true });
 
-const DEMO_URL = process.env.DEMO_URL ?? "https://demo.127.0.0.1.nip.io:9443";
-const LOGIN_URL = process.env.LOGIN_URL ?? "https://login.127.0.0.1.nip.io:9443";
+const DEMO_URL = process.env.DEMO_URL ?? "https://login-demo.cv.127.0.0.1.nip.io:9443";
+const LOGIN_URL = process.env.LOGIN_URL ?? "https://login.cv.127.0.0.1.nip.io:9443";
 
 const argv = process.argv.slice(2);
 function flag(name, def) {
@@ -52,13 +52,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Classify a request URL into one of the three documents of the flow. */
 function docOf(url) {
   if (!url) return "other";
-  if (url.includes("demo.127.0.0.1.nip.io") || url.startsWith(DEMO_URL))
+  if (url.includes("login-demo.cv.127.0.0.1.nip.io") || url.startsWith(DEMO_URL))
     return "demo";
   // login host serves BOTH the wrapper embed page AND the /login SPA + assets.
   // Split by path so embed.js (top window) vs the React main bundle (iframe)
   // are attributed separately.
   if (url.includes("/oauth2/")) return "embed-doc"; // wrapper embed html + hydra authorize
-  if (url.includes("login.127.0.0.1.nip.io") || url.startsWith(LOGIN_URL))
+  if (url.includes("login.cv.127.0.0.1.nip.io") || url.startsWith(LOGIN_URL))
     return "login-assets"; // SPA html/js/css/img served under /login/
   return "other";
 }
