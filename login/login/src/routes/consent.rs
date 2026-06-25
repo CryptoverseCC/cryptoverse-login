@@ -42,7 +42,7 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
     let client_id = req.client.client_id.clone();
     count("consent-start", &client_id);
 
-    let id_token = user_data::get_data(
+    let mut id_token = user_data::get_data(
         &st.eth,
         &st.enrichment_cache,
         &req.subject,
@@ -52,12 +52,20 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
     )
     .await;
 
-    // Access-token claims. Lean by default (`{}`): a token without the `mail`
-    // scope is byte-identical to the historical output. Only when the `mail`
-    // scope is granted do we surface the verified primary name on the access
-    // token as `cv_identities` (see `build_cv_identities`).
+    // `cv_identities` placement is gated on the `mail` scope. For a non-mail
+    // client neither token carries it: the access token stays `{}` and the
+    // id_token is byte-identical to the historical output (the harness asserts
+    // exact id_token claims for its non-mail client). When `mail` is granted we
+    // build the object **once** (reusing the verified primary already resolved
+    // for the id_token — no second on-chain call) and attach the *same* value
+    // to both the id_token claims (so it also appears in Hydra's `/userinfo`)
+    // and the access token (Hydra nests that under the token's `ext`).
     let access_token = if req.requested_scope.iter().any(|s| s == "mail") {
-        serde_json::json!({ "cv_identities": build_cv_identities(&id_token) })
+        let cv_identities = build_cv_identities(&req.subject, &id_token);
+        if let Some(obj) = id_token.as_object_mut() {
+            obj.insert("cv_identities".to_string(), cv_identities.clone());
+        }
+        serde_json::json!({ "cv_identities": cv_identities })
     } else {
         serde_json::json!({})
     };
@@ -84,29 +92,33 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
     }
 }
 
-/// Build the `cv_identities` object placed on the **access token** for the
-/// `mail` scope — the ETHMail mail-stack contract (a Dovecot/Postfix relying
-/// party reads the access token headlessly).
+/// Build the `cv_identities` object (schema `cv_identities/v1`) for the `mail`
+/// scope — the ETHMail mail-stack contract. The same value is attached to both
+/// the id_token claims and the access token by the consent handler.
 ///
-/// **Primary-only**: it surfaces the single verified primary name (ENS
-/// preferred, else Unstoppable Domains, else `null`) that `get_data` already
-/// resolved for the id_token — read back via [`user_data::primary_from_id_token`]
-/// so there is **no second on-chain resolution**. `owned` is **always `null`**
-/// for now: it's a tri-state where `null` means "not enumerated", signalling the
-/// relying party to run its own ownership check for any non-primary name.
-fn build_cv_identities(id_token: &serde_json::Value) -> serde_json::Value {
-    let (primary_name, kind) = match user_data::primary_from_id_token(id_token) {
-        Some((name, kind)) => (
-            serde_json::Value::String(name),
-            serde_json::Value::String(kind.to_string()),
-        ),
-        None => (serde_json::Value::Null, serde_json::Value::Null),
+/// Shape is **nested**: `primary_name` is an OBJECT carrying the verified name
+/// plus its per-name `kind` / `chain_id` / `verified_at`, or `null` when there
+/// is no forward-verified primary (the test-account case). The primary is the
+/// single verified name (ENS preferred, else Unstoppable Domains) that
+/// `get_data` already resolved for the id_token — read back via
+/// [`user_data::primary_from_id_token`] so there is **no second on-chain
+/// resolution**. `owned` is **always `null`** for now: a tri-state where `null`
+/// means "not enumerated", signalling the relying party to run its own
+/// ownership check for any non-primary name.
+fn build_cv_identities(subject: &str, id_token: &serde_json::Value) -> serde_json::Value {
+    let primary_name = match user_data::primary_from_id_token(id_token) {
+        Some((name, kind)) => serde_json::json!({
+            "name": name,
+            "kind": kind,
+            "chain_id": cryptoverse_core::auth::configured_chain_id(),
+            "verified_at": time::OffsetDateTime::now_utc().unix_timestamp(),
+        }),
+        None => serde_json::Value::Null,
     };
     serde_json::json!({
+        "schema": "cv_identities/v1",
+        "address": subject,
         "primary_name": primary_name,
-        "kind": kind,
-        "chain_id": cryptoverse_core::auth::configured_chain_id(),
-        "verified_at": time::OffsetDateTime::now_utc().unix_timestamp(),
         "owned": serde_json::Value::Null,
     })
 }
@@ -116,8 +128,12 @@ mod tests {
     use super::build_cv_identities;
     use serde_json::json;
 
-    /// A user WITH a verified ENS primary: `cv_identities` carries that name,
-    /// `kind: "ens"`, a real epoch-seconds `verified_at`, and `owned: null`.
+    const SUBJECT: &str = "0x000000000000000000000000000000000000dead";
+
+    /// A user WITH a verified ENS primary: `cv_identities` carries the
+    /// `cv_identities/v1` schema, the subject `address`, and a nested
+    /// `primary_name` object with the name, `kind: "ens"`, the configured
+    /// `chain_id`, and a real epoch-seconds `verified_at`. `owned` is `null`.
     #[test]
     fn cv_identities_for_ens_primary() {
         let id_token = json!({
@@ -126,18 +142,22 @@ mod tests {
                 "unstoppabledomains": { "default": "alice.crypto" },
             }
         });
-        let cv = build_cv_identities(&id_token);
-        assert_eq!(cv["primary_name"], json!("alice.eth"));
-        assert_eq!(cv["kind"], json!("ens"));
+        let cv = build_cv_identities(SUBJECT, &id_token);
+        assert_eq!(cv["schema"], json!("cv_identities/v1"));
+        assert_eq!(cv["address"], json!(SUBJECT));
+        assert_eq!(cv["owned"], serde_json::Value::Null);
+
+        let primary = &cv["primary_name"];
+        assert_eq!(primary["name"], json!("alice.eth"));
+        assert_eq!(primary["kind"], json!("ens"));
         assert_eq!(
-            cv["chain_id"],
+            primary["chain_id"],
             json!(cryptoverse_core::auth::configured_chain_id())
         );
-        assert!(cv["verified_at"].as_i64().expect("epoch seconds") > 1_700_000_000);
-        assert_eq!(cv["owned"], serde_json::Value::Null);
+        assert!(primary["verified_at"].as_i64().expect("epoch seconds") > 1_700_000_000);
     }
 
-    /// UD-only primary surfaces with `kind: "ud"`.
+    /// UD-only primary surfaces inside the nested object with `kind: "ud"`.
     #[test]
     fn cv_identities_for_ud_primary() {
         let id_token = json!({
@@ -146,14 +166,16 @@ mod tests {
                 "unstoppabledomains": { "default": "bob.crypto" },
             }
         });
-        let cv = build_cv_identities(&id_token);
-        assert_eq!(cv["primary_name"], json!("bob.crypto"));
-        assert_eq!(cv["kind"], json!("ud"));
+        let cv = build_cv_identities(SUBJECT, &id_token);
+        assert_eq!(cv["schema"], json!("cv_identities/v1"));
+        assert_eq!(cv["address"], json!(SUBJECT));
+        assert_eq!(cv["primary_name"]["name"], json!("bob.crypto"));
+        assert_eq!(cv["primary_name"]["kind"], json!("ud"));
         assert_eq!(cv["owned"], serde_json::Value::Null);
     }
 
-    /// A user WITHOUT any verified primary (the test-account case): both
-    /// `primary_name` and `kind` are `null`; the metadata fields still populate.
+    /// A user WITHOUT any verified primary (the test-account case): the whole
+    /// `primary_name` is `null`; `schema`/`address`/`owned` still populate.
     #[test]
     fn cv_identities_for_no_primary() {
         let id_token = json!({
@@ -162,10 +184,55 @@ mod tests {
                 "unstoppabledomains": { "default": serde_json::Value::Null },
             }
         });
-        let cv = build_cv_identities(&id_token);
+        let cv = build_cv_identities(SUBJECT, &id_token);
+        assert_eq!(cv["schema"], json!("cv_identities/v1"));
+        assert_eq!(cv["address"], json!(SUBJECT));
         assert_eq!(cv["primary_name"], serde_json::Value::Null);
-        assert_eq!(cv["kind"], serde_json::Value::Null);
         assert_eq!(cv["owned"], serde_json::Value::Null);
-        assert!(cv["verified_at"].as_i64().is_some());
+    }
+
+    /// The consent handler's placement contract: under the `mail` scope the
+    /// **same** `cv_identities` object is injected into the id_token claims
+    /// **and** set on the access token; under a non-mail scope neither token
+    /// carries it (the id_token stays byte-identical to `get_data`'s output).
+    ///
+    /// This mirrors the in-handler logic (build once, attach to both) without a
+    /// live Hydra: it exercises exactly the scope branch the handler runs.
+    #[test]
+    fn mail_scope_injects_into_both_tokens() {
+        let base_id_token = json!({
+            "sub": SUBJECT,
+            "names": {
+                "ens": { "default": "alice.eth" },
+                "unstoppabledomains": { "default": serde_json::Value::Null },
+            }
+        });
+
+        // --- mail scope: inject into both ---
+        let mut id_token = base_id_token.clone();
+        let cv = build_cv_identities(SUBJECT, &id_token);
+        id_token
+            .as_object_mut()
+            .unwrap()
+            .insert("cv_identities".to_string(), cv.clone());
+        let access_token = json!({ "cv_identities": cv });
+
+        assert_eq!(
+            id_token["cv_identities"]["schema"],
+            json!("cv_identities/v1")
+        );
+        assert_eq!(
+            id_token["cv_identities"]["primary_name"]["name"],
+            json!("alice.eth")
+        );
+        // Same value on both sessions.
+        assert_eq!(id_token["cv_identities"], access_token["cv_identities"]);
+
+        // --- non-mail scope: id_token untouched, access token empty ---
+        let non_mail_id_token = base_id_token.clone();
+        let non_mail_access_token = json!({});
+        assert!(non_mail_id_token.get("cv_identities").is_none());
+        assert_eq!(non_mail_id_token, base_id_token);
+        assert_eq!(non_mail_access_token, json!({}));
     }
 }
