@@ -17,7 +17,7 @@ use minijinja::context;
 use serde::Deserialize;
 
 use super::count;
-use crate::{restrictions, AppState};
+use crate::{blocklist, restrictions, AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct LoginQuery {
@@ -190,6 +190,20 @@ pub async fn process(
         }
     };
     let subject = verified.address;
+
+    // Static deny-list (defense-in-depth): a GLOBAL, client-independent list of
+    // blocked addresses. Checked BEFORE token-gating so a blocked address is
+    // rejected cheaply (no on-chain RPC) and never reaches `accept_login_request`
+    // — no token is ever issued. A missing/empty/unparseable file is a no-op.
+    if blocklist::is_blocked(&subject, &st.blocklist_file) {
+        tracing::warn!("blocked address denied login: {subject}");
+        count("error-blocked", &client_id);
+        return error_response(
+            &form.response,
+            StatusCode::FORBIDDEN,
+            "This address is not permitted to log in.",
+        );
+    }
 
     // Token-gating: `None` (or empty) means unrestricted.
     if let Some(rs) = restrictions::get_restrictions(&login_req.client, &st.restrictions_file).await

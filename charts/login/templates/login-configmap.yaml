@@ -13,3 +13,9 @@ data:
   # has no metadata.restrictions. Override via .Values.login.restrictions.
   restrictions.json: |
 {{ .Values.login.restrictions | default dict | toPrettyJson | indent 4 }}
+  # Global login-deny blocklist. Backend reads this via BLOCKLIST_FILE
+  # (/config/blocklist.json), re-read per request. A JSON array of blocked
+  # Ethereum addresses (case-insensitive match); empty blocks nobody.
+  # Override via .Values.login.blocklist.
+  blocklist.json: |
+{{ .Values.login.blocklist | default list | toPrettyJson | indent 4 }}

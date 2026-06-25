@@ -9,6 +9,7 @@
 //!
 //! Rust/axum port of the previous Node/Express backend.
 
+mod blocklist;
 mod restrictions;
 mod routes;
 mod user_data;
@@ -102,6 +103,11 @@ pub struct AppState {
     /// then omitted; injected wallets still work). No key is hardcoded.
     pub wallet_connect_project_id: String,
     pub restrictions_file: String,
+    /// Path to the global login-deny blocklist (`BLOCKLIST_FILE`, default
+    /// `/config/blocklist.json`): a JSON array of blocked lowercased addresses,
+    /// re-read per request. A blocked recovered address is denied login before
+    /// any on-chain token-gating. Missing/empty ⇒ no-op (nobody blocked).
+    pub blocklist_file: std::path::PathBuf,
     pub metrics_handle: PrometheusHandle,
 }
 
@@ -154,6 +160,7 @@ async fn main() {
             .eq_ignore_ascii_case("true"),
         wallet_connect_project_id: config::var_or("WALLETCONNECT_PROJECT_ID", ""),
         restrictions_file: config::var_or("RESTRICTIONS_FILE", "/config/restrictions.json"),
+        blocklist_file: config::var_or("BLOCKLIST_FILE", "/config/blocklist.json").into(),
         metrics_handle,
     });
 

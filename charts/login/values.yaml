@@ -152,6 +152,12 @@ login:
     fwb.cryptoverse.cc:
       - tokenAddress: "0x7d91e637589EC3Bb54D8213a9e92Dc6E8D12da91"
         condition: "balanceOf >= 100"
+  # Global login-deny blocklist (defense-in-depth): a flat list of Ethereum
+  # addresses that are DENIED login regardless of relying party. Rendered into
+  # the login ConfigMap as blocklist.json (backend BLOCKLIST_FILE,
+  # /config/blocklist.json), re-read per request. Matching is case-insensitive,
+  # so checksum casing does not matter. Empty (the default) blocks nobody.
+  blocklist: []
 
 wrapper:
   replicaCount: 1
