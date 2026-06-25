@@ -26,4 +26,5 @@ alloy.workspace = true
 evalexpr.workspace = true
 reqwest.workspace = true
 anyhow.workspace = true
+time.workspace = true
 tower_governor = { version = "0.7", features = ["axum"] }

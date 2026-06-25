@@ -158,9 +158,16 @@ pub async fn get_data(
     let names = json!({
         "default": user,
         "all": name_all,
-        "ens": { "default": ens_name_default, "all": ens_name_all },
-        "unstoppabledomains": { "default": ud_name_default, "all": ud_name_all },
+        "ens": { "default": ens_name_default.clone(), "all": ens_name_all },
+        "unstoppabledomains": { "default": ud_name_default.clone(), "all": ud_name_all },
     });
+
+    // The OIDC `name` claim is the verified primary name (ENS preferred, else
+    // UD) when one resolved, falling back to the address. `preferred_username`
+    // and `nickname` are intentionally left as-is.
+    let primary_name = primary_identity(ens_name_default.as_deref(), ud_name_default.as_deref())
+        .map(|(name, _kind)| name.to_string());
+    let name_claim = primary_name.as_deref().unwrap_or(user);
 
     json!({
         "address": { "country": "Cryptoverse", "region": "Ethereum" },
@@ -180,7 +187,7 @@ pub async fn get_data(
         "given_name": user,
         "locale": "",
         "middle_name": "",
-        "name": user,
+        "name": name_claim,
         "names": names,
         "nickname": ens_name_default,
         "phone_number_verified": false,
@@ -193,6 +200,36 @@ pub async fn get_data(
         "website": format!("https://{user}.{profile_domain}/"),
         "zoneinfo": "",
     })
+}
+
+/// Pick the verified primary identity from the resolved ENS and UD default
+/// names: **ENS is preferred, else UD, else none**. Returns the name and its
+/// namespace (`"ens"` | `"ud"`).
+///
+/// Both inputs are already forward-/ownership-verified by the enrichment layer
+/// (`ens_reverse` only returns a name whose forward `addr` resolves back to the
+/// address; `ud_reverse` only returns an owned name), so this is a pure
+/// selection — no extra on-chain work.
+fn primary_identity<'a>(
+    ens_default: Option<&'a str>,
+    ud_default: Option<&'a str>,
+) -> Option<(&'a str, &'static str)> {
+    if let Some(ens) = ens_default {
+        Some((ens, "ens"))
+    } else {
+        ud_default.map(|ud| (ud, "ud"))
+    }
+}
+
+/// Extract the verified primary `(name, kind)` from an already-built `id_token`
+/// claims object (as produced by [`get_data`]). Lets the consent handler reuse
+/// the enrichment result for `cv_identities` **without triggering a second
+/// on-chain resolution** — it just reads back the `names.{ens,unstoppabledomains}.default`
+/// fields `get_data` already populated. ENS is preferred, else UD, else `None`.
+pub fn primary_from_id_token(id_token: &serde_json::Value) -> Option<(String, &'static str)> {
+    let ens = id_token["names"]["ens"]["default"].as_str();
+    let ud = id_token["names"]["unstoppabledomains"]["default"].as_str();
+    primary_identity(ens, ud).map(|(name, kind)| (name.to_string(), kind))
 }
 
 #[cfg(test)]
@@ -282,6 +319,78 @@ mod tests {
 
         let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", true).await;
         assert_eq!(claims["email_verified"], serde_json::json!(true));
+    }
+
+    /// Primary selection: ENS preferred, else UD, else none.
+    #[test]
+    fn primary_identity_prefers_ens_then_ud_then_none() {
+        assert_eq!(
+            primary_identity(Some("alice.eth"), Some("alice.crypto")),
+            Some(("alice.eth", "ens")),
+            "ENS wins when both present"
+        );
+        assert_eq!(
+            primary_identity(None, Some("alice.crypto")),
+            Some(("alice.crypto", "ud")),
+            "UD used when no ENS"
+        );
+        assert_eq!(
+            primary_identity(Some("alice.eth"), None),
+            Some(("alice.eth", "ens")),
+            "ENS used when no UD"
+        );
+        assert_eq!(primary_identity(None, None), None, "none when neither");
+    }
+
+    /// `primary_from_id_token` reads back the verified default names that
+    /// `get_data` populated (no second resolution), ENS-preferred.
+    #[test]
+    fn primary_from_id_token_reads_back_defaults() {
+        let with_ens = json!({
+            "names": {
+                "ens": { "default": "alice.eth" },
+                "unstoppabledomains": { "default": "alice.crypto" },
+            }
+        });
+        assert_eq!(
+            primary_from_id_token(&with_ens),
+            Some(("alice.eth".to_string(), "ens"))
+        );
+
+        let ud_only = json!({
+            "names": {
+                "ens": { "default": serde_json::Value::Null },
+                "unstoppabledomains": { "default": "bob.crypto" },
+            }
+        });
+        assert_eq!(
+            primary_from_id_token(&ud_only),
+            Some(("bob.crypto".to_string(), "ud"))
+        );
+
+        let none = json!({
+            "names": {
+                "ens": { "default": serde_json::Value::Null },
+                "unstoppabledomains": { "default": serde_json::Value::Null },
+            }
+        });
+        assert_eq!(primary_from_id_token(&none), None);
+    }
+
+    /// With no resolvable primary (the test-account case), the `name` claim
+    /// falls back to the address — must not regress.
+    #[tokio::test]
+    async fn name_claim_falls_back_to_address() {
+        std::env::set_var("ETH_RPC_URL", "http://127.0.0.1:1");
+        std::env::set_var("RPC_TIMEOUT_MS", "150");
+        let eth = Eth::from_env().expect("eth");
+        let cache = EnrichmentCache::new();
+        let subject = "0x0000000000000000000000000000000000000001";
+
+        let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", false).await;
+        assert_eq!(claims["name"], serde_json::json!(subject));
+        // And `primary_from_id_token` agrees there is no primary.
+        assert_eq!(primary_from_id_token(&claims), None);
     }
 
     #[tokio::test]
