@@ -460,9 +460,17 @@ mod tests {
         );
         let sig = signer.sign_message_sync(message.as_bytes()).unwrap();
         let sig_hex = format!("0x{}", hex::encode(sig.as_bytes()));
-        verify(&message, &sig_hex, host, "https", 1, challenge, &offline_eth())
-            .await
-            .expect("a host:port deployment's message must verify");
+        verify(
+            &message,
+            &sig_hex,
+            host,
+            "https",
+            1,
+            challenge,
+            &offline_eth(),
+        )
+        .await
+        .expect("a host:port deployment's message must verify");
     }
 
     #[tokio::test]

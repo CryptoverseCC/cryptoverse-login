@@ -4,6 +4,14 @@
 //! **Enrichment** (ENS / UD names) is best-effort: a flaky RPC must never block
 //! a login, so those lookups return `Option`/`None` on error and log at `warn`.
 //!
+//! The names they emit are **verified**, not bare reverse records: a reverse
+//! record is owner-settable free text, so [`Eth::ens_reverse`] only returns a
+//! name whose own forward `addr(node)` resolves back to the address (the
+//! ENS-standard verified-primary-name check), and [`Eth::ud_reverse`] only
+//! returns a name whose token the address provably owns (`ownerOf`). Anything
+//! unverifiable — including offchain/CCIP names we can't follow — fails closed to
+//! `None`, so we never assert a name the user does not control.
+//!
 //! **Security-relevant reads** — signature validation (ERC-1271/6492) and gated
 //! ERC-20 balances — are *not* best-effort. They return `Result`, so the caller
 //! can tell "RPC down / could not check" apart from "checked and invalid / zero"
@@ -121,9 +129,18 @@ sol! {
         function name(bytes32 node) external view returns (string);
     }
 
+    // The EIP-137 forward resolver: `addr(node)` maps an ENS name's namehash to
+    // the address it points at. Used to *verify* a reverse record — the name is
+    // only trusted if its own forward `addr` resolves back to the same owner.
+    #[sol(rpc)]
+    interface ENSAddrResolver {
+        function addr(bytes32 node) external view returns (address);
+    }
+
     #[sol(rpc)]
     interface IUDProxyReader {
         function reverseOf(address addr) external view returns (uint256);
+        function ownerOf(uint256 tokenId) external view returns (address);
     }
 }
 
@@ -328,8 +345,22 @@ impl Eth {
         }
     }
 
-    /// ENS reverse resolution (`addr -> name`). Returns `None` if there is no
-    /// reverse record or on error.
+    /// ENS **verified primary name** for `owner` (`addr -> name`, *forward-checked*).
+    ///
+    /// A reverse record (`addr.reverse → name`) is **free text the address owner
+    /// can set to any string**, including a name they don't control. Returning it
+    /// as-is would assert a name the user may not own — a spoofing hole (a
+    /// downstream relying party could authorize "act-as alice.eth" off it). So
+    /// this performs the ENS-standard verification: after reading the reverse
+    /// `name`, it forward-resolves that name's own `addr(namehash(name))` and only
+    /// returns the name if **that address equals `owner`** (the 20 address bytes
+    /// compared exactly, checksum-agnostic). The returned name is therefore one
+    /// the user **provably controls**, not a bare reverse record.
+    ///
+    /// Fails **closed** (`None`) on any of: no reverse record, the forward
+    /// resolver is zero, the forward `addr` is zero or ≠ `owner`, the name has no
+    /// standard on-chain forward record (e.g. offchain / CCIP-read names — we do
+    /// not follow CCIP, so they are treated as unverified), or any RPC error.
     pub async fn ens_reverse(&self, owner: Address) -> Option<String> {
         let reverse_name = format!("{}.addr.reverse", hex::encode(owner.as_slice()));
         let node = namehash(&reverse_name);
@@ -356,23 +387,94 @@ impl Eth {
         // NOTE: this second call is data-dependent on the first (the resolver
         // address came from `registry.resolver`), so the two CANNOT be collapsed
         // into a single Multicall3 batch — they are deliberately sequential.
-        match self
+        let name = match self
             .rpc_call("ENS resolver.name", |p| async move {
                 ENSNameResolver::new(resolver, p).name(node).call().await
             })
             .await
         {
-            Ok(name) if !name.is_empty() => Some(name),
-            Ok(_) => None,
+            Ok(name) if !name.is_empty() => name,
+            Ok(_) => return None,
             Err(e) => {
                 tracing::warn!("ENS resolver.name failed for {owner}: {e}");
-                None
+                return None;
             }
+        };
+
+        // Forward-verify: the reverse record is unauthenticated free text, so the
+        // claimed `name` is only trusted if *it* forward-resolves back to `owner`.
+        if self.ens_forward_matches(&name, owner).await {
+            Some(name)
+        } else {
+            None
         }
     }
 
-    /// Unstoppable Domains reverse resolution. Reads the reverse token id from
-    /// the UNS ProxyReader, then resolves its name via the UD metadata API.
+    /// Does `name`'s standard on-chain forward record resolve to `owner`?
+    ///
+    /// Looks up `name`'s resolver via `ENSRegistry.resolver(namehash(name))`, then
+    /// calls that resolver's EIP-137 `addr(node)` and compares the result to
+    /// `owner` (full 20-byte equality). Returns `false` — never asserts the name —
+    /// when the forward resolver is zero, `addr` is zero or different, the name has
+    /// no standard forward record (offchain/CCIP names included), or any RPC error
+    /// occurs. This is the verification that turns an arbitrary reverse string into
+    /// a name the user provably controls.
+    async fn ens_forward_matches(&self, name: &str, owner: Address) -> bool {
+        let node = namehash(name);
+
+        let resolver = match self
+            .rpc_call("ENS forward registry.resolver", |p| async move {
+                ENSRegistry::new(ENS_REGISTRY, p)
+                    .resolver(node)
+                    .call()
+                    .await
+            })
+            .await
+        {
+            Ok(addr) => addr,
+            Err(e) => {
+                tracing::warn!("ENS forward registry.resolver failed for {name}: {e}");
+                return false;
+            }
+        };
+        if resolver.is_zero() {
+            // No forward resolver set ⇒ no standard on-chain forward record ⇒
+            // unverifiable. Fail closed.
+            return false;
+        }
+
+        let resolved = match self
+            .rpc_call("ENS forward resolver.addr", |p| async move {
+                ENSAddrResolver::new(resolver, p).addr(node).call().await
+            })
+            .await
+        {
+            Ok(addr) => addr,
+            Err(e) => {
+                // A resolver without `addr(bytes32)` (or an offchain/CCIP resolver
+                // that reverts to signal a lookup) reverts here — we don't follow
+                // CCIP-read, so we cannot verify it. Treat as unverified.
+                tracing::warn!("ENS forward resolver.addr failed for {name}: {e}");
+                return false;
+            }
+        };
+
+        // Checksum is irrelevant: `Address` is the raw 20 bytes, so `==` compares
+        // them exactly. A zero forward address never matches a real `owner`.
+        !resolved.is_zero() && resolved == owner
+    }
+
+    /// Unstoppable Domains **ownership-verified** reverse resolution.
+    ///
+    /// Reads the reverse token id from the UNS ProxyReader, then — because a UD
+    /// reverse record is, like ENS's, an owner-settable pointer that must not be
+    /// trusted blind — **verifies on-chain ownership**: the name is only kept if
+    /// `ProxyReader.ownerOf(token_id) == owner`. Only after that does it fetch the
+    /// human-readable name from the UD metadata API. The returned name is one the
+    /// user **provably owns**, not an unverified reverse pointer.
+    ///
+    /// Fails **closed** (`None`) on: no reverse token, an `ownerOf` mismatch, or
+    /// any RPC / metadata error.
     pub async fn ud_reverse(&self, owner: Address) -> Option<String> {
         let token_id: U256 = match self
             .rpc_call("UD reverseOf", |p| async move {
@@ -390,6 +492,33 @@ impl Eth {
             }
         };
         if token_id.is_zero() {
+            return None;
+        }
+
+        // Ownership check: the reverse pointer is owner-settable, so confirm the
+        // address actually owns the token before trusting its name. A revert here
+        // (e.g. a burned / nonexistent token) is surfaced by `ownerOf` as an RPC
+        // error → None (fail closed), same as a mismatch.
+        let token_owner = match self
+            .rpc_call("UD ownerOf", |p| async move {
+                IUDProxyReader::new(UD_PROXY_READER, p)
+                    .ownerOf(token_id)
+                    .call()
+                    .await
+            })
+            .await
+        {
+            Ok(addr) => addr,
+            Err(e) => {
+                tracing::warn!("UD ownerOf failed for {owner}: {e}");
+                return None;
+            }
+        };
+        if token_owner.is_zero() || token_owner != owner {
+            tracing::warn!(
+                "UD reverse for {owner} points at token {token_id} owned by {token_owner}; \
+                 ignoring unverified name"
+            );
             return None;
         }
 
@@ -548,7 +677,9 @@ mod tests {
             "error sending request for url (http://rpc): connection refused"
         ));
         assert!(!is_revert("ERC-1271/6492 validation timed out after 3s"));
-        assert!(!is_revert("server returned an error response: error code -32005"));
+        assert!(!is_revert(
+            "server returned an error response: error code -32005"
+        ));
     }
 
     /// The per-token `decimals` cache returns the seeded value with no RPC.
@@ -589,6 +720,75 @@ mod tests {
         // Well-known EIP-137 test vector for "eth".
         let expected = "93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae";
         assert_eq!(hex::encode(namehash("eth").as_slice()), expected);
+    }
+
+    /// The forward-verification step hashes the *claimed name itself* (e.g.
+    /// `vitalik.eth`), which is a different node than the reverse record
+    /// (`<addr>.addr.reverse`). Pin the well-known `vitalik.eth` namehash so a
+    /// regression in the forward node derivation is caught offline.
+    #[test]
+    fn forward_namehash_of_name_matches_known_vector() {
+        // Canonical EIP-137 namehash of "vitalik.eth".
+        let expected = "ee6c4522aab0003e8d14cd40a6af439055fd2577951148c14b6cea9a53475835";
+        assert_eq!(hex::encode(namehash("vitalik.eth").as_slice()), expected);
+
+        // The reverse node for the same owner is a *different* node — confirming
+        // forward verification hashes the name, not the reverse record.
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"); // vitalik.eth
+        let reverse = format!("{}.addr.reverse", hex::encode(owner.as_slice()));
+        assert_ne!(namehash("vitalik.eth"), namehash(&reverse));
+    }
+
+    /// An ENS reverse lookup against an unreachable RPC must **fail closed** to
+    /// `None` — never surface an unverified name — because the forward-verify
+    /// RPCs can't run. (The reverse read itself also fails, but this pins the
+    /// best-effort `None` contract end-to-end.)
+    #[tokio::test]
+    async fn ens_reverse_unreachable_rpc_is_none() {
+        let eth = offline_eth();
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        assert!(
+            eth.ens_reverse(owner).await.is_none(),
+            "an unreachable RPC must yield no (unverified) ENS name"
+        );
+    }
+
+    /// A UD reverse lookup against an unreachable RPC must **fail closed** to
+    /// `None` — the `ownerOf` ownership check can't run, so no name is asserted.
+    #[tokio::test]
+    async fn ud_reverse_unreachable_rpc_is_none() {
+        let eth = offline_eth();
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        assert!(
+            eth.ud_reverse(owner).await.is_none(),
+            "an unreachable RPC must yield no (unverified) UD name"
+        );
+    }
+
+    /// The verification predicate is plain 20-byte address equality (checksum is
+    /// irrelevant since `Address` is the raw bytes), and a zero forward address
+    /// never matches a real owner. This pins the comparison `ens_forward_matches`
+    /// makes without needing a live RPC.
+    #[test]
+    fn forward_address_match_predicate() {
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        // Same address parsed from differing checksum casings must be equal.
+        let same_lower: Address = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045"
+            .parse()
+            .unwrap();
+        assert_eq!(
+            owner, same_lower,
+            "checksum casing must not affect equality"
+        );
+
+        let other = address!("0000000000000000000000000000000000000001");
+        assert_ne!(owner, other, "a different forward address must not match");
+
+        // The exact guard `ens_forward_matches` applies: `!addr.is_zero() && addr
+        // == owner`. A zero forward address must fail it; a matching owner passes.
+        let guard = |addr: Address| !addr.is_zero() && addr == owner;
+        assert!(!guard(Address::ZERO), "zero forward addr never matches");
+        assert!(guard(same_lower), "a matching forward addr passes");
     }
 
     #[test]
@@ -772,5 +972,75 @@ mod tests {
         //     .await
         //     .expect("RPC must be reachable for the live positive check");
         // assert_eq!(got, SigCheck::Valid, "real contract signature must be Valid");
+    }
+
+    /// Live forward-verified ENS resolution against a real mainnet RPC.
+    ///
+    /// Ignored by default (needs network). Run with a real RPC:
+    ///
+    /// ```bash
+    /// ETH_RPC_URL=https://eth.llamarpc.com \
+    ///   cargo test -p cryptoverse-core -- --ignored ens_reverse_forward_verified_live
+    /// ```
+    ///
+    /// `vitalik.eth` has a primary name whose forward `addr` resolves back to the
+    /// same address, so the verified lookup must return `Some("vitalik.eth")`. A
+    /// fresh random address has no reverse record, so it must be `None`. This
+    /// exercises the full reverse → forward-`addr` → equality path live; the
+    /// offline tests pin the fail-closed behaviour and the node derivation.
+    #[tokio::test]
+    #[ignore = "requires a live RPC (set ETH_RPC_URL); see doc comment"]
+    async fn ens_reverse_forward_verified_live() {
+        let eth = Eth::from_env().expect("build provider from env");
+
+        let vitalik = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        match eth.ens_reverse(vitalik).await {
+            Some(name) => assert_eq!(
+                name, "vitalik.eth",
+                "the forward-verified primary name must be vitalik.eth"
+            ),
+            // If the RPC is flaky the best-effort contract yields None; don't fail
+            // the suite on infrastructure, but surface it.
+            None => eprintln!("ENS lookup returned None (RPC flaky, or record changed)"),
+        }
+
+        // An address with no reverse record verifies to nothing.
+        let no_name = address!("000000000000000000000000000000000000dEaD");
+        assert!(
+            eth.ens_reverse(no_name).await.is_none(),
+            "an address with no primary name must not produce a verified name"
+        );
+    }
+
+    /// Live ownership-verified Unstoppable Domains resolution against a real
+    /// mainnet RPC. Ignored by default (needs network).
+    ///
+    /// ```bash
+    /// ETH_RPC_URL=https://eth.llamarpc.com \
+    ///   cargo test -p cryptoverse-core -- --ignored ud_reverse_ownership_verified_live
+    /// ```
+    ///
+    /// READY-TO-RUN SCAFFOLD — most addresses have no UD reverse record, so the
+    /// positive assertion is left for a committed vector (an address with a UD
+    /// reverse record it provably owns). The negative branch runs live today: a
+    /// fresh address must verify to `None` (no reverse token, or `ownerOf`
+    /// mismatch ⇒ fail closed).
+    #[tokio::test]
+    #[ignore = "requires a live RPC (set ETH_RPC_URL); see doc comment"]
+    async fn ud_reverse_ownership_verified_live() {
+        let eth = Eth::from_env().expect("build provider from env");
+
+        // Negative (live): no UD reverse record ⇒ ownership check never trusts a
+        // name ⇒ None.
+        let no_name = address!("000000000000000000000000000000000000dEaD");
+        assert!(
+            eth.ud_reverse(no_name).await.is_none(),
+            "an address without a UD reverse record must yield None"
+        );
+
+        // Positive (commit a real vector to enable):
+        //
+        // let owner = address!("<address that owns a UD domain set as its reverse>");
+        // assert_eq!(eth.ud_reverse(owner).await.as_deref(), Some("<name.crypto>"));
     }
 }

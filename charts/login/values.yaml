@@ -36,6 +36,16 @@ hydra:
     automigration:
       enabled: true
     config:
+      # Issue VERIFIABLE JWT access tokens instead of opaque (DB-backed) ones, so
+      # relying parties can validate access tokens offline against the published
+      # JWKS. Hydra signs them with its `hydra.jwt.access-token` key set, published
+      # in the same JWKS at /.well-known/jwks.json (advertised via discovery's
+      # jwks_uri). Tradeoff: JWT access tokens CANNOT be revoked before expiry
+      # (opaque ones can, since they're looked up in the DB) — so keep access-token
+      # TTLs short (left at Hydra defaults here); introspection still works for
+      # callers that want revocation freshness (it's token-format-independent).
+      strategies:
+        access_token: jwt
       log:
         level: info
         leak_sensitive_values: true
