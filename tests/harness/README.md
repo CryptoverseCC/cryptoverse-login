@@ -16,6 +16,7 @@ covered separately by the [`../e2e/`](../e2e/README.md) suite (Playwright + dapp
 |---|---|
 | `test_discovery.py` | `/.well-known/openid-configuration` + JWKS are served |
 | `test_login_flow.py` | full SIWE auth-code flow → ID token `sub`/email/names; `/userinfo` |
+| `test_device_flow.py` | RFC 8628 device grant: `device/auth` → user-code verify → `/device` → SIWE login → token poll → `sub` |
 | `test_siwe_errors.py` | bad signature, wrong/replayed nonce, and expired messages are rejected |
 | `test_token_gating.py` | `metadata.restrictions` allow/deny by on-chain balance |
 | `test_introspection.py` | `/oauth2/introspect` requires basic auth and reports tokens active |

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Cryptoverse Login is an **OIDC / OAuth2 identity provider that authenticates users with their Ethereum wallet** ("Sign in with Ethereum"). It wraps [ORY Hydra](https://www.ory.sh/hydra/) (the audited OAuth2/OIDC token engine) and supplies the login + consent UI. The subject of every issued identity is the user's lowercased Ethereum address; the consent step enriches the ID token with ENS / Unstoppable Domains names and generated `{address}@{MAILSERVER_DOMAIN}` emails. Optional **token-gating** can require an address to hold certain ERC-20 balances before login is allowed.
+Cryptoverse Login is an **OIDC / OAuth2 identity provider that authenticates users with their Ethereum wallet** ("Sign in with Ethereum"). It wraps [ORY Hydra](https://www.ory.sh/hydra/) (the audited OAuth2/OIDC token engine) and supplies the login + consent UI. The subject of every issued identity is the user's lowercased Ethereum address; the consent step enriches the ID token with **forward-verified** ENS / Unstoppable Domains names and generated `{address}@{MAILSERVER_DOMAIN}` emails. Optional **token-gating** can require an address to hold certain ERC-20 balances before login is allowed.
 
 Authentication uses the **EIP-4361 (Sign-In with Ethereum / SIWE)** standard. Everything runs in Kubernetes, deployed via the Helm chart in `charts/login`. There is no way to run the full system without a cluster (see Commands).
 
@@ -24,9 +24,9 @@ Four containers, all behind the gateway.
 
 - **Rust workspace** (`login/`, a Cargo workspace) — three crates:
   - **`core`** (`login/core`, crate `cryptoverse-core`) — shared library:
-    - `hydra.rs` — thin `reqwest` client for Hydra 2.x **admin** API (get/accept login & consent). No official ORY Rust SDK; the surface is small.
-    - `auth.rs` — EIP-4361 verification via the [`siwe`](https://github.com/spruceid/siwe-rs) crate, plus `nonce_for_challenge` (see SIWE below).
-    - `eth.rs` — [`alloy`](https://github.com/alloy-rs/alloy) provider: ENS reverse resolution (hand-rolled EIP-137 namehash + registry/resolver calls), ERC-20 `balanceOf`, Unstoppable Domains `reverseOf`.
+    - `hydra.rs` — thin `reqwest` client for Hydra 2.x **admin** API (get/accept login & consent; accept device user-code). No official ORY Rust SDK; the surface is small.
+    - `auth.rs` — EIP-4361 verification via the [`siwe`](https://github.com/spruceid/siwe-rs) crate, plus `nonce_for_challenge` (see SIWE below). Enforces a **mandatory** `Expiration Time` + server-side max-age, and checks `version`/`chainId`/`uri` against what was issued.
+    - `eth.rs` — [`alloy`](https://github.com/alloy-rs/alloy) provider: **forward-verified** ENS reverse resolution (the reverse name's own `addr(node)` must resolve back to the address — never a bare, owner-settable reverse record; hand-rolled EIP-137 namehash + registry/resolver), **ownership-verified** Unstoppable Domains (`reverseOf` + `ownerOf`), and ERC-20 `balanceOf`. Names that can't be verified (incl. offchain/CCIP) are dropped. Security-relevant reads (ERC-1271/6492 validation, gated balances) return `Result` and **fail closed** (deny) on RPC error — distinct from a clean negative; enrichment stays best-effort (`None`).
     - `config.rs`, `telemetry.rs` (tracing + Sentry + a Prometheus handle).
   - **`wrapper`** (`login/wrapper`, axum) — two routes rendering thin HTML shells (minijinja; templates reused from the old Flask app, embedded via `include_str!`):
     - `GET /oauth2/auth` → `embed.html`: the **top-level** page; loads `embed.js` and an `<iframe>` at `/oauth2/inner`.
@@ -34,8 +34,9 @@ Four containers, all behind the gateway.
   - **`login`** (`login/login`, axum) — the core. The Hydra **login & consent provider** and the SPA host:
     - `GET /login` (`routes/login.rs::page`) → renders the SPA `index.html` with challenge, client metadata, restrictions, and **SIWE params**.
     - `POST /login/process` (`routes/login.rs::process`) → verifies the SIWE message+signature (`core::auth::verify`), runs token-gating, then `accept_login_request` with `subject = recovered address`.
-    - `GET /consent` (`routes/consent.rs`) → auto-accepts consent and attaches the ID token built by `user_data.rs::get_data` (ENS + Unstoppable Domains).
-    - `GET /---/metrics` → Prometheus exposition; keeps the `login_status{status,client}` counter the dashboards expect.
+    - `GET /consent` (`routes/consent.rs`) → auto-accepts consent and attaches the **ID token** built by `user_data.rs::get_data` (verified ENS/UD names; `name` = the verified primary; `email_verified` defaults **false** unless `EMAIL_VERIFIED_CLAIM=true`). On tokens carrying the **`mail`** scope it also adds **`cv_identities`** (verified primary name + `owned:null`) to the **access token** — which Hydra nests under the `ext` claim.
+    - `GET /device` / `POST /device` (`routes/device.rs`) → the **device-authorization-grant** (RFC 8628) user-code verification page (server-rendered minijinja, templates bundled via `include_str!`, no wallet/JS). It accepts the `user_code` via Hydra (`core::hydra::accept_device_request`) and redirects into the **standard `/login` → `/consent` SIWE flow**, reused unchanged — so native clients (mail apps, CLIs) get a token without a browser of their own. `GET /device/success` is the landing page. The gateway routes `/device` to this backend; `/oauth2/device/*` already reach Hydra.
+    - `GET /---/metrics` → Prometheus exposition; keeps the `login_status{status,client}` counter the dashboards expect (now incl. `device-verify-*` and `rpc_calls_total{label,result}`).
     - everything else → static SPA assets via `tower_http::ServeDir` (rooted at `STATIC_DIR`, files live under `/login/...`).
     - The **frontend** (`login/login/frontend`, React + **Vite**, **MUI v7** on emotion) emits three bundles (`main`/`embed`/`final`); see the iframe split and "Frontend build contract" below. Wallet connectivity is **`@wagmi/core` + `viem`** (EIP-6963 injected discovery + WalletConnect v2 + Coinbase). The login crate lives alongside it in the same directory.
 
@@ -163,3 +164,5 @@ WALLETCONNECT_PROJECT_ID=<id> yarn test:e2e:walletconnect   # WalletConnect (nee
 ## Hydra
 
 Subchart `hydra` is pinned in `charts/login/Chart.yaml` (currently **0.62.1 → Ory Hydra v26.2.0**, the 2.x line). Hydra config lives under the `hydra:` block in `charts/login/values*.yaml`. The chart is apiVersion v2; the dependency lock is regenerated by `helm dependency update` (there is no committed lock).
+
+Hydra issues **JWT access tokens** (`strategies.access_token: jwt`) signed by the published JWKS, so relying parties validate them offline (introspection still works; JWT access tokens can't be revoked before expiry — keep TTLs short). The **device grant** (RFC 8628) is wired via `urls.device.{verification,success}` pointing at the login backend's `/device` page; clients opt in with the `urn:ietf:params:oauth:grant-type:device_code` grant type. Custom access-token claims (e.g. `cv_identities`) land under the token's `ext` claim. New env knobs surfaced in `values.yaml`: `SIWE_CHAIN_ID`, `SIWE_STATEMENT`, `RPC_TIMEOUT_MS`, `ETH_RPC_URL_FALLBACK`, `EMAIL_VERIFIED_CLAIM`.
