@@ -135,6 +135,37 @@ for i in $(seq 1 60); do
 done
 kubectl -n "$NS_DEMO" rollout status deploy/demo --timeout=180s || true
 
+say "Registering the ETHMail webclient OAuth2 client"
+# ETHMail's webclient (separate repo: Webclient/charts/ethmail-webclient/values-local.yaml)
+# expects a Hydra client `ethmail-webclient` with this exact id/secret + the mail and
+# offline_access scopes + the `ethmail` audience. We register it via the admin API (the
+# OAuth2Client CRD would mint a random client_id; ETHMail needs this fixed one). Idempotent;
+# skips gracefully if the admin API isn't reachable. webmail.cv... is allowlisted for the
+# final-redirect in values-kind.yaml so the browser login completes.
+ETHMAIL_WC_SECRET="ethmail-webclient-secret" # pragma: allowlist secret
+kubectl -n "$NS_LOGIN" port-forward svc/cryptoverse-login-hydra-admin 4455:4445 >/dev/null 2>&1 &
+HPF=$!
+for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:4455/health/ready 2>/dev/null && break || sleep 0.5; done
+curl -fsS -o /dev/null -X DELETE http://127.0.0.1:4455/admin/clients/ethmail-webclient 2>/dev/null || true
+curl -fsS -o /dev/null -X POST http://127.0.0.1:4455/admin/clients \
+  -H 'Content-Type: application/json' --data @- <<JSON && echo "  registered client_id=ethmail-webclient" || echo "  (ethmail-webclient registration skipped — admin API not reachable)"
+{
+  "client_id": "ethmail-webclient",
+  "client_secret": "$ETHMAIL_WC_SECRET",
+  "client_name": "ETHMail Webclient (RoundCube)",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "scope": "openid email profile offline_access mail",
+  "audience": ["ethmail"],
+  "redirect_uris": [
+    "https://webmail.cv.127.0.0.1.nip.io:9443/index.php/login/oauth",
+    "https://webmail.cv.127.0.0.1.nip.io/index.php/login/oauth"
+  ],
+  "token_endpoint_auth_method": "client_secret_post"
+}
+JSON
+kill "$HPF" 2>/dev/null || true
+
 say "Verifying OIDC discovery through the ingress"
 curl -fsSk "$LOGIN_URL/.well-known/openid-configuration" | head -c 160 || \
   echo "(discovery not ready yet — give Hydra a few more seconds)"

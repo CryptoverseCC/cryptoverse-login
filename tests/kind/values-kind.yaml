@@ -25,6 +25,10 @@ wrapper:
     # redirect_uri is http://localhost:9876/callback; allow that host so the
     # browser-path test (test_demo_flow.py) can fetch /oauth2/final.
     - localhost
+    # ETHMail webclient (RoundCube) — setup.sh registers the `ethmail-webclient`
+    # OAuth2 client; its redirect is on this host, so the final-page redirect
+    # must be allowed for ETHMail login to complete locally.
+    - webmail.cv.127.0.0.1.nip.io
 
 ingressClassName: nginx
 
