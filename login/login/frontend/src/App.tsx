@@ -41,8 +41,6 @@ export interface AppProps {
   className?: string;
 }
 
-let identitiesInterval: number | null = null;
-
 const App: React.FC<AppProps> = ({ loginProvider, className }) => {
   const [wallets, setWallets] = useState([] as TWalletInfo[]);
   const [currentWallet, setCurrentWallet] = useState(null as TWalletInfo | null);
@@ -54,6 +52,17 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
   // Guards against re-entrant connect/login (a wallet handles one prompt at a
   // time); a second trigger while one is busy is ignored with a message.
   const busy = useRef(false);
+  // The live identities poll (started on connect; runs only while the user is on
+  // the address-picker idle page). Held in a ref so the unmount cleanup and the
+  // flow transitions can clear it — a previous module-level interval leaked,
+  // ticking through signing/redirect/error and across remounts.
+  const identitiesInterval = useRef<number | null>(null);
+  const stopIdentitiesPoll = () => {
+    if (identitiesInterval.current !== null) {
+      window.clearInterval(identitiesInterval.current);
+      identitiesInterval.current = null;
+    }
+  };
   const [walletPageMode, setWalletPageMode] = useState(
     ConnectWalletPageModes.SELECT
   );
@@ -67,14 +76,17 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
   };
 
   // Move to the terminal error surface (Try again resets to the wallet picker).
+  // Leaving the idle page also stops the identities poll.
   const fail = (title: string, subtext: string, err?: unknown) => {
     capture(err);
+    stopIdentitiesPoll();
     setFlow({ kind: "error", title, subtext });
   };
 
   // Try again from a terminal error: drop the selected wallet and go back to
   // the wallet picker so the user can start over cleanly.
   const onRetry = () => {
+    stopIdentitiesPoll();
     setPageError(null);
     setCurrentWallet(null);
     setFlow({ kind: "idle" });
@@ -89,6 +101,8 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
     }
     busy.current = true;
     setPageError(null);
+    // Leaving the idle page for the signing choreography — stop polling identities.
+    stopIdentitiesPoll();
     setFlow({ kind: "signing", wallet: currentWallet?.name ?? "your wallet" });
     // The hang guard: if the wallet never responds, dead-end into a retry state.
     const guard = window.setTimeout(
@@ -102,10 +116,17 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
 
     try {
       const resp = await loginProvider.login(request);
-      if (!resp) {
+      if (!resp.ok) {
         window.clearTimeout(guard);
-        setPageError("Signing was cancelled. Choose an address to try again.");
-        setFlow({ kind: "idle" });
+        if (resp.cancelled) {
+          // User dismissed the prompt — recoverable, stay on the page.
+          setPageError(`${resp.error} Choose an address to try again.`);
+          setFlow({ kind: "idle" });
+        } else {
+          // A genuine signing failure (locked wallet, connector/RPC error):
+          // surface its real message instead of the misleading "cancelled".
+          fail("We couldn't sign you in", resp.error);
+        }
         return;
       }
 
@@ -183,10 +204,11 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
       setCurrentWallet(wallet);
       setFlow({ kind: "idle" });
 
-      if (identitiesInterval) {
-        clearInterval(identitiesInterval);
-      }
-      identitiesInterval = window.setInterval(async () => {
+      // Poll for account changes while the user is on the address picker. Don't
+      // double-start; the unmount cleanup and every flow transition out of idle
+      // (sign/redirect/error/back) clear it via stopIdentitiesPoll.
+      stopIdentitiesPoll();
+      identitiesInterval.current = window.setInterval(async () => {
         const resp = await loginProvider.identities({});
         if (resp) {
           setIdentities(resp.identities);
@@ -205,6 +227,8 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
   };
 
   const onBackToSelectWallet = () => {
+    // Back to the wallet picker — the address poll no longer applies.
+    stopIdentitiesPoll();
     setPageError(null);
     setCurrentWallet(null);
     setFlow({ kind: "idle" });
@@ -253,6 +277,11 @@ const App: React.FC<AppProps> = ({ loginProvider, className }) => {
       window.clearTimeout(guard);
     };
   }, [loginProvider]);
+
+  // Stop the identities poll when App unmounts so the interval never outlives
+  // the component (it previously leaked via a module-level variable, surviving
+  // remounts). Empty deps: this runs once on mount and its cleanup on unmount.
+  useEffect(() => () => stopIdentitiesPoll(), []);
 
   const clientId = loginProvider.loginData.clientId;
   const metadata = loginProvider.loginData.metadata;

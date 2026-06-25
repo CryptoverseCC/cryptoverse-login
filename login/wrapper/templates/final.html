@@ -18,7 +18,11 @@
       });
     </script>
     <script>
-      var redirectUrl = "{{ url|safe }}";
+      // `tojson` emits a properly-quoted, JS-escaped string literal, so a value
+      // containing quotes/backslashes/newlines can't break out of the string or
+      // inject script. The backend additionally validates `url` is an absolute
+      // http(s) URL before rendering.
+      var redirectUrl = {{ url|tojson }};
     </script>
     <script
       type="module"

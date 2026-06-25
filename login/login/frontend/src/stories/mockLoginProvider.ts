@@ -32,6 +32,7 @@ export function makeMockLoginProvider(
     connect: async (_req: TConnectRequest) => ({ identities }),
     identities: async () => ({ identities }),
     login: async (_req: TLoginRequest) => ({
+      ok: true as const,
       message: "Sign-in message",
       signature: "0xsignature",
       challenge: loginData.challenge,

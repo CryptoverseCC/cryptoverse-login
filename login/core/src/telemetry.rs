@@ -40,3 +40,17 @@ pub fn init_metrics() -> PrometheusHandle {
         .install_recorder()
         .expect("failed to install Prometheus recorder")
 }
+
+/// Increment `rpc_calls_total{label,result}` (result = `ok` | `timeout` |
+/// `error`). Emitted at the single JSON-RPC chokepoint in [`crate::eth`] so
+/// dashboards can watch RPC health (and tell a timeout storm apart from a
+/// provider returning errors). Uses the same global `metrics` recorder as the
+/// `login_status` counter, so it is rendered by the same Prometheus handle.
+pub fn record_rpc_call(label: &str, result: &str) {
+    metrics::counter!(
+        "rpc_calls_total",
+        "label" => label.to_string(),
+        "result" => result.to_string(),
+    )
+    .increment(1);
+}

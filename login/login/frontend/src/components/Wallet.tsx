@@ -3,8 +3,10 @@ import React from "react";
 import { Theme } from "@mui/material/styles";
 import { makeStyles } from "tss-react/mui";
 import Typography from "@mui/material/Typography";
+import ButtonBase from "@mui/material/ButtonBase";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import { TWalletInfo } from "../services/loginProvider";
+import { fallbackWalletIcon } from "../embed/walletIcons";
 
 const useStyles = makeStyles()((theme: Theme) => ({
   // Self-sizing flex cell: sits directly inside the screen's plain
@@ -98,22 +100,26 @@ export const Wallet: React.FC<WalletProps> = ({ wallet, onClick }) => {
   const select = () => onClick(wallet);
   return (
     <div className={classes.cell}>
-      <div
-        role="button"
-        tabIndex={0}
+      {/* A real interactive element (MUI ButtonBase → native <button>) so the
+          tile is keyboard/AT-focusable for free — no hand-rolled role/tabIndex/
+          onKeyDown. The tile class keeps the visual styling. */}
+      <ButtonBase
         aria-label={`Connect with ${wallet.name}`}
         className={classes.tile}
         onClick={select}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            select();
-          }
-        }}
+        focusRipple
       >
         <div className={classes.logoFrame}>
           {wallet.logo ? (
-            <img className={classes.logo} src={wallet.logo} alt="" />
+            <img
+              className={classes.logo}
+              src={wallet.logo}
+              alt=""
+              // Fall back to the default wallet glyph if the icon fails to load.
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = fallbackWalletIcon;
+              }}
+            />
           ) : (
             <AccountBalanceWalletOutlinedIcon
               className={classes.fallbackGlyph}
@@ -124,7 +130,7 @@ export const Wallet: React.FC<WalletProps> = ({ wallet, onClick }) => {
         <Typography variant="subtitle1" className={classes.name}>
           {wallet.name}
         </Typography>
-      </div>
+      </ButtonBase>
     </div>
   );
 };

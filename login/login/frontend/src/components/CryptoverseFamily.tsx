@@ -49,9 +49,7 @@ const FAMILY = [
   },
 ];
 
-export interface CryptoverseFamilyProps {}
-
-export const CryptoverseFamily: React.FC<CryptoverseFamilyProps> = () => {
+export const CryptoverseFamily: React.FC = () => {
   const { classes } = useStyles();
   return (
     <Box className={classes.root}>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
@@ -126,6 +126,13 @@ export const StatusView: React.FC<StatusViewProps> = ({
   const animate = kind !== "error" && kind !== "redirecting";
   const liveStatus = kind === "error" ? "assertive" : "polite";
 
+  // On a terminal error, move keyboard focus to the action ("Try again") button
+  // so the recovery path is immediately reachable without hunting for it.
+  const actionRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (kind === "error") actionRef.current?.focus();
+  }, [kind]);
+
   return (
     <PageShell align="center" className={className}>
       <Box
@@ -204,6 +211,7 @@ export const StatusView: React.FC<StatusViewProps> = ({
 
       {actionLabel && onAction && (
         <Button
+          ref={actionRef}
           variant="contained"
           color="primary"
           onClick={onAction}

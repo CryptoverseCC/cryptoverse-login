@@ -65,7 +65,7 @@ pub async fn page(
         .unwrap_or_else(|| "default".to_string());
 
     let (host, scheme) = super::public_origin(&headers);
-    let siwe = auth::SiweChallenge::new(&host, &scheme, &st.statement, &challenge);
+    let siwe = auth::SiweChallenge::new(&host, &scheme, &st.statement, &challenge, st.chain_id);
 
     // Single JSON object the SPA reads from a `<script type="application/json">`
     // block (see frontend/services/loginProvider.ts). Embedding as data (not
@@ -142,7 +142,7 @@ pub async fn process(
     let client_id = login_req.client.client_id.clone();
     count("login-start", &client_id);
 
-    let (host, _scheme) = super::public_origin(&headers);
+    let (host, scheme) = super::public_origin(&headers);
     // `&st.eth` is threaded in so SIWE verification can fall back from the EOA
     // (EIP-191) path to on-chain ERC-1271 / ERC-6492 validation for smart-contract
     // and counterfactual wallets (e.g. Coinbase Smart Wallet).
@@ -150,19 +150,42 @@ pub async fn process(
         &form.message,
         &form.signature,
         &host,
+        &scheme,
+        st.chain_id,
         &form.challenge,
         &st.eth,
     )
     .await
     {
         Ok(v) => v,
-        Err(e) => {
+        // A genuinely invalid / expired / wrong-field signature → 401, terminal.
+        Err(
+            e @ (auth::AuthError::Parse(_)
+            | auth::AuthError::Signature(_)
+            | auth::AuthError::Domain { .. }
+            | auth::AuthError::Field(_)
+            | auth::AuthError::Time(_)
+            | auth::AuthError::Verify(_)),
+        ) => {
             tracing::warn!("SIWE verification failed: {e}");
             count("error-siwe-verify", &client_id);
             return error_response(
                 &form.response,
                 StatusCode::UNAUTHORIZED,
                 &format!("Login error: {e}"),
+            );
+        }
+        // We couldn't reach the RPC to validate a contract-wallet signature, so
+        // validity is unknown. This is NOT a forgery — surface a distinct,
+        // retryable 503 so a Safe / smart-account user can try again rather than
+        // see a misleading "invalid signature" 401.
+        Err(auth::AuthError::RpcUnavailable(e)) => {
+            tracing::warn!("SIWE verification could not reach RPC: {e}");
+            count("error-siwe-rpc-unavailable", &client_id);
+            return error_response(
+                &form.response,
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Couldn't verify your wallet right now. Please try again.",
             );
         }
     };
@@ -182,12 +205,25 @@ pub async fn process(
             };
             let results = restrictions::check_restrictions(&st.eth, &rs, owner).await;
             if !results.iter().all(|r| r.passed) {
-                tracing::warn!("restriction checks failed for {subject}");
-                count("error-restricted", &client_id);
-                let msg = format!(
-                    "Your address fails conditions: {}",
+                // Log the full detail (conditions + on-chain balances) server-side
+                // only — never serialise the user's balances back to the browser.
+                tracing::warn!(
+                    "restriction checks failed for {subject}: {}",
                     serde_json::to_string(&results).unwrap_or_default()
                 );
+                count("error-restricted", &client_id);
+                // Return only the per-restriction messages of the failing checks
+                // (or a generic line if none carry a message).
+                let messages: Vec<String> = results
+                    .iter()
+                    .filter(|r| !r.passed)
+                    .filter_map(|r| r.message.clone())
+                    .collect();
+                let msg = if messages.is_empty() {
+                    "Your address does not meet the requirements to log in.".to_string()
+                } else {
+                    messages.join(" ")
+                };
                 return error_response(&form.response, StatusCode::FORBIDDEN, &msg);
             }
         }
@@ -210,9 +246,36 @@ pub async fn process(
         Err(e) => {
             tracing::error!("accept_login_request failed: {e}");
             count("error-unknown", &client_id);
-            (StatusCode::BAD_GATEWAY, "Hydra error").into_response()
+            hydra_error_response(&e)
         }
     }
+}
+
+/// Map a Hydra admin-call failure to a sensible HTTP status, instead of
+/// collapsing everything to 502. A 4xx from Hydra means *our request* was bad
+/// (e.g. the challenge was already used / expired → 409, other 4xx → 400); a
+/// transport error or 5xx means Hydra itself is the problem → 502.
+fn hydra_error_response(err: &anyhow::Error) -> Response {
+    if let Some(re) = err.downcast_ref::<reqwest::Error>() {
+        if let Some(status) = re.status() {
+            if status.is_client_error() {
+                // 409/410 typically mean the one-time challenge is gone.
+                if status == reqwest::StatusCode::CONFLICT
+                    || status == reqwest::StatusCode::GONE
+                    || status == reqwest::StatusCode::NOT_FOUND
+                {
+                    return (
+                        StatusCode::CONFLICT,
+                        "This login request is no longer valid. Please start again.",
+                    )
+                        .into_response();
+                }
+                return (StatusCode::BAD_REQUEST, "Invalid login request.").into_response();
+            }
+        }
+    }
+    // Transport error, timeout, or Hydra 5xx → upstream is unavailable.
+    (StatusCode::BAD_GATEWAY, "Authentication service error").into_response()
 }
 
 fn error_response(response: &Option<String>, status: StatusCode, message: &str) -> Response {

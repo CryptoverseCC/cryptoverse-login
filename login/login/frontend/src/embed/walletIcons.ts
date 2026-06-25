@@ -22,6 +22,17 @@ const WALLETCONNECT = dataUri(
     `a1 1 0 0 0 2 0l57-56a9 9 0 0 1 12 0z"/></svg>`
 );
 
+// A neutral generic-wallet glyph used as the last-resort fallback when a wallet's
+// own icon URL fails to load (`<img onError>` in Wallet.tsx). A simple wallet
+// outline on the brand-muted surface so a broken icon never leaves an empty box.
+export const fallbackWalletIcon = dataUri(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">` +
+    `<rect width="48" height="48" rx="12" fill="#1b1d2a"/>` +
+    `<rect x="11" y="15" width="26" height="20" rx="4" fill="none" stroke="#8a8fa3" stroke-width="2.5"/>` +
+    `<rect x="27" y="22" width="12" height="7" rx="3.5" fill="#1b1d2a" stroke="#8a8fa3" stroke-width="2.5"/>` +
+    `<circle cx="32" cy="25.5" r="1.6" fill="#8a8fa3"/></svg>`
+);
+
 const BY_KEY: Record<string, string> = {
   coinbaseWallet: COINBASE,
   coinbaseWalletSDK: COINBASE,

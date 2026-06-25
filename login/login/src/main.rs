@@ -27,6 +27,9 @@ use cryptoverse_core::{config, eth::Eth, hydra::Hydra, telemetry};
 use metrics_exporter_prometheus::PrometheusHandle;
 use minijinja::Environment;
 use tower::ServiceBuilder;
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
+};
 use tower_http::{services::ServeDir, trace::TraceLayer};
 
 /// `Cache-Control` for Vite content-hashed assets (hashed JS/CSS, `*.woff2`
@@ -87,6 +90,13 @@ pub struct AppState {
     pub profile_domain: String,
     pub mailserver_domain: String,
     pub statement: String,
+    /// SIWE chain id (`SIWE_CHAIN_ID`, default mainnet). Issued to the frontend
+    /// (`loginData.siwe.chainId`) and enforced in `auth::verify`.
+    pub chain_id: u64,
+    /// Value of the OIDC `email_verified` claim (`EMAIL_VERIFIED_CLAIM`, default
+    /// `false`). The synthetic `{address}@{MAILSERVER_DOMAIN}` mailbox is not a
+    /// verified inbox; only set this when a real, delivering mailserver backs it.
+    pub email_verified_claim: bool,
     /// WalletConnect Cloud / Reown project id forwarded to the SPA so it can
     /// offer the WalletConnect connector. Empty when unset (the connector is
     /// then omitted; injected wallets still work). No key is hardcoded.
@@ -126,6 +136,9 @@ async fn main() {
         profile_domain: config::var_or("PROFILE_DOMAIN", "cryptoverse.cc"),
         mailserver_domain: config::var_or("MAILSERVER_DOMAIN", "ethmail.cc"),
         statement: config::var_or("SIWE_STATEMENT", "Sign in to Cryptoverse Login"),
+        chain_id: cryptoverse_core::auth::configured_chain_id(),
+        email_verified_claim: config::var_or("EMAIL_VERIFIED_CLAIM", "false")
+            .eq_ignore_ascii_case("true"),
         wallet_connect_project_id: config::var_or("WALLETCONNECT_PROJECT_ID", ""),
         restrictions_file: config::var_or("RESTRICTIONS_FILE", "/config/restrictions.json"),
         metrics_handle,
@@ -139,9 +152,30 @@ async fn main() {
         .layer(axum::middleware::from_fn(cache_control))
         .service(ServeDir::new(&static_dir));
 
+    // Per-client rate limit on the one route that fires eth_calls. The IdP runs
+    // behind a TLS-terminating ingress, so all sockets share its IP — key on the
+    // forwarded client IP (`SmartIpKeyExtractor` reads `X-Forwarded-For` /
+    // `Forwarded`) instead of the peer address. Limits are deliberately generous
+    // (burst of 30, then ~1 req/sec replenish per client) so normal logins and
+    // the harness/e2e suites are never throttled; it only blunts brute-force /
+    // signature-spray bursts. `finish()` only fails on a nonsensical config.
+    let governor_conf = std::sync::Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(1)
+            .burst_size(30)
+            .key_extractor(SmartIpKeyExtractor)
+            .finish()
+            .expect("valid rate-limit config"),
+    );
+    let process_router = Router::new()
+        .route("/login/process", post(routes::login::process))
+        .layer(GovernorLayer {
+            config: governor_conf,
+        });
+
     let app = Router::new()
         .route("/login", get(routes::login::page))
-        .route("/login/process", post(routes::login::process))
+        .merge(process_router)
         .route("/consent", get(routes::consent::consent))
         .route("/---/metrics", get(metrics))
         .route("/healthz", get(|| async { "ok" }))

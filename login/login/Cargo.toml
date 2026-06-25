@@ -24,3 +24,6 @@ serde.workspace = true
 serde_json.workspace = true
 alloy.workspace = true
 evalexpr.workspace = true
+reqwest.workspace = true
+anyhow.workspace = true
+tower_governor = { version = "0.7", features = ["axum"] }

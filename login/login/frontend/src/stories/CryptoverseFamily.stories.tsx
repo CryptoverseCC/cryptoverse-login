@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { CryptoverseFamily } from "../components/CryptoverseFaimily";
+import { CryptoverseFamily } from "../components/CryptoverseFamily";
 
 const meta: Meta<typeof CryptoverseFamily> = {
   title: "Components/CryptoverseFamily",

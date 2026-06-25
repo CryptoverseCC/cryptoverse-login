@@ -84,12 +84,17 @@ async fn resolve_enrichment(eth: &Eth, cache: &EnrichmentCache, owner: Address) 
 }
 
 /// Build the `id_token` claims object for `subject`.
+///
+/// `email_verified` is the value put on the `email_verified` claim — see the
+/// claim's inline comment: it must default to `false` because the generated
+/// `{address}@{MAILSERVER_DOMAIN}` mailbox is synthetic and never delivered to.
 pub async fn get_data(
     eth: &Eth,
     cache: &EnrichmentCache,
     subject: &str,
     mailserver_domain: &str,
     profile_domain: &str,
+    email_verified: bool,
 ) -> serde_json::Value {
     let user = subject;
     let default_email = format!("{user}@{mailserver_domain}");
@@ -113,7 +118,10 @@ pub async fn get_data(
         let Enrichment { ens, ud } = resolve_enrichment(eth, cache, owner).await;
 
         if let Some(ens) = ens {
-            let email = format!("{}@{mailserver_domain}", ens.replace(".eth", ""));
+            // Strip only the trailing `.eth` (a `.replace` would also mangle a
+            // name that legitimately contains "eth", e.g. "ethan.eth").
+            let local = ens.strip_suffix(".eth").unwrap_or(&ens);
+            let email = format!("{local}@{mailserver_domain}");
             email_all.push(email.clone());
             ens_email_default = Some(email.clone());
             ens_email_all.push(email);
@@ -124,10 +132,12 @@ pub async fn get_data(
         }
 
         if let Some(ud) = ud {
-            let email = format!(
-                "{}@unstoppable.email",
-                ud.strip_suffix(".crypto").unwrap_or(&ud)
-            );
+            // Unstoppable Domains issues many TLDs (.crypto, .nft, .x, .wallet,
+            // .dao, …), so strip whatever the actual trailing label is rather
+            // than only ".crypto". The local part is everything before the last
+            // dot; a name with no dot is used as-is.
+            let local = ud.rsplit_once('.').map(|(head, _)| head).unwrap_or(&ud);
+            let email = format!("{local}@unstoppable.email");
             email_all.push(email.clone());
             ud_email_default = Some(email.clone());
             ud_email_all.push(email);
@@ -155,7 +165,14 @@ pub async fn get_data(
     json!({
         "address": { "country": "Cryptoverse", "region": "Ethereum" },
         "birthdate": "",
-        "email_verified": true,
+        // The verified identity is the *Ethereum address*, not the synthetic
+        // `{address}@{MAILSERVER_DOMAIN}` mailbox (which is generated, never
+        // confirmed, and may not even receive mail). Asserting `email_verified:
+        // true` here would be a false claim that relying parties may trust for
+        // account-recovery / password-reset. So it defaults to `false`; an
+        // operator running a real, delivering mailserver can opt in via
+        // `EMAIL_VERIFIED_CLAIM=true`.
+        "email_verified": email_verified,
         "email": default_email,
         "emails": emails,
         "family_name": "Ethereum",
@@ -220,6 +237,51 @@ mod tests {
             .await
             .expect("negative result must be cached");
         assert!(hit.ens.is_none() && hit.ud.is_none());
+    }
+
+    /// `.eth` is stripped only as a *suffix* (not every occurrence), so a name
+    /// like "ethan.eth" keeps its "eth" inside the local part.
+    #[test]
+    fn ens_local_part_strips_only_trailing_eth() {
+        let ens = "ethan.eth";
+        let local = ens.strip_suffix(".eth").unwrap_or(ens);
+        assert_eq!(local, "ethan");
+
+        let ens = "vitalik.eth";
+        assert_eq!(ens.strip_suffix(".eth").unwrap_or(ens), "vitalik");
+    }
+
+    /// The UD local part strips whatever the trailing TLD is, not only ".crypto".
+    #[test]
+    fn ud_local_part_strips_actual_tld() {
+        for (name, expected) in [
+            ("brad.crypto", "brad"),
+            ("alice.nft", "alice"),
+            ("bob.wallet", "bob"),
+            ("dao.x", "dao"),
+            ("nodot", "nodot"),
+        ] {
+            let local = name.rsplit_once('.').map(|(h, _)| h).unwrap_or(name);
+            assert_eq!(local, expected, "for {name}");
+        }
+    }
+
+    /// `email_verified` reflects the passed flag (honest default is false): the
+    /// synthetic mailbox is never asserted verified unless explicitly opted in.
+    #[tokio::test]
+    async fn email_verified_claim_reflects_flag() {
+        // Address that won't resolve (offline Eth via unroutable RPC).
+        std::env::set_var("ETH_RPC_URL", "http://127.0.0.1:1");
+        std::env::set_var("RPC_TIMEOUT_MS", "150");
+        let eth = Eth::from_env().expect("eth");
+        let cache = EnrichmentCache::new();
+        let subject = "0x0000000000000000000000000000000000000001";
+
+        let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", false).await;
+        assert_eq!(claims["email_verified"], serde_json::json!(false));
+
+        let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", true).await;
+        assert_eq!(claims["email_verified"], serde_json::json!(true));
     }
 
     #[tokio::test]

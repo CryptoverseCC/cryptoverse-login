@@ -7,10 +7,36 @@ import {
   type Connector,
   type CreateConnectorFn,
 } from "@wagmi/core";
-import { mainnet } from "@wagmi/core/chains";
+import {
+  mainnet,
+  base,
+  optimism,
+  arbitrum,
+  polygon,
+  sepolia,
+  type Chain,
+} from "@wagmi/core/chains";
 import { coinbaseWallet, injected, walletConnect } from "@wagmi/connectors";
 import { IIdentity, TWalletInfo } from "../services/loginProvider";
 import { connectorIcon } from "./walletIcons";
+
+// Map the backend-configured SIWE chain id to a viem chain object. Signing is a
+// pure EIP-191 personal_sign — no RPC call is made in the browser (balance gating
+// is server-side) — so a known-chain object is all wagmi needs; an unknown id
+// falls back to mainnet. The id still ends up in the signed SIWE message
+// (`Chain ID:`), so picking the right one keeps the signature on the right chain.
+const CHAINS_BY_ID: Record<number, Chain> = {
+  [mainnet.id]: mainnet, // 1
+  [base.id]: base, // 8453
+  [optimism.id]: optimism, // 10
+  [arbitrum.id]: arbitrum, // 42161
+  [polygon.id]: polygon, // 137
+  [sepolia.id]: sepolia, // 11155111
+};
+
+export function chainForId(chainId?: number): Chain {
+  return (chainId && CHAINS_BY_ID[chainId]) || mainnet;
+}
 
 // The wagmi id of the generic, EIP-6963-agnostic `injected()` connector. It
 // talks to whatever `window.ethereum` is present without announcing an `rdns`.
@@ -51,8 +77,14 @@ let config: Config | null = null;
 export function ensureConfig(opts: {
   walletConnectProjectId?: string;
   appName?: string;
+  // The SIWE chain id threaded from the iframe (loginData.siwe.chainId). Selects
+  // the viem chain the wagmi config is built on; defaults to mainnet if absent
+  // or unknown. The config is built once, so the first init's chainId wins.
+  chainId?: number;
 }): Config {
   if (config) return config;
+
+  const chain = chainForId(opts.chainId);
 
   const connectors: CreateConnectorFn[] = [
     // Coinbase Wallet is ALWAYS present (mobile + extension + Smart Wallet). We
@@ -83,8 +115,8 @@ export function ensureConfig(opts: {
   }
 
   config = createConfig({
-    chains: [mainnet],
-    transports: { [mainnet.id]: http() },
+    chains: [chain],
+    transports: { [chain.id]: http() },
     connectors,
     multiInjectedProviderDiscovery: true,
   });

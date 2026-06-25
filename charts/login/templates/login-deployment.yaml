@@ -52,6 +52,21 @@ spec:
             - name: ETH_RPC_URL
               value: {{ .Values.ethRpcUrl | quote }}
             {{- end }}
+            {{- if .Values.login.ethRpcUrlFallback }}
+            # Secondary mainnet JSON-RPC URL the backend falls back to when the
+            # primary RPC errors/times out. Only rendered when set (mirrors
+            # ETH_RPC_URL) so it never injects an empty value.
+            - name: ETH_RPC_URL_FALLBACK
+              value: {{ .Values.login.ethRpcUrlFallback | quote }}
+            {{- end }}
+            - name: SIWE_CHAIN_ID
+              value: {{ .Values.login.chainId | default 1 | quote }}
+            - name: SIWE_STATEMENT
+              value: {{ .Values.login.siweStatement | default "Sign in to Cryptoverse Login" | quote }}
+            - name: RPC_TIMEOUT_MS
+              value: {{ .Values.login.rpcTimeoutMs | default 3000 | quote }}
+            - name: EMAIL_VERIFIED_CLAIM
+              value: {{ .Values.login.emailVerifiedClaim | default false | quote }}
             - name: DEBUG
               value: "{{ .Values.debug }}"
           securityContext:
@@ -69,6 +84,24 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.login.deployment.port }}
+          # Both probes hit the RPC-INDEPENDENT /healthz so a mainnet RPC outage
+          # never amplifies into pod restarts / removal from the Service.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
       restartPolicy: Always
       volumes:
         - name: secrets

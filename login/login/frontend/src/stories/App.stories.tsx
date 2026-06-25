@@ -74,3 +74,31 @@ export const ConnectFailed: Story = {
     }),
   },
 };
+
+// A login() that reports a user rejection (cancelled) — the recoverable path:
+// an inline warning on the address picker, not the terminal surface.
+export const SignCancelled: Story = {
+  args: {
+    loginProvider: makeMockLoginProvider({
+      login: async () => ({
+        ok: false,
+        cancelled: true,
+        error: "Signing was cancelled.",
+      }),
+    }),
+  },
+};
+
+// A login() that reports a GENUINE failure (locked wallet, connector/RPC error)
+// — distinct from a cancel: the terminal error surface with the real message.
+export const SignFailed: Story = {
+  args: {
+    loginProvider: makeMockLoginProvider({
+      login: async () => ({
+        ok: false,
+        cancelled: false,
+        error: "Your wallet is locked. Unlock it and try again.",
+      }),
+    }),
+  },
+};

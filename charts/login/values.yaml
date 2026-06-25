@@ -77,6 +77,11 @@ alchemyApiKey: "!!! CHANGE THIS !!!"
 # neither alchemyApiKey nor infuraApiKey is set (precedence: Alchemy > Infura >
 # ETH_RPC_URL > built-in public default). Leave empty in production and supply a
 # dedicated Alchemy/Infura key instead.
+#
+# WARNING: when this is "" AND no Alchemy/Infura key is set, the backend falls
+# back to a *public* mainnet node (rate-limited, best-effort, not for
+# production). On-chain enrichment (ENS / Unstoppable Domains) and token-gating
+# (balanceOf) then run against that public RPC. Supply a dedicated key in prod.
 ethRpcUrl: ""
 
 gateway:
@@ -104,6 +109,36 @@ login:
   # Also enables hardware wallets (Ledger Live, Trezor Suite), which connect via
   # WalletConnect — needs mainnet (chainId 1) + personal_sign in the Reown dashboard.
   walletConnectProjectId: ""
+  # SIWE (EIP-4361) chain id the backend issues + verifies against. Mainnet = 1.
+  # → SIWE_CHAIN_ID env.
+  chainId: 1
+  # SIWE statement line shown to the user in the wallet sign prompt.
+  # → SIWE_STATEMENT env.
+  siweStatement: "Sign in to Cryptoverse Login"
+  # Whether the id_token asserts email_verified=true for the synthesized
+  # {address}@MAILSERVER_DOMAIN email. Default false (the address is verified, the
+  # mailbox is not). Set true only if a real mailserver backs the domain.
+  # → EMAIL_VERIFIED_CLAIM env.
+  emailVerifiedClaim: false
+  # Per-request timeout (ms) for on-chain JSON-RPC calls (ENS / Unstoppable
+  # Domains / balanceOf). Bounds login latency on a slow/unreachable RPC.
+  # → RPC_TIMEOUT_MS env.
+  rpcTimeoutMs: 3000
+  # Optional secondary mainnet JSON-RPC URL the backend falls back to when the
+  # primary RPC errors/times out. Empty ⇒ env not rendered (mirrors ethRpcUrl).
+  # → ETH_RPC_URL_FALLBACK env.
+  ethRpcUrlFallback: ""
+  # Token-gating restrictions rendered into the login ConfigMap as
+  # restrictions.json (backend RESTRICTIONS_FILE fallback), keyed by client_id.
+  # Each entry has a tokenAddress (or contractAliases) plus an evalexpr
+  # `condition` over balanceOf. Set to {} to ship no file-based restrictions.
+  restrictions:
+    flynnjamm.cryptoverse.cc:
+      - tokenAddress: "0x56687cf29ac9751ce2a4e764680b6ad7e668942e"
+        condition: "balanceOf >= 1000"
+    fwb.cryptoverse.cc:
+      - tokenAddress: "0x7d91e637589EC3Bb54D8213a9e92Dc6E8D12da91"
+        condition: "balanceOf >= 100"
 
 wrapper:
   replicaCount: 1

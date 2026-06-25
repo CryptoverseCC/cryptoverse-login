@@ -98,7 +98,9 @@
         window.addEventListener("load", async (event) => {
             await window.ready; // Wait for Comlink exposing this context
             const iframe = document.getElementById("auth");
-            iframe.src = "{{ url|safe }}";
+            // `tojson` produces a safe JS string literal (no breakout/injection);
+            // the backend also validates `url` is an absolute http(s) URL.
+            iframe.src = {{ url|tojson }};
         });
     </script>
   </body>

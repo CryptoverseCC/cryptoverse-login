@@ -44,19 +44,25 @@ export const init = async (
     const config = ensureConfig({
       walletConnectProjectId: request.walletConnectProjectId,
       appName: request.appName,
+      // The viem chain to build the wagmi config on (loginData.siwe.chainId,
+      // threaded from the iframe). Defaults to mainnet inside ensureConfig.
+      chainId: request.chainId,
     });
 
-    // Diagnostic: dump the raw connector set once so "only MetaMask appears"
-    // (Coinbase missing, no injected fallback, …) is diagnosable from the
-    // console. Coinbase should ALWAYS be present here.
-    console.info(
-      "[cryptoverse] connectors:",
-      getConnectors(config).map((c) => ({
-        id: c.id,
-        name: c.name,
-        type: c.type,
-      }))
-    );
+    // Diagnostic (dev only): dump the raw connector set once so "only MetaMask
+    // appears" (Coinbase missing, no injected fallback, …) is diagnosable from
+    // the console. Coinbase should ALWAYS be present here. Gated behind DEV so it
+    // doesn't ship to production builds.
+    if (import.meta.env.DEV) {
+      console.info(
+        "[cryptoverse] connectors:",
+        getConnectors(config).map((c) => ({
+          id: c.id,
+          name: c.name,
+          type: c.type,
+        }))
+      );
+    }
 
     const onWalletsChanged = onWalletsChangedArg ?? request.onWalletsChanged;
 

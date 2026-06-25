@@ -17,3 +17,4 @@ tower-http.workspace = true
 tracing.workspace = true
 minijinja.workspace = true
 sentry.workspace = true
+url = "2"

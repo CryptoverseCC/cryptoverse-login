@@ -15,7 +15,7 @@ import { Reassurance } from "./Reassurance";
 import { PageShell } from "./PageShell";
 import BrandMark from "./BrandMark";
 import { TRestrictions, TWalletInfo } from "../services/loginProvider";
-import { CryptoverseFamily } from "./CryptoverseFaimily";
+import { CryptoverseFamily } from "./CryptoverseFamily";
 
 import metamaskImage from "./images/metamask.png";
 import operaImage from "./images/opera.png";

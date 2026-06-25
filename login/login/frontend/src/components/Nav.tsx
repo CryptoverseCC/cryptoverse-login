@@ -25,11 +25,9 @@ export const Nav: React.FC<NavProps> = ({ origin, children, className }) => {
         "& .MuiBreadcrumbs-separator": { color: "text.disabled", mx: 1 },
       }}
     >
-      <Link
-        href={href}
-        onClick={() => window.location.assign(href)}
-        sx={{ color: "primary.main", fontWeight: 500 }}
-      >
+      {/* Plain anchor navigation: no onClick — an onClick={assign} double-navigates
+          and breaks ⌘/ctrl/middle-click (open-in-new-tab). The href is enough. */}
+      <Link href={href} sx={{ color: "primary.main", fontWeight: 500 }}>
         {origin}
       </Link>
       {children}

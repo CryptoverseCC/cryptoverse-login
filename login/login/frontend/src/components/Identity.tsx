@@ -4,8 +4,9 @@ import { Theme } from "@mui/material/styles";
 import { makeStyles } from "tss-react/mui";
 import Typography from "@mui/material/Typography";
 
-import { Box, Button, Chip, Tooltip } from "@mui/material";
+import { Box, Button, ButtonBase, Chip, Tooltip } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import { useId } from "react";
 
 import { IIdentity } from "../services/loginProvider";
 import Mono, { truncateAddress } from "./Mono";
@@ -165,6 +166,10 @@ export const Identity: React.FC<IdentityProps> = ({
   const ens = identity.ens || (identity.name.endsWith(".eth") ? identity.name : null);
   const address = identity.name;
   const short = truncateAddress(address);
+  const label = ens || short;
+  // Stable id so an inactive (token-gated) card's reason text can be associated
+  // with the card via aria-describedby (the card itself carries the aria-label).
+  const reasonId = useId();
   const select = () => {
     if (active) onClick();
   };
@@ -185,24 +190,8 @@ export const Identity: React.FC<IdentityProps> = ({
     </Box>
   );
 
-  const card = (
-    <div
-      className={cx(
-        classes.card,
-        active ? classes.cardActive : classes.cardInactive
-      )}
-      role={active ? "button" : undefined}
-      tabIndex={active ? 0 : undefined}
-      aria-disabled={active ? undefined : true}
-      aria-label={active ? `Sign in with ${ens || short}` : undefined}
-      onClick={select}
-      onKeyDown={(e) => {
-        if (active && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          select();
-        }
-      }}
-    >
+  const cardContent = (
+    <>
       {avatar}
 
       {ens && (
@@ -227,11 +216,18 @@ export const Identity: React.FC<IdentityProps> = ({
       />
 
       {active ? (
-        <Button variant="contained" color="primary" size="small" tabIndex={-1}>
+        <Button
+          variant="contained"
+          color="primary"
+          size="small"
+          component="span"
+          tabIndex={-1}
+        >
           Sign in
         </Button>
       ) : (
         <Typography
+          id={reasonId}
           variant="caption"
           color="text.disabled"
           className={classes.reason}
@@ -239,13 +235,38 @@ export const Identity: React.FC<IdentityProps> = ({
           {restrictionReason}
         </Typography>
       )}
+    </>
+  );
+
+  // Active: a real interactive element (ButtonBase → native <button>), so it is
+  // keyboard/AT-focusable without a hand-rolled role/tabIndex/onKeyDown.
+  // Inactive (token-gated): a non-interactive group that still announces what it
+  // is (aria-label) and *why* it can't be used (aria-describedby → the reason).
+  const card = active ? (
+    <ButtonBase
+      className={cx(classes.card, classes.cardActive)}
+      aria-label={`Sign in with ${label}`}
+      onClick={select}
+      focusRipple
+    >
+      {cardContent}
+    </ButtonBase>
+  ) : (
+    <div
+      className={cx(classes.card, classes.cardInactive)}
+      role="group"
+      aria-disabled
+      aria-label={`${label} — unavailable`}
+      aria-describedby={reasonId}
+    >
+      {cardContent}
     </div>
   );
 
   return (
     <div className={classes.cell}>
       {active ? (
-        <Tooltip title={`Sign in with ${ens || short}`} arrow>
+        <Tooltip title={`Sign in with ${label}`} arrow>
           {card}
         </Tooltip>
       ) : (

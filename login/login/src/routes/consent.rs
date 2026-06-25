@@ -12,6 +12,7 @@ use axum::{
 use cryptoverse_core::hydra::{AcceptConsent, ConsentSession};
 use serde::Deserialize;
 
+use super::count;
 use crate::{user_data, AppState};
 
 #[derive(Debug, Deserialize)]
@@ -34,9 +35,12 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
         Ok(r) => r,
         Err(e) => {
             tracing::error!("get_consent_request failed: {e}");
+            count("consent-error-retrieving-hydra-request", "unknown");
             return (StatusCode::BAD_GATEWAY, "Hydra error").into_response();
         }
     };
+    let client_id = req.client.client_id.clone();
+    count("consent-start", &client_id);
 
     let id_token = user_data::get_data(
         &st.eth,
@@ -44,6 +48,7 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
         &req.subject,
         &st.mailserver_domain,
         &st.profile_domain,
+        st.email_verified_claim,
     )
     .await;
 
@@ -51,15 +56,22 @@ pub async fn consent(State(st): State<Arc<AppState>>, Query(q): Query<ConsentQue
         grant_scope: req.requested_scope,
         grant_access_token_audience: req.requested_access_token_audience,
         session: ConsentSession {
-            access_token: serde_json::json!({ "some_custom_claim": "some_custom_value" }),
+            // No debug/placeholder claims in the issued access token. The
+            // identity lives in the id_token; the access token carries no custom
+            // claims unless a real need is added.
+            access_token: serde_json::json!({}),
             id_token,
         },
     };
 
     match st.hydra.accept_consent_request(&challenge, &body).await {
-        Ok(resp) => Redirect::to(&resp.redirect_to).into_response(),
+        Ok(resp) => {
+            count("consent-success", &client_id);
+            Redirect::to(&resp.redirect_to).into_response()
+        }
         Err(e) => {
             tracing::error!("accept_consent_request failed: {e}");
+            count("consent-error", &client_id);
             (StatusCode::BAD_GATEWAY, "Hydra error").into_response()
         }
     }

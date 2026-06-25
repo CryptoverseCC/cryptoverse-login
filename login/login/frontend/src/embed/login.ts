@@ -32,6 +32,30 @@ function buildSiweMessage(address: string, p: TSiweParams): string {
   ].join("\n");
 }
 
+// True when the wallet reported a user-initiated rejection of the signature
+// prompt (EIP-1193 4001 / viem `UserRejectedRequestError`). Only these map to the
+// benign "cancelled" state — any other failure is a real error we surface.
+function isUserRejection(error: unknown): boolean {
+  const e = error as {
+    code?: number;
+    name?: string;
+    cause?: { code?: number; name?: string };
+  };
+  const code = e?.code ?? e?.cause?.code;
+  const name = e?.name ?? e?.cause?.name;
+  return code === 4001 || name === "UserRejectedRequestError";
+}
+
+// A human-readable message for a genuine (non-rejection) signing failure.
+function humanizeSignError(error: unknown): string {
+  const e = error as { shortMessage?: string; message?: string };
+  return (
+    e?.shortMessage ||
+    e?.message ||
+    "Couldn't get the signature from your wallet. Please try again."
+  );
+}
+
 export const login = async ({
   address,
   siwe,
@@ -49,10 +73,15 @@ export const login = async ({
       account: getAddress(address),
       message,
     });
-    return { message, signature, challenge, address };
+    return { ok: true, message, signature, challenge, address };
   } catch (error) {
     console.error(error);
+    if (isUserRejection(error)) {
+      // Benign: the user dismissed the prompt. No Sentry noise.
+      return { ok: false, cancelled: true, error: "Signing was cancelled." };
+    }
+    // A real failure (locked wallet, connector/RPC error). Report + surface it.
     sentry?.captureException(error);
-    return null;
+    return { ok: false, cancelled: false, error: humanizeSignError(error) };
   }
 };

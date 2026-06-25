@@ -84,6 +84,11 @@ export type TWalletsChangedCallback = (wallets: TWalletInfo[]) => void;
 export type TInitRequest = {
   walletConnectProjectId?: string;
   appName?: string;
+  // The EVM chain id the SIWE message is bound to (from `loginData.siwe.chainId`,
+  // populated by the backend). The embed (top window) has no login-data of its
+  // own, so the iframe threads it here; the parent selects the matching viem
+  // chain when building the wagmi config. Absent ⇒ the parent defaults to mainnet.
+  chainId?: number;
   // Optional live-update channel. When supplied, the embed keeps watching the
   // connector set and re-pushes the wallet list as it changes. When omitted, the
   // embed returns a single settled snapshot instead (backward-safe).
@@ -111,14 +116,27 @@ export type TIdentitiesResponse = {
   identities: IIdentity[];
 } | null;
 
-export type TLoginResponse = {
-  // The full EIP-4361 message that was signed, posted to the backend for
-  // verification (which re-derives the expected nonce from the challenge).
+// A successful signature: the EIP-4361 message + signature posted to the backend
+// for verification (which re-derives the expected nonce from the challenge).
+export type TLoginSuccess = {
+  ok: true;
   message: TMessage;
   signature: TSignature;
   challenge: TChallenge;
   address: TEthereumAddress;
-} | null;
+};
+
+// The signing step failed. `cancelled` distinguishes a user rejection (wallet
+// "reject" / EIP-1193 4001) — a benign, recoverable state — from a genuine
+// failure (locked wallet, connector/RPC error), whose `error` is surfaced to the
+// user. Mirrors connect.ts's `humanize()` discipline.
+export type TLoginFailure = {
+  ok: false;
+  cancelled: boolean;
+  error: string;
+};
+
+export type TLoginResponse = TLoginSuccess | TLoginFailure;
 
 export type TLoginRequest = {
   address: TEthereumAddress;
@@ -142,8 +160,20 @@ interface CommunicationChannel {
   loginProvider: Comlink.Remote<IProvider> | IProvider;
 }
 
+// The parent (embed) and this iframe are served from the SAME origin (the IdP),
+// so every cross-window message is pinned to it: postMessage targets it and the
+// expose/handshake listener rejects anything from a different origin. This stops
+// an unrelated framing page from driving the Comlink surface (whose `redirect`
+// calls `window.location.assign`).
+const IDP_ORIGIN =
+  typeof window !== "undefined" ? window.location.origin : "";
+
 let channel = {
-  loginProvider: Comlink.wrap(Comlink.windowEndpoint(window.parent)),
+  // windowEndpoint's 3rd arg is the targetOrigin used for the messages Comlink
+  // posts to the parent; pin it to the IdP origin instead of the "*" default.
+  loginProvider: Comlink.wrap(
+    Comlink.windowEndpoint(window.parent, window, IDP_ORIGIN)
+  ),
 } as CommunicationChannel;
 
 // --- iframe<->parent startup handshake (see embed/index.ts) -----------------
@@ -194,6 +224,8 @@ function waitForEmbedReady(): Promise<void> {
       resolve();
     };
     const onMessage = (event: MessageEvent) => {
+      // Only trust handshake pings from the IdP origin (the parent embed).
+      if (event.origin !== IDP_ORIGIN) return;
       const data = event.data as HandshakeMessage | null;
       if (data && data.__cryptoverse === HANDSHAKE_READY) finish();
     };
@@ -201,7 +233,7 @@ function waitForEmbedReady(): Promise<void> {
     const timer = window.setTimeout(finish, READY_WAIT_MS);
     // Nudge the parent in case its `embed-ready` was posted before this listener
     // existed; harmless if the parent isn't up yet (init() retry still recovers).
-    window.parent?.postMessage({ __cryptoverse: HANDSHAKE_HELLO }, "*");
+    window.parent?.postMessage({ __cryptoverse: HANDSHAKE_HELLO }, IDP_ORIGIN);
   });
 }
 
@@ -216,6 +248,10 @@ async function init(request: TInitRequest): Promise<TInitResponse> {
   const payload = {
     walletConnectProjectId: loginData.walletConnectProjectId,
     appName: loginData.metadata?.app,
+    // Thread the SIWE chain id to the parent so it builds the wagmi config on the
+    // configured chain (the embed has no login-data of its own). Defaults to
+    // mainnet on the parent side if absent.
+    chainId: loginData.siwe?.chainId,
   };
 
   // The live-update callback is a FUNCTION, so it must cross the iframe boundary
@@ -259,7 +295,7 @@ async function init(request: TInitRequest): Promise<TInitResponse> {
     }
     // Re-nudge before retrying so a parent that only just came up re-sends ready
     // and is guaranteed to be exposing before the next call.
-    window.parent?.postMessage({ __cryptoverse: HANDSHAKE_HELLO }, "*");
+    window.parent?.postMessage({ __cryptoverse: HANDSHAKE_HELLO }, IDP_ORIGIN);
   }
 }
 

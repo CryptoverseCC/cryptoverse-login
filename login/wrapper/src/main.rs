@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 use axum::{
     extract::{RawQuery, State},
-    http::HeaderMap,
-    response::Html,
+    http::{HeaderMap, StatusCode},
+    response::{Html, IntoResponse, Response},
     routing::get,
     Router,
 };
@@ -27,6 +27,43 @@ struct AppState {
     version: String,
     sentry_dsn: String,
     sentry_env: String,
+}
+
+/// Validate that `url` is an absolute `http`/`https` URL with a host, so it is
+/// safe to hand to the templates as a redirect / iframe `src`. Both call sites
+/// render it into a JS string literal via `tojson` (which prevents breakout),
+/// and this rejects non-http(s) schemes (`javascript:`, `data:`, …) and
+/// scheme-relative / relative values that could redirect somewhere unexpected.
+///
+/// The `url=` value may arrive percent-encoded, so we validate the decoded form.
+fn is_safe_redirect(url: &str) -> bool {
+    let decoded = percent_decode(url);
+    match url::Url::parse(&decoded) {
+        Ok(u) => matches!(u.scheme(), "http" | "https") && u.has_host(),
+        Err(_) => false,
+    }
+}
+
+/// Minimal percent-decoder (enough to validate a redirect target). Invalid
+/// escapes are left as-is; this is for validation, not canonicalisation.
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = (bytes[i + 1] as char).to_digit(16);
+            let lo = (bytes[i + 2] as char).to_digit(16);
+            if let (Some(hi), Some(lo)) = (hi, lo) {
+                out.push((hi * 16 + lo) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Derive the public `(host, scheme)` from the request as forwarded by the
@@ -85,13 +122,21 @@ async fn embed(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
     RawQuery(query): RawQuery,
-) -> Html<String> {
+) -> Response {
     let (host, scheme) = public_origin(&headers);
 
     let url = match query {
         Some(q) if !q.is_empty() => format!("{scheme}://{host}/oauth2/inner?{q}"),
         _ => format!("{scheme}://{host}/oauth2/inner"),
     };
+
+    // The URL is built from the (trusted) forwarded origin, but validate it as a
+    // defence-in-depth check — a malformed forwarded host shouldn't yield an
+    // iframe `src` we can't vouch for.
+    if !is_safe_redirect(&url) {
+        tracing::warn!("embed: refusing to render unsafe iframe src `{url}`");
+        return (StatusCode::BAD_REQUEST, "invalid request").into_response();
+    }
 
     let tmpl = st.env.get_template("embed.html").expect("embed template");
     let body = tmpl
@@ -102,16 +147,24 @@ async fn embed(
             sentry_env => st.sentry_env,
         })
         .expect("render embed");
-    Html(body)
+    Html(body).into_response()
 }
 
 /// Final redirect page. The gateway rewrote Hydra's consent `Location` into
 /// `/oauth2/final?url=<the original redirect>`. We strip the leading `url=` from
 /// the raw query (the target URL carries its own `&`-separated params, so we
 /// must not parse it as form data) and hand it to `final.js`.
-async fn final_page(State(st): State<Arc<AppState>>, RawQuery(query): RawQuery) -> Html<String> {
+async fn final_page(State(st): State<Arc<AppState>>, RawQuery(query): RawQuery) -> Response {
     let raw = query.unwrap_or_default();
     let url = raw.strip_prefix("url=").unwrap_or(&raw).to_string();
+
+    // `url` is the redirect target the gateway placed in the query. Reject
+    // anything that isn't an absolute http(s) URL (open-redirect / `javascript:`
+    // protection) before handing it to `final.js` as a `window.location`.
+    if !is_safe_redirect(&url) {
+        tracing::warn!("final: refusing unsafe redirect target `{url}`");
+        return (StatusCode::BAD_REQUEST, "invalid redirect").into_response();
+    }
 
     let tmpl = st.env.get_template("final.html").expect("final template");
     let body = tmpl
@@ -122,5 +175,46 @@ async fn final_page(State(st): State<Arc<AppState>>, RawQuery(query): RawQuery) 
             sentry_env => st.sentry_env,
         })
         .expect("render final");
-    Html(body)
+    Html(body).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_absolute_https_redirect() {
+        assert!(is_safe_redirect(
+            "https://demo.cryptoverse.cc/callback?code=abc&state=xyz"
+        ));
+        assert!(is_safe_redirect("http://localhost:8080/cb"));
+    }
+
+    #[test]
+    fn accepts_percent_encoded_redirect() {
+        // The gateway may percent-encode the `url=` value.
+        assert!(is_safe_redirect(
+            "https%3A%2F%2Fdemo.cryptoverse.cc%2Fcb%3Fcode%3Dabc"
+        ));
+    }
+
+    #[test]
+    fn rejects_dangerous_or_relative_redirects() {
+        // Non-http(s) schemes and breakout attempts must be refused.
+        assert!(!is_safe_redirect("javascript:alert(1)"));
+        assert!(!is_safe_redirect(
+            "data:text/html,<script>alert(1)</script>"
+        ));
+        assert!(!is_safe_redirect("//evil.example.com")); // scheme-relative
+        assert!(!is_safe_redirect("/relative/path"));
+        assert!(!is_safe_redirect("not a url"));
+        assert!(!is_safe_redirect(""));
+        // A value crafted to break out of the old `"{{ url|safe }}"` literal.
+        assert!(!is_safe_redirect("\";alert(1);//"));
+    }
+
+    #[test]
+    fn rejects_percent_encoded_javascript() {
+        assert!(!is_safe_redirect("javascript%3Aalert(1)"));
+    }
 }

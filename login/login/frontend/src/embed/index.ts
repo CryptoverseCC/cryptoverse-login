@@ -16,6 +16,14 @@ const HANDSHAKE_READY = "embed-ready";
 const HANDSHAKE_HELLO = "hello";
 type HandshakeMessage = { __cryptoverse?: string };
 
+// The iframe (#auth) is served from the SAME origin as this embed page (the IdP),
+// so every cross-window message is pinned to that origin: we post the readiness
+// ping to it and reject any `message` event whose origin differs. This keeps the
+// exposed Comlink surface (notably `redirect`, which calls window.location.assign)
+// reachable only from our own iframe, not an arbitrary framing page.
+const IDP_ORIGIN =
+  typeof window !== "undefined" ? window.location.origin : "";
+
 // The embed is the TOP-WINDOW page (served by the wrapper's embed.html). It owns
 // the wallet (a wallet provider must run top-level, not inside an iframe) and
 // exposes init/connect/identities/login/redirect to the iframe over Comlink.
@@ -59,7 +67,7 @@ type HandshakeMessage = { __cryptoverse?: string };
     const signalReady = () => {
       ifr.contentWindow?.postMessage(
         { __cryptoverse: HANDSHAKE_READY },
-        "*"
+        IDP_ORIGIN
       );
     };
 
@@ -68,8 +76,14 @@ type HandshakeMessage = { __cryptoverse?: string };
       // navigates; binding once would leave us listening on a stale window
       // after the /oauth2/inner -> Hydra -> /login chain. Comlink.expose
       // attaches its own message listener, so the previous one is replaced for
-      // the new endpoint and there is no double-handling.
-      Comlink.expose(loginProvider, Comlink.windowEndpoint(ifr.contentWindow!));
+      // the new endpoint and there is no double-handling. `allowedOrigins`
+      // restricts which message origins Comlink will service, and the endpoint's
+      // targetOrigin pins our replies — both to the IdP origin (the iframe).
+      Comlink.expose(
+        loginProvider,
+        Comlink.windowEndpoint(ifr.contentWindow!, self, IDP_ORIGIN),
+        [IDP_ORIGIN]
+      );
       const loader = document.getElementById("loader") as HTMLElement | null;
       if (loader) loader.style.display = "none";
       signalReady();
@@ -85,6 +99,8 @@ type HandshakeMessage = { __cryptoverse?: string };
     // a `hello`; reply with a fresh `embed-ready`. (The iframe's `init()` retry
     // loop alone would also recover, but this makes the first attempt land.)
     window.addEventListener("message", (event: MessageEvent) => {
+      // Only trust greetings from the IdP origin (our iframe).
+      if (event.origin !== IDP_ORIGIN) return;
       const data = event.data as HandshakeMessage | null;
       if (data && data.__cryptoverse === HANDSHAKE_HELLO) {
         signalReady();

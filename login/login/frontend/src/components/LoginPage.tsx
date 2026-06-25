@@ -18,7 +18,7 @@ import { Identity } from "./Identity";
 import { Restrictions, restrictionReason } from "./Restrictions";
 import { Reassurance } from "./Reassurance";
 import { PageShell } from "./PageShell";
-import { CryptoverseFamily } from "./CryptoverseFaimily";
+import { CryptoverseFamily } from "./CryptoverseFamily";
 
 export enum Modes {
   SELECT = "select",
