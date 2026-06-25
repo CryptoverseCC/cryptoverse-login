@@ -83,9 +83,14 @@ export async function runLogin({
   await page.goto(demoPath);
   await page.getByText("Login with Ethereum Wallet").click();
 
-  // 2. We're now on the IdP. The picker is inside the login iframe. Pick the
-  //    wallet tile by its accessible name.
+  // 2. We're now on the IdP, inside the login iframe. The redesigned UI shows a
+  //    landing screen first; click "Continue with a wallet" to reveal the picker.
   const frame = loginFrame(page);
+  const cta = frame.getByRole("button", { name: "Continue with a wallet" });
+  await expect(cta).toBeVisible();
+  await cta.click();
+
+  // Pick the wallet tile by its accessible name.
   const tile = frame.getByRole("button", {
     name: `Connect with ${driver.pickerName}`,
   });

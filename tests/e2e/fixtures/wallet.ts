@@ -61,7 +61,9 @@ export function expectedIdToken(
     address: { country: "Cryptoverse", region: "Ethereum" },
     birthdate: "",
     email,
-    email_verified: true,
+    // The {address}@domain mailbox is synthesized, not delivery-verified, so the
+    // IdP asserts email_verified=false by default (EMAIL_VERIFIED_CLAIM opt-in).
+    email_verified: false,
     emails: {
       all: [email],
       default: email,

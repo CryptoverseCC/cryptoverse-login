@@ -48,6 +48,13 @@ const IDP_ORIGIN =
 // once to a stale contentWindow.
 (window as unknown as Window).ready = new Promise<void>((resolve, reject) => {
   try {
+    // The iframe navigates several times (/oauth2/inner -> Hydra -> /login ->
+    // /oauth2/final) and we re-`expose` on each load, so multiple Comlink
+    // listeners accumulate on this top window and a single fire-and-forget
+    // `redirect` message is serviced more than once. Guard so the RP callback is
+    // hit EXACTLY once — a second navigation reuses the auth code and bounces the
+    // user to the RP's error page.
+    let redirected = false;
     const loginProvider: IProvider = {
       init,
       login,
@@ -57,7 +64,11 @@ const IDP_ORIGIN =
       ): Promise<TIdentitiesResponse> => {
         return { identities: getIdentities() };
       },
-      redirect: (url) => window.location.assign(url),
+      redirect: (url) => {
+        if (redirected) return;
+        redirected = true;
+        window.location.assign(url);
+      },
     };
 
     const ifr = document.querySelector("#auth") as HTMLIFrameElement;
