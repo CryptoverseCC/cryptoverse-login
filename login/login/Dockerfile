@@ -33,6 +33,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY core ./core
 COPY login/Cargo.toml ./login/Cargo.toml
 COPY login/src ./login/src
+# Server-rendered minijinja templates (device verification page) are bundled into
+# the binary via include_str!, so they must be present at compile time.
+COPY login/templates ./login/templates
 COPY wrapper ./wrapper
 # Compile only the login binary (its deps include the shared core crate).
 RUN cargo build --release -p login

@@ -126,6 +126,19 @@ async fn main() {
         Err(e) => tracing::warn!("index template `{index_path}` not loaded: {e}"),
     }
 
+    // The device-flow (RFC 8628) verification pages are server-rendered and
+    // bundled into the binary (no ConfigMap/volume needed), so they're always
+    // available regardless of the frontend build.
+    templates
+        .add_template("device.html", include_str!("../templates/device.html"))
+        .expect("failed to register device.html template");
+    templates
+        .add_template(
+            "device_success.html",
+            include_str!("../templates/device_success.html"),
+        )
+        .expect("failed to register device_success.html template");
+
     let static_dir = config::var_or("STATIC_DIR", "public");
 
     let state = Arc::new(AppState {
@@ -177,6 +190,11 @@ async fn main() {
         .route("/login", get(routes::login::page))
         .merge(process_router)
         .route("/consent", get(routes::consent::consent))
+        .route(
+            "/device",
+            get(routes::device::page).post(routes::device::process),
+        )
+        .route("/device/success", get(routes::device::success))
         .route("/---/metrics", get(metrics))
         .route("/healthz", get(|| async { "ok" }))
         .fallback_service(static_service)

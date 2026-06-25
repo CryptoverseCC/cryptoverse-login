@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>{{ title }}</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f1115;
+      color: #e8eaed;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #181b22;
+      border: 1px solid #2a2f3a;
+      border-radius: 14px;
+      padding: 32px 28px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 8px; }
+    p.lede { margin: 0 0 24px; color: #aab0bd; font-size: 0.95rem; line-height: 1.5; }
+    label { display: block; font-size: 0.85rem; color: #aab0bd; margin-bottom: 8px; }
+    input[type="text"] {
+      width: 100%;
+      font-size: 1.4rem;
+      letter-spacing: 0.25em;
+      text-align: center;
+      text-transform: uppercase;
+      padding: 14px 12px;
+      border-radius: 10px;
+      border: 1px solid #2a2f3a;
+      background: #0f1115;
+      color: #e8eaed;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    input[type="text"]:focus { border-color: #5b8cff; }
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      background: #5b8cff;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    button:hover { background: #4a7bf0; }
+    .error {
+      margin: 0 0 20px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(229, 72, 77, 0.12);
+      border: 1px solid rgba(229, 72, 77, 0.4);
+      color: #ff9ba0;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>{{ title }}</h1>
+    <p class="lede">Enter the code shown on your device to continue signing in with your wallet.</p>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/device" id="device-form">
+      <input type="hidden" name="device_challenge" value="{{ device_challenge }}" />
+      <label for="user_code">Device code</label>
+      <input
+        type="text"
+        id="user_code"
+        name="user_code"
+        value="{{ user_code }}"
+        autocomplete="off"
+        autocapitalize="characters"
+        autocorrect="off"
+        spellcheck="false"
+        autofocus
+        required
+      />
+      <button type="submit">Continue</button>
+    </form>
+    {% if auto_submit %}
+    <script>document.getElementById("device-form").submit();</script>
+    {% endif %}
+  </main>
+</body>
+</html>

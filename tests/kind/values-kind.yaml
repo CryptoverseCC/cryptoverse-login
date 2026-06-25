@@ -78,6 +78,9 @@ hydra:
       urls:
         login: https://login.cv.127.0.0.1.nip.io:9443/login
         consent: https://login.cv.127.0.0.1.nip.io:9443/consent
+        device:
+          verification: https://login.cv.127.0.0.1.nip.io:9443/device
+          success: https://login.cv.127.0.0.1.nip.io:9443/device/success
         self:
           issuer: https://login.cv.127.0.0.1.nip.io:9443/
       secrets:

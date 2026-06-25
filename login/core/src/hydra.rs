@@ -52,6 +52,14 @@ pub struct ConsentRequest {
     pub requested_access_token_audience: Vec<String>,
 }
 
+/// Body for accepting a device verification request (RFC 8628). Hydra binds the
+/// submitted `user_code` to the encrypted `device_challenge` and, on success,
+/// returns the URL that hands off to the standard login → consent pipeline.
+#[derive(Debug, Clone, Serialize)]
+struct AcceptDeviceUserCode {
+    user_code: String,
+}
+
 /// Body for accepting a consent request.
 #[derive(Debug, Clone, Serialize)]
 pub struct AcceptConsent {
@@ -127,6 +135,33 @@ impl Hydra {
             .put(url)
             .query(&[("login_challenge", challenge)])
             .json(&serde_json::json!({ "subject": subject }))
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(resp.json().await?)
+    }
+
+    /// Accept a device-verification request (RFC 8628 device authorization
+    /// grant). `device_challenge` is the encrypted challenge Hydra issued on the
+    /// 302 from `/oauth2/device/verify`; `user_code` is the code the user typed.
+    ///
+    /// Hydra binds the code to the challenge and returns a `redirect_to` URL
+    /// that enters the **standard** login → consent pipeline (our existing
+    /// `/login` + `/consent` routes). There is no `GET` device-request endpoint
+    /// in Hydra 2.x — accept is the only call.
+    pub async fn accept_device_request(
+        &self,
+        device_challenge: &str,
+        user_code: &str,
+    ) -> anyhow::Result<RedirectResponse> {
+        let url = format!("{}/admin/oauth2/auth/requests/device/accept", self.base);
+        let resp = self
+            .http
+            .put(url)
+            .query(&[("device_challenge", device_challenge)])
+            .json(&AcceptDeviceUserCode {
+                user_code: user_code.to_string(),
+            })
             .send()
             .await?
             .error_for_status()?;

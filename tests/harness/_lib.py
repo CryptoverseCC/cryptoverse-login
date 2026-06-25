@@ -78,13 +78,24 @@ def to_gateway(abs_url):
 
 
 # --- Hydra admin (client lifecycle) ------------------------------------------
-def create_client(metadata=None, scope="openid", redirect_uri="http://localhost:9876/callback"):
+def create_client(metadata=None, scope="openid", redirect_uri="http://localhost:9876/callback",
+                  grant_types=None, token_endpoint_auth_method=None, public=False):
+    """Register an OAuth2 client with Hydra.
+
+    Defaults reproduce the historical authorization-code client. Pass
+    `grant_types` (e.g. the device-code grant) and/or `public=True` (a public
+    client with `token_endpoint_auth_method="none"`, as the device flow needs)
+    to vary it; `token_endpoint_auth_method` overrides either default.
+    """
     cid = "harness-" + uuid.uuid4().hex[:12]
+    grant_types = grant_types or ["authorization_code"]
+    if token_endpoint_auth_method is None:
+        token_endpoint_auth_method = "none" if public else "client_secret_post"
     spec = {
         "client_id": cid, "client_secret": "harness-secret",  # pragma: allowlist secret
-        "grant_types": ["authorization_code"], "response_types": ["code"],
+        "grant_types": grant_types, "response_types": ["code"],
         "redirect_uris": [redirect_uri], "scope": scope,
-        "token_endpoint_auth_method": "client_secret_post",
+        "token_endpoint_auth_method": token_endpoint_auth_method,
     }
     if metadata is not None:
         spec["metadata"] = metadata

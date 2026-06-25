@@ -75,6 +75,9 @@ hydra:
       urls:
         login: https://login.cryptoverse.cc/login
         consent: https://login.cryptoverse.cc/consent
+        device:
+          verification: https://login.cryptoverse.cc/device
+          success: https://login.cryptoverse.cc/device/success
         self:
           issuer: https://login.cryptoverse.cc/
 
