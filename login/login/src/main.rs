@@ -165,9 +165,10 @@ async fn main() {
         .layer(axum::middleware::from_fn(cache_control))
         .service(ServeDir::new(&static_dir));
 
-    // Per-client rate limit on the one route that fires eth_calls. The IdP runs
-    // behind a TLS-terminating ingress, so all sockets share its IP — key on the
-    // forwarded client IP (`SmartIpKeyExtractor` reads `X-Forwarded-For` /
+    // Per-client rate limit on the credential-bearing POSTs (`/login/process`,
+    // which fires eth_calls, and the device-flow accept `POST /device`). The IdP
+    // runs behind a TLS-terminating ingress, so all sockets share its IP — key on
+    // the forwarded client IP (`SmartIpKeyExtractor` reads `X-Forwarded-For` /
     // `Forwarded`) instead of the peer address. Limits are deliberately generous
     // (burst of 30, then ~1 req/sec replenish per client) so normal logins and
     // the harness/e2e suites are never throttled; it only blunts brute-force /
@@ -180,20 +181,23 @@ async fn main() {
             .finish()
             .expect("valid rate-limit config"),
     );
-    let process_router = Router::new()
+    // Rate-limited POSTs: `/login/process` (signature verification + eth_calls)
+    // and the device-flow accept `POST /device` (also signature/credential
+    // bearing). Both share the one generous governor config above. `GET /device`
+    // and `/device/success` (form rendering) stay unthrottled below. Keying is
+    // by forwarded client IP, so the harness/e2e suites aren't throttled.
+    let governed_router = Router::new()
         .route("/login/process", post(routes::login::process))
+        .route("/device", post(routes::device::process))
         .layer(GovernorLayer {
             config: governor_conf,
         });
 
     let app = Router::new()
         .route("/login", get(routes::login::page))
-        .merge(process_router)
+        .merge(governed_router)
         .route("/consent", get(routes::consent::consent))
-        .route(
-            "/device",
-            get(routes::device::page).post(routes::device::process),
-        )
+        .route("/device", get(routes::device::page))
         .route("/device/success", get(routes::device::success))
         .route("/---/metrics", get(metrics))
         .route("/healthz", get(|| async { "ok" }))

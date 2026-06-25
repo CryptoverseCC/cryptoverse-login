@@ -14,6 +14,18 @@ version: test
 imagePullPolicy: Never
 imagePullSecrets: []
 
+# Open-redirect allowlist for the wrapper's /oauth2/final. Must include the demo
+# relying-party callback host (login-demo.cv.127.0.0.1.nip.io) or the demo login
+# flow's final redirect 400s and tests/harness/test_demo_flow.py breaks. Setting
+# it here turns the open-redirect protection ON in the kind env.
+wrapper:
+  allowedRedirectHosts:
+    - login-demo.cv.127.0.0.1.nip.io
+    # The harness (tests/harness/) registers ephemeral OAuth2 clients whose
+    # redirect_uri is http://localhost:9876/callback; allow that host so the
+    # browser-path test (test_demo_flow.py) can fetch /oauth2/final.
+    - localhost
+
 ingressClassName: nginx
 
 # No cert-manager locally: setup.sh seeds the ingress TLS secret with a

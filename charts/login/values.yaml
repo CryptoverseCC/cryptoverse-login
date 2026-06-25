@@ -161,6 +161,17 @@ wrapper:
     port: 80
   image:
     repository: cryptoverse-login/wrapper
+  # Open-redirect allowlist for the wrapper's /oauth2/final endpoint, rendered
+  # into the ALLOWED_REDIRECT_HOSTS env (comma-joined). List the hostnames of
+  # your relying-party (OAuth2 client) redirect/callback URLs here.
+  #
+  # EMPTY (the default) DISABLES the protection: /oauth2/final will accept any
+  # http(s) redirect target, which is an open-redirect risk. Operators SHOULD
+  # set this to their RP hosts, e.g.:
+  #   allowedRedirectHosts:
+  #     - app.example.com
+  #     - dashboard.example.com
+  allowedRedirectHosts: []
 
 # Default values for help.
 # This is a YAML-formatted file.
