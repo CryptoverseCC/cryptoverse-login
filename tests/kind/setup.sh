@@ -158,7 +158,7 @@ curl -fsS -o /dev/null -X POST http://127.0.0.1:4455/admin/clients \
   "scope": "openid email profile offline_access mail",
   "audience": ["ethmail"],
   "redirect_uris": [
-    "https://webmail.cv.127.0.0.1.nip.io:9443/index.php/login/oauth",
+    "https://webmail.cv.127.0.0.1.nip.io:8443/index.php/login/oauth",
     "https://webmail.cv.127.0.0.1.nip.io/index.php/login/oauth"
   ],
   "token_endpoint_auth_method": "client_secret_post"
