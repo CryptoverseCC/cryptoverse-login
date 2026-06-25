@@ -306,10 +306,16 @@ pub async fn verify(
     }
 }
 
-/// Host component of a SIWE message's `uri` (`iri-string` exposes it via the
-/// authority components). Returns `None` if the URI has no authority.
+/// Host (incl. port) of a SIWE message's `uri` (`iri-string` exposes it via the
+/// authority components). Returns `None` if the URI has no authority. The port is
+/// kept because `expected_host` is the forwarded `host:port` the IdP is served on
+/// (e.g. `login.example:9443`), so dropping it would reject every non-default-port
+/// deployment.
 fn uri_host(msg: &Message) -> Option<String> {
-    msg.uri.authority_components().map(|a| a.host().to_string())
+    msg.uri.authority_components().map(|a| match a.port() {
+        Some(port) => format!("{}:{}", a.host(), port),
+        None => a.host().to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -425,6 +431,38 @@ mod tests {
             &offline_eth(),
         )
         .await
+    }
+
+    #[tokio::test]
+    async fn verifies_message_served_on_a_non_default_port() {
+        // Regression: a deployment served on host:port (e.g. the kind cluster on
+        // :9443) carries the port in both the SIWE `domain` and `uri`. verify()
+        // must accept it — `uri_host` previously dropped the port and rejected
+        // every non-default-port login with a spurious "uri mismatch".
+        let host = "login.cv.127.0.0.1.nip.io:9443";
+        let challenge = "port-challenge";
+        let signer = test_signer();
+        let now = OffsetDateTime::now_utc();
+        let message = format!(
+            "{host} wants you to sign in with your Ethereum account:\n\
+             {}\n\n\
+             Sign in to Cryptoverse Login\n\n\
+             URI: https://{host}/\n\
+             Version: 1\n\
+             Chain ID: 1\n\
+             Nonce: {}\n\
+             Issued At: {}\n\
+             Expiration Time: {}",
+            signer.address().to_checksum(None),
+            nonce_for_challenge(challenge),
+            rfc3339(now),
+            rfc3339(now + Duration::minutes(10)),
+        );
+        let sig = signer.sign_message_sync(message.as_bytes()).unwrap();
+        let sig_hex = format!("0x{}", hex::encode(sig.as_bytes()));
+        verify(&message, &sig_hex, host, "https", 1, challenge, &offline_eth())
+            .await
+            .expect("a host:port deployment's message must verify");
     }
 
     #[tokio::test]

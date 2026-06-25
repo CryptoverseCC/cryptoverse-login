@@ -312,17 +312,17 @@ impl Eth {
             } else {
                 SigCheck::Invalid
             }),
+            // The deployless validator signals an INVALID signature by reverting
+            // (bad length / v value, failed ecrecover), which alloy surfaces as a
+            // call error whose cause reads "execution reverted". That is a
+            // definitive "no" → Invalid (terminal 401). Only a genuine
+            // transport/timeout/rate-limit failure is Unavailable (retryable 503).
             Err(e) => {
-                // `rpc_call` only returns Unavailable for transport/timeout/parse
-                // — but the deployless validator signals an *invalid* signature
-                // by reverting, which alloy surfaces as a call error too. We
-                // can't cleanly tell "RPC down" from "validator reverted" here,
-                // so we err on the side of fail-closed-but-observable: treat it
-                // as Unavailable so the auth layer returns a retryable error
-                // rather than silently passing. A genuinely down RPC and a
-                // revert both correctly DENY; the difference is only the
-                // (retryable vs terminal) error surfaced to the user.
-                tracing::warn!("ERC-1271/6492 validation call failed for {signer}: {e}");
+                let EthError::Unavailable { cause, .. } = &e;
+                if is_revert(cause) {
+                    return Ok(SigCheck::Invalid);
+                }
+                tracing::warn!("ERC-1271/6492 validation unavailable for {signer}: {e}");
                 Err(e)
             }
         }
@@ -492,6 +492,13 @@ impl Eth {
     }
 }
 
+/// An `eth_call` *revert* (the deployless validator's definitive "no" for a
+/// malformed/invalid signature) surfaces with a cause that reads "execution
+/// reverted" — distinct from the RPC being unreachable. Tiny testable predicate.
+fn is_revert(cause: &str) -> bool {
+    cause.to_ascii_lowercase().contains("revert")
+}
+
 /// Pick the mainnet JSON-RPC URL from the environment.
 fn mainnet_rpc_url() -> String {
     if let Some(key) = crate::config::var_opt("ALCHEMY_API_KEY") {
@@ -525,6 +532,23 @@ mod tests {
     #[test]
     fn namehash_empty_is_zero() {
         assert_eq!(namehash(""), FixedBytes::<32>::ZERO);
+    }
+
+    /// A validator revert classifies as a definitive INVALID signature; a
+    /// transport/timeout/rate-limit cause stays Unavailable (retryable).
+    #[test]
+    fn revert_is_invalid_transport_is_unavailable() {
+        assert!(is_revert(
+            "server returned an error response: error code 3: execution reverted"
+        ));
+        assert!(is_revert(
+            "execution reverted: SignatureValidator#recoverSigner: invalid signature length"
+        ));
+        assert!(!is_revert(
+            "error sending request for url (http://rpc): connection refused"
+        ));
+        assert!(!is_revert("ERC-1271/6492 validation timed out after 3s"));
+        assert!(!is_revert("server returned an error response: error code -32005"));
     }
 
     /// The per-token `decimals` cache returns the seeded value with no RPC.

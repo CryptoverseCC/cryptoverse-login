@@ -11,7 +11,10 @@ def test_full_siwe_login(http, basic_client):
     assert "access_token" in tokens and "id_token" in tokens
     assert claims["sub"] == sub
     assert claims["email"] == f"{sub}@{_lib.MAILSERVER_DOMAIN}"
-    assert claims["email_verified"] is True
+    # email_verified is False by default: the {address}@domain mailbox is
+    # synthesized and never delivery-verified (operators opt in via
+    # EMAIL_VERIFIED_CLAIM only when a real mailserver backs the domain).
+    assert claims["email_verified"] is False
     assert claims["name"] == sub
     assert claims["preferred_username"] == sub
     assert claims["names"]["default"] == sub
