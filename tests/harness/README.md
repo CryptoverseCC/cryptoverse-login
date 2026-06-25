@@ -21,6 +21,16 @@ covered separately by the [`../e2e/`](../e2e/README.md) suite (Playwright + dapp
 | `test_siwe_errors.py` | bad signature, wrong/replayed nonce, and expired messages are rejected |
 | `test_token_gating.py` | `metadata.restrictions` allow/deny by on-chain balance |
 | `test_introspection.py` | `/oauth2/introspect` requires basic auth and reports tokens active |
+| `test_blocklist.py` | a globally blocklisted address is denied at `/login/process`, and login works again once un-blocked |
+
+`test_blocklist.py` is the one **cluster-mutating** test: the blocklist is a file
+mounted from the login ConfigMap (read per request), so to exercise the real deny
+path it patches `blocklist.json` + restarts the login Deployment, then restores it
+(via `kubectl`). It **self-skips** when `kubectl`/the login Deployment isn't
+reachable (the podman stack, or no cluster), and **must run serially** (pytest's
+default) since the test key's address is blocked for the duration. Override the
+targets with `HARNESS_KUBECTL` / `HARNESS_K8S_CONTEXT` / `HARNESS_K8S_NAMESPACE` /
+`HARNESS_LOGIN_CONFIGMAP` / `HARNESS_LOGIN_DEPLOY`.
 
 ## Prerequisites
 
