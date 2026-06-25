@@ -35,10 +35,12 @@ struct AppState {
 }
 
 /// Validate that `url` is an absolute `http`/`https` URL with a host, so it is
-/// safe to hand to the templates as a redirect / iframe `src`. Both call sites
-/// render it into a JS string literal via `tojson` (which prevents breakout),
-/// and this rejects non-http(s) schemes (`javascript:`, `data:`, …) and
-/// scheme-relative / relative values that could redirect somewhere unexpected.
+/// safe to hand to the `embed` template as an iframe `src`. It is rendered into a
+/// JS string literal via `tojson` (which prevents breakout), and this rejects
+/// non-http(s) schemes (`javascript:`, `data:`, …) and scheme-relative / relative
+/// values that could redirect somewhere unexpected. (The `/oauth2/final` target
+/// goes through `final_redirect_target`, which additionally enforces the host
+/// allowlist and renders the normalized URL.)
 ///
 /// The `url=` value may arrive percent-encoded, so we validate the decoded form.
 fn is_safe_redirect(url: &str) -> bool {
@@ -59,27 +61,44 @@ fn parse_allowed_redirect_hosts(raw: &str) -> Vec<String> {
 }
 
 /// Decide whether `url`'s host is permitted by the redirect allowlist. An EMPTY
-/// allowlist permits any (already-`is_safe_redirect`-validated) http(s) host —
-/// preserving the pre-allowlist behaviour. A non-empty allowlist requires the
-/// target's host (lowercased, port-agnostic) to be a member. A target we can't
-/// parse / that has no host is rejected when the allowlist is non-empty.
-///
-/// `url` is expected to be the percent-decoded, already-`is_safe_redirect`
-/// target; callers decode before this check.
-fn redirect_host_allowed(url: &str, allowlist: &[String]) -> bool {
+/// allowlist permits any host (preserving the pre-allowlist, opt-in behaviour); a
+/// non-empty allowlist requires the host (lowercased, port-agnostic) to be a
+/// member. A url with no host is rejected when the allowlist is non-empty.
+fn host_allowed(url: &url::Url, allowlist: &[String]) -> bool {
     if allowlist.is_empty() {
         return true;
     }
-    match url::Url::parse(url) {
-        Ok(u) => match u.host_str() {
-            Some(host) => {
-                let host = host.to_ascii_lowercase();
-                allowlist.contains(&host)
-            }
-            None => false,
-        },
-        Err(_) => false,
+    match url.host_str() {
+        Some(host) => allowlist.contains(&host.to_ascii_lowercase()),
+        None => false,
     }
+}
+
+/// Validate the `/oauth2/final` redirect target and return the EXACT normalized
+/// URL string to render. The query is `url=<target>`; the target carries its own
+/// `&`-separated params, so we strip only the literal `url=` prefix (never parse
+/// it as form data). The target may arrive percent-encoded, so decode once, parse
+/// it, enforce http(s) + host + allowlist on the PARSED url, and return that same
+/// url's normalized string.
+///
+/// Returning the parsed/normalized form (not the raw query slice) is a security
+/// requirement, not cosmetics: otherwise the allowlist check and the browser can
+/// disagree on the host. E.g. `https://allowed%2f@evil.com/cb` percent-decodes to
+/// the `/`-terminated authority `allowed` for our check, but a browser handed the
+/// RAW string parses the host as `evil.com`. Checking and rendering the one
+/// parsed `Url` (whose `%2f` is a real `/` that ends the authority at `allowed`)
+/// closes that parse-here / use-there open redirect.
+fn final_redirect_target(raw_query: &str, allowlist: &[String]) -> Result<String, &'static str> {
+    let target = raw_query.strip_prefix("url=").unwrap_or(raw_query);
+    let decoded = percent_decode(target);
+    let parsed = match url::Url::parse(&decoded) {
+        Ok(u) if matches!(u.scheme(), "http" | "https") && u.has_host() => u,
+        _ => return Err("invalid redirect"),
+    };
+    if !host_allowed(&parsed, allowlist) {
+        return Err("redirect host not allowed");
+    }
+    Ok(parsed.to_string())
 }
 
 /// Minimal percent-decoder (enough to validate a redirect target). Invalid
@@ -215,29 +234,19 @@ async fn embed(
 }
 
 /// Final redirect page. The gateway rewrote Hydra's consent `Location` into
-/// `/oauth2/final?url=<the original redirect>`. We strip the leading `url=` from
-/// the raw query (the target URL carries its own `&`-separated params, so we
-/// must not parse it as form data) and hand it to `final.js`.
+/// `/oauth2/final?url=<the original redirect>`. We validate + normalize the
+/// target (`final_redirect_target`) and hand the SAME normalized URL to
+/// `final.js`, so the host we allowlist-checked is exactly the host the browser
+/// navigates to (`window.location.assign`).
 async fn final_page(State(st): State<Arc<AppState>>, RawQuery(query): RawQuery) -> Response {
     let raw = query.unwrap_or_default();
-    let url = raw.strip_prefix("url=").unwrap_or(&raw).to_string();
-
-    // `url` is the redirect target the gateway placed in the query. Reject
-    // anything that isn't an absolute http(s) URL (open-redirect / `javascript:`
-    // protection) before handing it to `final.js` as a `window.location`.
-    if !is_safe_redirect(&url) {
-        tracing::warn!("final: refusing unsafe redirect target `{url}`");
-        return (StatusCode::BAD_REQUEST, "invalid redirect").into_response();
-    }
-
-    // Open-redirect allowlist: when configured (ALLOWED_REDIRECT_HOSTS), the
-    // target host must be a member. The `url=` value may arrive percent-encoded,
-    // so check the decoded form (same as `is_safe_redirect`). An empty allowlist
-    // is non-breaking (any http(s) host allowed).
-    if !redirect_host_allowed(&percent_decode(&url), &st.allowed_redirect_hosts) {
-        tracing::warn!("final: redirect host not allowed for target `{url}`");
-        return (StatusCode::BAD_REQUEST, "redirect host not allowed").into_response();
-    }
+    let url = match final_redirect_target(&raw, &st.allowed_redirect_hosts) {
+        Ok(u) => u,
+        Err(reason) => {
+            tracing::warn!("final: {reason} for query `{raw}`");
+            return (StatusCode::BAD_REQUEST, reason).into_response();
+        }
+    };
 
     let tmpl = st.env.get_template("final.html").expect("final template");
     let body = tmpl
@@ -313,44 +322,64 @@ mod tests {
     }
 
     #[test]
-    fn redirect_allowlist_permits_listed_host_rejects_others() {
-        let allowlist = parse_allowed_redirect_hosts("login-demo.cv.127.0.0.1.nip.io");
-        // The legit demo RP callback (host-only match, port-agnostic).
-        assert!(redirect_host_allowed(
-            "https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/?code=abc&state=xyz",
-            &allowlist
-        ));
+    fn final_target_permits_listed_host_rejects_others() {
+        let allow = parse_allowed_redirect_hosts("login-demo.cv.127.0.0.1.nip.io");
+        // The legit demo RP callback (host match, port-agnostic) — normalized url
+        // keeps the host + port + path + query.
+        let t = final_redirect_target(
+            "url=https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/?code=abc&state=xyz",
+            &allow,
+        )
+        .expect("listed host allowed");
+        assert!(t.starts_with("https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback"));
         // Case-insensitive host match.
-        assert!(redirect_host_allowed(
-            "https://LOGIN-DEMO.cv.127.0.0.1.NIP.IO/cb",
-            &allowlist
-        ));
+        assert!(
+            final_redirect_target("url=https://LOGIN-DEMO.cv.127.0.0.1.NIP.IO/cb", &allow).is_ok()
+        );
         // An attacker-controlled host is refused.
-        assert!(!redirect_host_allowed(
-            "https://attacker.com/steal?code=abc",
-            &allowlist
-        ));
-        // A subdomain of the attacker that merely contains the allowed host as a
-        // substring must NOT pass (exact host match, not substring).
-        assert!(!redirect_host_allowed(
-            "https://login-demo.cv.127.0.0.1.nip.io.attacker.com/cb",
-            &allowlist
-        ));
+        assert!(final_redirect_target("url=https://attacker.com/steal?code=abc", &allow).is_err());
+        // A host that merely contains the allowed host as a substring is refused
+        // (exact host match, not substring).
+        assert!(final_redirect_target(
+            "url=https://login-demo.cv.127.0.0.1.nip.io.attacker.com/cb",
+            &allow
+        )
+        .is_err());
     }
 
     #[test]
-    fn empty_redirect_allowlist_permits_any_http_host() {
-        let allowlist: Vec<String> = parse_allowed_redirect_hosts("");
-        assert!(allowlist.is_empty());
-        assert!(redirect_host_allowed("https://attacker.com/cb", &allowlist));
-        assert!(redirect_host_allowed(
-            "http://localhost:8080/cb",
-            &allowlist
-        ));
-        assert!(redirect_host_allowed(
-            "https://login-demo.cv.127.0.0.1.nip.io:9443/cb",
-            &allowlist
-        ));
+    fn final_target_closes_encoded_authority_open_redirect() {
+        // The parse-here / use-there bypass: `%2f@evil.com` percent-decodes so a
+        // naive host check sees the allowed host, but a browser handed the RAW
+        // string parses the host as evil.com. Because we render the PARSED url, the
+        // rendered target's host is the allowed host (the decoded `/` ends the
+        // authority), never evil.com.
+        let allow = parse_allowed_redirect_hosts("login-demo.cv.127.0.0.1.nip.io");
+        let t = final_redirect_target(
+            "url=https://login-demo.cv.127.0.0.1.nip.io%2f@evil.com/cb",
+            &allow,
+        )
+        .expect("encoded-slash form normalizes to the allowed host");
+        let host = url::Url::parse(&t).unwrap().host_str().unwrap().to_string();
+        assert_eq!(
+            host, "login-demo.cv.127.0.0.1.nip.io",
+            "rendered redirect host must be the allowed host, not evil.com"
+        );
+        // The plain userinfo form (real host = evil.com) is rejected outright.
+        assert!(final_redirect_target(
+            "url=https://login-demo.cv.127.0.0.1.nip.io@evil.com/cb",
+            &allow
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn final_target_empty_allowlist_permits_any_http_host() {
+        let allow = parse_allowed_redirect_hosts("");
+        assert!(final_redirect_target("url=https://attacker.com/cb", &allow).is_ok());
+        assert!(final_redirect_target("url=http://localhost:8080/cb", &allow).is_ok());
+        // Non-http(s) is still rejected even with an empty allowlist.
+        assert!(final_redirect_target("url=javascript:alert(1)", &allow).is_err());
     }
 
     #[test]
