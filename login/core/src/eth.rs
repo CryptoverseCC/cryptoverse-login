@@ -860,6 +860,40 @@ mod tests {
         );
     }
 
+    /// The Coinbase Smart Wallet **replay-safe EIP-712 digest** of `hash`: the
+    /// value the CBSW's `_isValidSignature` actually `ecrecover`s against. This
+    /// mirrors `ERC1271._eip712Hash` in coinbase/smart-wallet:
+    ///
+    /// `keccak256(0x1901 ‖ domainSeparator ‖ keccak256(MESSAGE_TYPEHASH ‖ hash))`
+    ///
+    /// with domain `EIP712Domain(name="Coinbase Smart Wallet", version="1",
+    /// chainId, verifyingContract=account)` and
+    /// `MESSAGE_TYPEHASH = keccak256("CoinbaseSmartWalletMessage(bytes32 hash)")`.
+    /// Used only by the live ERC-6492 test to build a genuine owner signature.
+    fn cbsw_replay_safe_hash(account: Address, chain_id: u64, hash: B256) -> B256 {
+        let eip712_domain_typehash = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+        );
+        let domain_separator = keccak256(
+            (
+                eip712_domain_typehash,
+                keccak256("Coinbase Smart Wallet"),
+                keccak256("1"),
+                U256::from(chain_id),
+                account,
+            )
+                .abi_encode(),
+        );
+        let message_typehash = keccak256("CoinbaseSmartWalletMessage(bytes32 hash)");
+        let hash_struct = keccak256((message_typehash, hash).abi_encode());
+
+        let mut buf = Vec::with_capacity(2 + 32 + 32);
+        buf.extend_from_slice(&[0x19, 0x01]);
+        buf.extend_from_slice(domain_separator.as_slice());
+        buf.extend_from_slice(hash_struct.as_slice());
+        keccak256(buf)
+    }
+
     /// An `Eth` whose primary RPC points at a closed local port, so a call that
     /// actually hits the network fails fast with connection-refused (no real
     /// network, no long wait) — used to assert the fail-closed paths.
@@ -936,42 +970,169 @@ mod tests {
     ///   cargo test -p cryptoverse-core -- --ignored live_contract_signature
     /// ```
     ///
-    /// READY-TO-RUN SCAFFOLD — fill `SIGNER` / `HASH` / `SIGNATURE` with a real
-    /// committed vector to make the positive assertion live. To produce one:
-    /// deploy (or pick an already-deployed) Gnosis Safe / Coinbase Smart Wallet,
-    /// have it sign a 32-byte hash (ERC-1271) — or capture a counterfactual
-    /// ERC-6492-wrapped signature from a fresh smart wallet — and paste the
-    /// `signer`, `hash`, and `signature` bytes below. Until then the positive
-    /// branch is left commented so we never fake a passing assertion; the
-    /// negative branch below already runs live and proves the call path returns a
-    /// clean result (not an error) against a real RPC.
+    /// This is the **negative** live check: a random signer + zero hash + zero
+    /// sig is definitively NOT valid, and the deployless call must return a clean
+    /// `Invalid` (or, if the RPC is flaky, `Unavailable`) — never panic. The
+    /// **positive** happy path (a genuine smart-account signature →
+    /// `SigCheck::Valid`) is covered by [`live_erc6492_coinbase_smart_wallet`].
     #[tokio::test]
     #[ignore = "requires a live RPC (set ETH_RPC_URL); see doc comment"]
     async fn live_contract_signature() {
         let eth = Eth::from_env().expect("build provider from env");
 
-        // --- Negative (runs live today): a random signer + zero hash + zero sig
-        //     is definitively NOT valid, and the deployless call must return a
-        //     clean Invalid (or, if the RPC is flaky, Unavailable) — never panic.
         let signer = address!("0000000000000000000000000000000000000001");
         match eth.verify_signature(signer, B256::ZERO, &[0u8; 65]).await {
             Ok(SigCheck::Invalid) => { /* expected */ }
             Ok(SigCheck::Valid) => panic!("a zero signature must not validate as Valid"),
             Err(e) => eprintln!("RPC unavailable during live negative check: {e}"),
         }
+    }
 
-        // --- Positive (commit a real vector to enable): uncomment and fill in.
-        //
-        // let signer = address!("<deployed Safe / smart-wallet address>");
-        // let hash = B256::from(hex!(
-        //     "<32-byte hash the wallet signed over>"
-        // ));
-        // let signature = hex!("<ERC-1271 or ERC-6492-wrapped signature bytes>");
-        // let got = eth
-        //     .verify_signature(signer, hash, &signature)
-        //     .await
-        //     .expect("RPC must be reachable for the live positive check");
-        // assert_eq!(got, SigCheck::Valid, "real contract signature must be Valid");
+    /// **The headline differentiator, proven live**: a *genuine* counterfactual
+    /// ERC-6492 signature from a (not-yet-deployed) **Coinbase Smart Wallet**
+    /// validates as [`SigCheck::Valid`] — exactly the case an `ecrecover`-only
+    /// backend rejects.
+    ///
+    /// Ignored by default (needs a real mainnet RPC). Run:
+    ///
+    /// ```bash
+    /// cd login && set -a; . ../.env; set +a
+    /// ETH_RPC_URL="$ALCHEMY_URL" \
+    ///   cargo test -p cryptoverse-core --ignored \
+    ///   live_erc6492_coinbase_smart_wallet -- --nocapture
+    /// ```
+    ///
+    /// We construct the signature from scratch for the well-known Hardhat test
+    /// key `0x59c6…690d` (EOA `0x7099…79C8`) — the *owner* of a CBSW that is not
+    /// yet deployed — and feed it through the real [`Eth::verify_signature`]. The
+    /// deployless [`UNIVERSAL_VALIDATOR_BYTECODE`] does the CREATE2 factory deploy
+    /// in the (discarded) call state, then ERC-1271-validates. Construction:
+    ///
+    /// 1. `owners = [bytes32(owner)]`, `nonce = 0`.
+    /// 2. The counterfactual account address (= the ERC-1271 `verifyingContract`
+    ///    *and* the `signer` we pass to `verify_signature`) is read live from the
+    ///    canonical mainnet factory's `getAddress(owners, nonce)` view —
+    ///    [`CBSW_FACTORY`] `0x0BA5…428a`.
+    /// 3. The owner ECDSA-signs the CBSW **replay-safe EIP-712 digest** of the
+    ///    app hash (`keccak256(0x1901 ‖ domainSeparator ‖ keccak256(
+    ///    MESSAGE_TYPEHASH ‖ hash))`, domain `"Coinbase Smart Wallet" / "1"`,
+    ///    chainId 1, verifyingContract = the account) — see [`cbsw_replay_safe_hash`].
+    ///    `SignatureCheckerLib` does a raw `ecrecover` over that digest (no EIP-191
+    ///    prefix), so we sign the digest directly.
+    /// 4. inner ERC-1271 sig = `abi.encode(SignatureWrapper{ownerIndex:0,
+    ///    signatureData: ecdsaSig})`.
+    /// 5. `factoryCalldata = createAccount(owners, nonce)` (selector `0x3ffba36f`).
+    /// 6. 6492 wrapper = `abi.encode(factory, factoryCalldata, innerSig) ‖
+    ///    0x6492…6492`.
+    ///
+    /// Asserts `verify_signature(account, app_hash, wrapper) == Valid`.
+    #[tokio::test]
+    #[ignore = "requires a live RPC (set ETH_RPC_URL); see doc comment"]
+    async fn live_erc6492_coinbase_smart_wallet() {
+        use alloy::providers::DynProvider;
+        use alloy::signers::local::PrivateKeySigner;
+        use alloy::signers::SignerSync;
+        use alloy::sol_types::SolCall;
+
+        sol! {
+            #[sol(rpc)]
+            interface ICBSWFactory {
+                function getAddress(bytes[] owners, uint256 nonce) external view returns (address);
+                function createAccount(bytes[] owners, uint256 nonce) external payable returns (address);
+            }
+        }
+
+        // Hardhat account #1 — a well-known throwaway key (EOA 0x7099…79C8).
+        // pragma: allowlist secret
+        const TEST_KEY: &str = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+        // Canonical Coinbase Smart Wallet factory (mainnet, also same across chains).
+        const CBSW_FACTORY: Address = address!("0BA5ED0c6AA8c49038F819E587E2633c4A9F428a");
+
+        let eth = Eth::from_env().expect("build provider from env");
+
+        // A second provider handle (typed `DynProvider`) for the factory view +
+        // code check — `Eth` deliberately exposes only `verify_signature`, so the
+        // test does its own read-only setup calls.
+        let url = mainnet_rpc_url();
+        let provider: DynProvider = match url.parse() {
+            Ok(u) => RootProvider::new(ClientBuilder::default().http(u)).erased(),
+            Err(e) => {
+                eprintln!("skipping: bad RPC url {url}: {e}");
+                return;
+            }
+        };
+
+        let signer: PrivateKeySigner = TEST_KEY.parse().expect("valid test key");
+        let owner = signer.address();
+
+        // owners = [bytes32(owner)] (the 20-byte address left-padded to 32 bytes).
+        let owners: Vec<Bytes> = vec![Bytes::from(owner.into_word().0.to_vec())];
+        let nonce = U256::ZERO;
+
+        // (2) counterfactual account address from the live factory view.
+        let factory = ICBSWFactory::new(CBSW_FACTORY, provider.clone());
+        let account = match factory.getAddress(owners.clone(), nonce).call().await {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("skipping: factory.getAddress unavailable (RPC flaky?): {e}");
+                return;
+            }
+        };
+
+        // Sanity: the account must be counterfactual (no code) so we're really
+        // exercising the ERC-6492 CREATE2-then-1271 path, not a plain deployed
+        // ERC-1271. (If someone deployed it, the 1271 branch still proves Valid.)
+        if let Ok(code) = provider.get_code_at(account).await {
+            eprintln!(
+                "CBSW account {account} code len = {} (0 ⇒ counterfactual ERC-6492 path)",
+                code.len()
+            );
+        }
+
+        // (3) the app hash + its CBSW replay-safe EIP-712 digest.
+        let app_hash = keccak256("cryptoverse smart-account login test");
+        let digest = cbsw_replay_safe_hash(account, 1, app_hash);
+
+        // (3b) owner ECDSA-signs the RAW digest (SignatureCheckerLib does a bare
+        // ecrecover, NOT an EIP-191 personal_sign).
+        let ecdsa = signer
+            .sign_hash_sync(&digest)
+            .expect("sign digest")
+            .as_bytes();
+
+        // (4) inner ERC-1271 sig = abi.encode(SignatureWrapper{ownerIndex, sig}).
+        let inner = (U256::ZERO, Bytes::from(ecdsa.to_vec())).abi_encode_params();
+
+        // (5) factoryCalldata = createAccount(owners, nonce).
+        let factory_calldata = ICBSWFactory::createAccountCall {
+            owners: owners.clone(),
+            nonce,
+        }
+        .abi_encode();
+
+        // (6) ERC-6492 wrapper = abi.encode(factory, calldata, inner) ++ magic.
+        let mut wrapper = (
+            CBSW_FACTORY,
+            Bytes::from(factory_calldata),
+            Bytes::from(inner),
+        )
+            .abi_encode_params();
+        wrapper.extend_from_slice(&ERC6492_MAGIC_SUFFIX);
+        assert!(
+            is_erc6492_wrapped(&wrapper),
+            "constructed signature must carry the 6492 magic suffix"
+        );
+
+        // The whole point: this is exactly the signature a pure-ecrecover backend
+        // would reject (the EOA `owner` is NOT the `account` we pass as signer).
+        // The universal validator deploys the CBSW, then ERC-1271-validates → Valid.
+        match eth.verify_signature(account, app_hash, &wrapper).await {
+            Ok(SigCheck::Valid) => { /* the differentiator, proven */ }
+            Ok(SigCheck::Invalid) => {
+                panic!("genuine ERC-6492 Coinbase Smart Wallet signature must be Valid")
+            }
+            Err(e) => eprintln!("RPC unavailable during live ERC-6492 check: {e}"),
+        }
     }
 
     /// Live forward-verified ENS resolution against a real mainnet RPC.
