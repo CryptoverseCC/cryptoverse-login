@@ -26,7 +26,9 @@ metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.16", default-features = false }
 
 # Templating
-minijinja = { version = "2", features = ["loader"] }
+# `json` provides the `tojson` filter the wrapper templates use to emit safe JS
+# string literals (without it, embed/final rendering fails at runtime → 502).
+minijinja = { version = "2", features = ["loader", "json"] }
 
 # Ethereum / SIWE
 siwe = "0.6"

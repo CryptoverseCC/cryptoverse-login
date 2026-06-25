@@ -84,16 +84,24 @@ fn public_origin(headers: &HeaderMap) -> (String, String) {
     (host, scheme)
 }
 
-#[tokio::main]
-async fn main() {
-    let _sentry = cryptoverse_core::telemetry::init_sentry();
-    cryptoverse_core::telemetry::init_tracing();
-
+/// Build the minijinja environment with the embedded templates. Shared by `main`
+/// and the render regression test, so the test exercises the real templates
+/// (incl. the `tojson` filter, which needs minijinja's `json` feature).
+fn build_env() -> Environment<'static> {
     let mut env = Environment::new();
     env.add_template("embed.html", include_str!("../templates/embed.html"))
         .expect("embed.html");
     env.add_template("final.html", include_str!("../templates/final.html"))
         .expect("final.html");
+    env
+}
+
+#[tokio::main]
+async fn main() {
+    let _sentry = cryptoverse_core::telemetry::init_sentry();
+    cryptoverse_core::telemetry::init_tracing();
+
+    let env = build_env();
 
     let state = Arc::new(AppState {
         env,
@@ -181,6 +189,27 @@ async fn final_page(State(st): State<Arc<AppState>>, RawQuery(query): RawQuery) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renders_embed_and_final_without_filter_errors() {
+        // Regression: embed.html/final.html use the `tojson` filter, which needs
+        // minijinja's `json` feature. Without it, render() errors at runtime and
+        // the handler 502s the browser OAuth flow (cargo build still succeeds, so
+        // only a real render catches it). Render both templates for real.
+        let env = build_env();
+        let url = "https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/?code=abc&state=xyz";
+        for name in ["embed.html", "final.html"] {
+            let out = env
+                .get_template(name)
+                .unwrap()
+                .render(context! { url => url, version => "test", sentry_dsn => "", sentry_env => "test" })
+                .unwrap_or_else(|e| panic!("render {name} failed: {e}"));
+            assert!(
+                out.contains("login-demo.cv.127.0.0.1.nip.io"),
+                "{name} should embed the redirect url"
+            );
+        }
+    }
 
     #[test]
     fn accepts_absolute_https_redirect() {
