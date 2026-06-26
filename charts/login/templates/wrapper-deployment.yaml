@@ -34,12 +34,12 @@ spec:
               value: {{ .Values.sentryDSN }}
             - name: SENTRY_ENV
               value: {{ .Values.sentryEnv }}
-            # Open-redirect allowlist for /oauth2/final's `url=` target. Rendered
-            # as a comma-separated list of relying-party hostnames. EMPTY ⇒
-            # protection disabled (any http(s) host allowed) — set
-            # wrapper.allowedRedirectHosts to your RP hosts to enable it.
-            - name: ALLOWED_REDIRECT_HOSTS
-              value: {{ join "," .Values.wrapper.allowedRedirectHosts | quote }}
+            # Hydra admin URL: the wrapper validates the /oauth2/final `url=`
+            # target against the relying parties' registered redirect_uris fetched
+            # from Hydra (no static allowlist). Reuses the same admin service the
+            # login backend uses.
+            - name: HYDRA_ADMIN_URL
+              value: {{ .Values.login.hydraAdminUrl }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.registry }}/{{ .Values.wrapper.image.repository }}:{{ .Values.version }}"

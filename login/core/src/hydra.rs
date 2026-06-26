@@ -196,4 +196,56 @@ impl Hydra {
             .error_for_status()?;
         Ok(resp.json().await?)
     }
+
+    /// Fetch every registered OAuth2 client's `redirect_uris` from the admin API
+    /// (`GET /admin/clients`, following Hydra's `Link: …; rel="next"` pagination).
+    ///
+    /// Used to validate a redirect target against the redirect URIs the relying
+    /// parties actually registered — the permitted set is exactly what Hydra
+    /// holds, so there is no static, operator-maintained allowlist to drift.
+    pub async fn list_redirect_uris(&self) -> anyhow::Result<Vec<String>> {
+        #[derive(Deserialize)]
+        struct Client {
+            #[serde(default)]
+            redirect_uris: Vec<String>,
+        }
+
+        let mut out = Vec::new();
+        let mut url = format!("{}/admin/clients?page_size=500", self.base);
+        // Bound the page walk defensively (500 * 100 = 50k clients) so a broken
+        // `Link` header can never loop forever.
+        for _ in 0..100 {
+            let resp = self.http.get(&url).send().await?.error_for_status()?;
+            let next = next_page_url(&self.base, resp.headers());
+            let clients: Vec<Client> = resp.json().await?;
+            for c in clients {
+                out.extend(c.redirect_uris);
+            }
+            match next {
+                Some(n) => url = n,
+                None => break,
+            }
+        }
+        Ok(out)
+    }
+}
+
+/// Extract the absolute URL of the `rel="next"` link from a Hydra pagination
+/// `Link` header, if present. Hydra returns a path-relative target
+/// (`</admin/clients?page_token=…>; rel="next"`), so it's joined onto `base`.
+fn next_page_url(base: &str, headers: &reqwest::header::HeaderMap) -> Option<String> {
+    let link = headers.get(reqwest::header::LINK)?.to_str().ok()?;
+    for part in link.split(',') {
+        if part.contains("rel=\"next\"") {
+            let start = part.find('<')? + 1;
+            let end = part.find('>')?;
+            let target = &part[start..end];
+            return Some(if target.starts_with("http") {
+                target.to_string()
+            } else {
+                format!("{base}{target}")
+            });
+        }
+    }
+    None
 }

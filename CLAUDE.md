@@ -85,7 +85,7 @@ cargo build --workspace        # build core + login + wrapper
 cargo test --workspace         # unit tests (SIWE round-trip, evalexpr, namehash, ...)
 cargo clippy --workspace --all-targets
 cargo fmt
-cargo run -p wrapper           # needs env (PORT, SENTRY_*); domain is request-derived
+cargo run -p wrapper           # needs env (PORT, HYDRA_ADMIN_URL, SENTRY_*); domain is request-derived
 cargo run -p login             # needs env (HYDRA_ADMIN_URL, MAILSERVER_DOMAIN, INDEX_TEMPLATE, STATIC_DIR, ...)
 ```
 The `login` binary serves the SPA from `STATIC_DIR` and renders `INDEX_TEMPLATE` (the frontend-built `index.html`); without a frontend build those paths are absent and `GET /login` 500s — fine for unit tests.

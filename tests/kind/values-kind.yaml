@@ -14,21 +14,10 @@ version: test
 imagePullPolicy: Never
 imagePullSecrets: []
 
-# Open-redirect allowlist for the wrapper's /oauth2/final. Must include the demo
-# relying-party callback host (login-demo.cv.127.0.0.1.nip.io) or the demo login
-# flow's final redirect 400s and tests/harness/test_demo_flow.py breaks. Setting
-# it here turns the open-redirect protection ON in the kind env.
-wrapper:
-  allowedRedirectHosts:
-    - login-demo.cv.127.0.0.1.nip.io
-    # The harness (tests/harness/) registers ephemeral OAuth2 clients whose
-    # redirect_uri is http://localhost:9876/callback; allow that host so the
-    # browser-path test (test_demo_flow.py) can fetch /oauth2/final.
-    - localhost
-    # ETHMail webclient (RoundCube) — setup.sh registers the `ethmail-webclient`
-    # OAuth2 client; its redirect is on this host, so the final-page redirect
-    # must be allowed for ETHMail login to complete locally.
-    - webmail.cv.127.0.0.1.nip.io
+# The wrapper's /oauth2/final validates its redirect target against the OAuth2
+# clients' redirect_uris registered in Hydra (no static allowlist), so nothing to
+# configure here: the demo client, the harness's ephemeral clients, and the
+# ethmail-webclient all validate automatically once registered.
 
 ingressClassName: nginx
 

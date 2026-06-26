@@ -12,6 +12,7 @@
 //! Jinja templates are reused unchanged via minijinja.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use axum::{
     extract::{RawQuery, State},
@@ -20,6 +21,7 @@ use axum::{
     routing::get,
     Router,
 };
+use cryptoverse_core::hydra::Hydra;
 use minijinja::{context, Environment};
 
 struct AppState {
@@ -27,11 +29,56 @@ struct AppState {
     version: String,
     sentry_dsn: String,
     sentry_env: String,
-    /// Open-redirect allowlist for `/oauth2/final`'s `url=` target, parsed from
-    /// `ALLOWED_REDIRECT_HOSTS` (comma-separated hostnames). Empty ⇒ protection
-    /// disabled (any http(s) host allowed), preserving the pre-allowlist
-    /// behaviour so it's opt-in / non-breaking.
-    allowed_redirect_hosts: Vec<String>,
+    /// Hydra admin client, used to fetch the set of registered relying-party
+    /// `redirect_uris` that `/oauth2/final` validates its target against.
+    hydra: Hydra,
+    /// Cached snapshot of the registered redirect targets (refreshed from Hydra),
+    /// so the common case doesn't hit the admin API on every redirect.
+    redirect_cache: tokio::sync::Mutex<Option<RedirectCache>>,
+}
+
+/// How long a fetched set of registered redirect URIs is trusted before a
+/// refresh. Redirect URIs only change when a client is (de)registered.
+const REDIRECT_CACHE_TTL: Duration = Duration::from_secs(60);
+
+/// Minimum gap between forced refreshes triggered by a cache MISS, so an attacker
+/// hammering `/oauth2/final` with unregistered targets can't turn each request
+/// into a Hydra admin call. A genuinely just-registered client is still picked up
+/// within this window.
+const MISS_REFRESH_COOLDOWN: Duration = Duration::from_secs(2);
+
+struct RedirectCache {
+    targets: Vec<RedirectTarget>,
+    fetched_at: Instant,
+    last_attempt: Instant,
+}
+
+/// Comparison key for a redirect URI: scheme + host + port + path, ignoring query
+/// and fragment. Hydra appends the OAuth2 response params (`code`, `state`, …) to
+/// the client's registered URI, so origin+path is the stable part to match — and
+/// matching parsed components (not a raw string) is what closes the
+/// percent-encoded-authority open redirect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RedirectTarget {
+    scheme: String,
+    host: String,
+    port: Option<u16>,
+    path: String,
+}
+
+impl RedirectTarget {
+    fn parse(raw: &str) -> Option<Self> {
+        let u = url::Url::parse(raw).ok()?;
+        if !matches!(u.scheme(), "http" | "https") {
+            return None;
+        }
+        Some(Self {
+            scheme: u.scheme().to_ascii_lowercase(),
+            host: u.host_str()?.to_ascii_lowercase(),
+            port: u.port_or_known_default(),
+            path: u.path().to_string(),
+        })
+    }
 }
 
 /// Validate that `url` is an absolute `http`/`https` URL with a host, so it is
@@ -39,8 +86,9 @@ struct AppState {
 /// JS string literal via `tojson` (which prevents breakout), and this rejects
 /// non-http(s) schemes (`javascript:`, `data:`, …) and scheme-relative / relative
 /// values that could redirect somewhere unexpected. (The `/oauth2/final` target
-/// goes through `final_redirect_target`, which additionally enforces the host
-/// allowlist and renders the normalized URL.)
+/// instead goes through `parse_final_redirect` + `is_registered_redirect`, which
+/// require it to match a registered client redirect URI and render the normalized
+/// URL.)
 ///
 /// The `url=` value may arrive percent-encoded, so we validate the decoded form.
 fn is_safe_redirect(url: &str) -> bool {
@@ -51,54 +99,27 @@ fn is_safe_redirect(url: &str) -> bool {
     }
 }
 
-/// Parse the `ALLOWED_REDIRECT_HOSTS` env value into a hostname allowlist:
-/// comma-separated, trimmed, lowercased, with empty entries dropped.
-fn parse_allowed_redirect_hosts(raw: &str) -> Vec<String> {
-    raw.split(',')
-        .map(|h| h.trim().to_ascii_lowercase())
-        .filter(|h| !h.is_empty())
-        .collect()
-}
-
-/// Decide whether `url`'s host is permitted by the redirect allowlist. An EMPTY
-/// allowlist permits any host (preserving the pre-allowlist, opt-in behaviour); a
-/// non-empty allowlist requires the host (lowercased, port-agnostic) to be a
-/// member. A url with no host is rejected when the allowlist is non-empty.
-fn host_allowed(url: &url::Url, allowlist: &[String]) -> bool {
-    if allowlist.is_empty() {
-        return true;
-    }
-    match url.host_str() {
-        Some(host) => allowlist.contains(&host.to_ascii_lowercase()),
-        None => false,
-    }
-}
-
-/// Validate the `/oauth2/final` redirect target and return the EXACT normalized
-/// URL string to render. The query is `url=<target>`; the target carries its own
-/// `&`-separated params, so we strip only the literal `url=` prefix (never parse
-/// it as form data). The target may arrive percent-encoded, so decode once, parse
-/// it, enforce http(s) + host + allowlist on the PARSED url, and return that same
-/// url's normalized string.
+/// Parse the `/oauth2/final` `url=<target>` query into the normalized URL to
+/// render plus its comparison key. The target carries its own `&`-separated
+/// params, so we strip only the literal `url=` prefix (never parse it as form
+/// data); it may arrive percent-encoded, so we decode once and parse.
 ///
-/// Returning the parsed/normalized form (not the raw query slice) is a security
-/// requirement, not cosmetics: otherwise the allowlist check and the browser can
-/// disagree on the host. E.g. `https://allowed%2f@evil.com/cb` percent-decodes to
-/// the `/`-terminated authority `allowed` for our check, but a browser handed the
-/// RAW string parses the host as `evil.com`. Checking and rendering the one
-/// parsed `Url` (whose `%2f` is a real `/` that ends the authority at `allowed`)
-/// closes that parse-here / use-there open redirect.
-fn final_redirect_target(raw_query: &str, allowlist: &[String]) -> Result<String, &'static str> {
+/// Returning the parsed/normalized URL (not the raw query slice) is a security
+/// requirement: otherwise the membership check and the browser can disagree on
+/// the host. `https://allowed%2f@evil.com/cb` percent-decodes to the
+/// `/`-terminated authority `allowed`, so our parser keys on host `allowed` (path
+/// `/@evil.com/cb`), and a browser handed the SAME normalized string also lands on
+/// `allowed` — never `evil.com`. The `RedirectTarget` then has to match a
+/// registered client redirect URI, so an unregistered host/path is rejected.
+fn parse_final_redirect(raw_query: &str) -> Result<(url::Url, RedirectTarget), &'static str> {
     let target = raw_query.strip_prefix("url=").unwrap_or(raw_query);
     let decoded = percent_decode(target);
     let parsed = match url::Url::parse(&decoded) {
         Ok(u) if matches!(u.scheme(), "http" | "https") && u.has_host() => u,
         _ => return Err("invalid redirect"),
     };
-    if !host_allowed(&parsed, allowlist) {
-        return Err("redirect host not allowed");
-    }
-    Ok(parsed.to_string())
+    let key = RedirectTarget::parse(parsed.as_str()).ok_or("invalid redirect")?;
+    Ok((parsed, key))
 }
 
 /// Minimal percent-decoder (enough to validate a redirect target). Invalid
@@ -160,29 +181,19 @@ async fn main() {
 
     let env = build_env();
 
-    let allowed_redirect_hosts = parse_allowed_redirect_hosts(&cryptoverse_core::config::var_or(
-        "ALLOWED_REDIRECT_HOSTS",
-        "",
-    ));
-
-    if allowed_redirect_hosts.is_empty() {
-        tracing::warn!(
-            "open-redirect protection on /oauth2/final is DISABLED (any http(s) host allowed); \
-             set ALLOWED_REDIRECT_HOSTS to your relying-party hosts to enable it"
-        );
-    } else {
-        tracing::info!(
-            "open-redirect allowlist active: {}",
-            allowed_redirect_hosts.join(", ")
-        );
-    }
+    let hydra = Hydra::from_env().expect("HYDRA_ADMIN_URL must be set");
+    tracing::info!(
+        "/oauth2/final redirect targets are validated against registered client \
+         redirect_uris from Hydra (no static allowlist)"
+    );
 
     let state = Arc::new(AppState {
         env,
         version: cryptoverse_core::config::version(),
         sentry_dsn: cryptoverse_core::config::sentry_dsn().unwrap_or_default(),
         sentry_env: cryptoverse_core::config::sentry_env(),
-        allowed_redirect_hosts,
+        hydra,
+        redirect_cache: tokio::sync::Mutex::new(None),
     });
 
     let app = Router::new()
@@ -233,20 +244,80 @@ async fn embed(
     Html(body).into_response()
 }
 
+/// Whether `target` matches a registered client redirect URI, consulting (and
+/// refreshing) the cached set. On a cache MISS the target may be a just-registered
+/// client the snapshot predates, so we force one refresh — rate-limited by
+/// `MISS_REFRESH_COOLDOWN` so this can't be used to hammer Hydra.
+async fn is_registered_redirect(st: &AppState, target: &RedirectTarget) -> bool {
+    let mut cache = st.redirect_cache.lock().await;
+    let stale = cache
+        .as_ref()
+        .is_none_or(|c| c.fetched_at.elapsed() > REDIRECT_CACHE_TTL);
+    if stale {
+        refresh_redirect_cache(&st.hydra, &mut cache).await;
+    }
+    if let Some(c) = cache.as_ref() {
+        if c.targets.contains(target) {
+            return true;
+        }
+        if c.last_attempt.elapsed() > MISS_REFRESH_COOLDOWN {
+            refresh_redirect_cache(&st.hydra, &mut cache).await;
+            return cache.as_ref().is_some_and(|c| c.targets.contains(target));
+        }
+    }
+    false
+}
+
+/// Refresh the cached registered-redirect set from Hydra. On failure the last
+/// known-good set is kept (only `last_attempt` advances) so a transient Hydra blip
+/// doesn't break redirects; a cold start with Hydra down leaves the set empty,
+/// which fails closed (every target rejected).
+async fn refresh_redirect_cache(hydra: &Hydra, cache: &mut Option<RedirectCache>) {
+    let now = Instant::now();
+    match hydra.list_redirect_uris().await {
+        Ok(uris) => {
+            let targets = uris
+                .iter()
+                .filter_map(|u| RedirectTarget::parse(u))
+                .collect();
+            *cache = Some(RedirectCache {
+                targets,
+                fetched_at: now,
+                last_attempt: now,
+            });
+        }
+        Err(e) => {
+            tracing::warn!("failed to refresh registered redirect URIs from Hydra: {e}");
+            if let Some(c) = cache.as_mut() {
+                c.last_attempt = now;
+            }
+        }
+    }
+}
+
 /// Final redirect page. The gateway rewrote Hydra's consent `Location` into
-/// `/oauth2/final?url=<the original redirect>`. We validate + normalize the
-/// target (`final_redirect_target`) and hand the SAME normalized URL to
-/// `final.js`, so the host we allowlist-checked is exactly the host the browser
-/// navigates to (`window.location.assign`).
+/// `/oauth2/final?url=<the original redirect>`. We parse + normalize the target,
+/// require it to match a **registered client redirect URI** (fetched from Hydra,
+/// not a static list), and hand that SAME normalized URL to `final.js` — so the
+/// target we validated is exactly the one the browser navigates to.
 async fn final_page(State(st): State<Arc<AppState>>, RawQuery(query): RawQuery) -> Response {
     let raw = query.unwrap_or_default();
-    let url = match final_redirect_target(&raw, &st.allowed_redirect_hosts) {
-        Ok(u) => u,
+    let (parsed, key) = match parse_final_redirect(&raw) {
+        Ok(v) => v,
         Err(reason) => {
             tracing::warn!("final: {reason} for query `{raw}`");
             return (StatusCode::BAD_REQUEST, reason).into_response();
         }
     };
+    if !is_registered_redirect(&st, &key).await {
+        tracing::warn!("final: redirect target is not a registered redirect_uri `{parsed}`");
+        return (
+            StatusCode::BAD_REQUEST,
+            "redirect target is not a registered client redirect URI",
+        )
+            .into_response();
+    }
+    let url = parsed.to_string();
 
     let tmpl = st.env.get_template("final.html").expect("final template");
     let body = tmpl
@@ -321,73 +392,81 @@ mod tests {
         assert!(!is_safe_redirect("javascript%3Aalert(1)"));
     }
 
+    fn registered(uris: &[&str]) -> Vec<RedirectTarget> {
+        uris.iter()
+            .filter_map(|u| RedirectTarget::parse(u))
+            .collect()
+    }
+
     #[test]
-    fn final_target_permits_listed_host_rejects_others() {
-        let allow = parse_allowed_redirect_hosts("login-demo.cv.127.0.0.1.nip.io");
-        // The legit demo RP callback (host match, port-agnostic) — normalized url
-        // keeps the host + port + path + query.
-        let t = final_redirect_target(
+    fn final_target_matches_registered_redirect_uri() {
+        let reg = registered(&["https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/"]);
+        // Hydra emits the registered URI with the OAuth2 response params appended.
+        let (parsed, key) = parse_final_redirect(
             "url=https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/?code=abc&state=xyz",
-            &allow,
         )
-        .expect("listed host allowed");
-        assert!(t.starts_with("https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback"));
-        // Case-insensitive host match.
-        assert!(
-            final_redirect_target("url=https://LOGIN-DEMO.cv.127.0.0.1.NIP.IO/cb", &allow).is_ok()
-        );
-        // An attacker-controlled host is refused.
-        assert!(final_redirect_target("url=https://attacker.com/steal?code=abc", &allow).is_err());
-        // A host that merely contains the allowed host as a substring is refused
-        // (exact host match, not substring).
-        assert!(final_redirect_target(
-            "url=https://login-demo.cv.127.0.0.1.nip.io.attacker.com/cb",
-            &allow
-        )
-        .is_err());
+        .expect("valid target");
+        assert!(reg.contains(&key), "registered redirect must match");
+        assert!(parsed
+            .as_str()
+            .starts_with("https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/"));
+    }
+
+    #[test]
+    fn final_target_rejects_unregistered_host() {
+        let reg = registered(&["https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/"]);
+        let (_p, key) = parse_final_redirect("url=https://attacker.com/oidc/callback/?code=abc")
+            .expect("parses");
+        assert!(!reg.contains(&key), "unregistered host must be rejected");
     }
 
     #[test]
     fn final_target_closes_encoded_authority_open_redirect() {
-        // The parse-here / use-there bypass: `%2f@evil.com` percent-decodes so a
-        // naive host check sees the allowed host, but a browser handed the RAW
-        // string parses the host as evil.com. Because we render the PARSED url, the
-        // rendered target's host is the allowed host (the decoded `/` ends the
-        // authority), never evil.com.
-        let allow = parse_allowed_redirect_hosts("login-demo.cv.127.0.0.1.nip.io");
-        let t = final_redirect_target(
-            "url=https://login-demo.cv.127.0.0.1.nip.io%2f@evil.com/cb",
-            &allow,
+        // The parse-here / use-there bypass: `%2f@evil.com` percent-decodes so the
+        // PARSED host is the registered one, but with path `/@evil.com/...`, which
+        // is not a registered redirect path -> rejected. And the normalized url a
+        // browser navigates to has host = the registered host, never evil.com.
+        let reg = registered(&["https://login-demo.cv.127.0.0.1.nip.io:9443/oidc/callback/"]);
+        let (parsed, key) = parse_final_redirect(
+            "url=https://login-demo.cv.127.0.0.1.nip.io:9443%2f@evil.com/oidc/callback/?code=abc",
         )
-        .expect("encoded-slash form normalizes to the allowed host");
-        let host = url::Url::parse(&t).unwrap().host_str().unwrap().to_string();
-        assert_eq!(
-            host, "login-demo.cv.127.0.0.1.nip.io",
-            "rendered redirect host must be the allowed host, not evil.com"
+        .expect("parses");
+        assert_eq!(parsed.host_str(), Some("login-demo.cv.127.0.0.1.nip.io"));
+        assert!(
+            !reg.contains(&key),
+            "decoded path /@evil.com/... is not a registered redirect"
         );
-        // The plain userinfo form (real host = evil.com) is rejected outright.
-        assert!(final_redirect_target(
-            "url=https://login-demo.cv.127.0.0.1.nip.io@evil.com/cb",
-            &allow
+        // Plain userinfo form: the real host is evil.com -> not registered.
+        let (_p2, key2) = parse_final_redirect(
+            "url=https://login-demo.cv.127.0.0.1.nip.io:9443@evil.com/oidc/callback/?code=abc",
         )
-        .is_err());
+        .expect("parses");
+        assert!(!reg.contains(&key2));
     }
 
     #[test]
-    fn final_target_empty_allowlist_permits_any_http_host() {
-        let allow = parse_allowed_redirect_hosts("");
-        assert!(final_redirect_target("url=https://attacker.com/cb", &allow).is_ok());
-        assert!(final_redirect_target("url=http://localhost:8080/cb", &allow).is_ok());
-        // Non-http(s) is still rejected even with an empty allowlist.
-        assert!(final_redirect_target("url=javascript:alert(1)", &allow).is_err());
+    fn final_target_rejects_non_http_or_relative() {
+        assert!(parse_final_redirect("url=javascript:alert(1)").is_err());
+        assert!(parse_final_redirect("url=//evil.example.com").is_err());
+        assert!(parse_final_redirect("url=/relative/path").is_err());
     }
 
     #[test]
-    fn parses_allowed_redirect_hosts_trimmed_lowercased_nonempty() {
-        let hosts = parse_allowed_redirect_hosts(" Demo.Example.COM , , rp.example.org ,");
+    fn redirect_target_default_port_equivalence_and_path_sensitivity() {
+        // https default port: explicit :443 == omitted.
         assert_eq!(
-            hosts,
-            vec!["demo.example.com".to_string(), "rp.example.org".to_string()]
+            RedirectTarget::parse("https://app.example/cb"),
+            RedirectTarget::parse("https://app.example:443/cb"),
+        );
+        // A different path is a different target (exact-path match).
+        assert_ne!(
+            RedirectTarget::parse("https://app.example/cb"),
+            RedirectTarget::parse("https://app.example/cb/sub"),
+        );
+        // A different host is a different target.
+        assert_ne!(
+            RedirectTarget::parse("https://app.example/cb"),
+            RedirectTarget::parse("https://evil.example/cb"),
         );
     }
 }

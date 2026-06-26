@@ -54,6 +54,9 @@ spec:
       env:
         - { name: PORT, value: "3002" }
         - { name: DOMAIN, value: "login.cryptoverse.local" }
+        # The wrapper validates /oauth2/final redirect targets against the OAuth2
+        # clients' registered redirect_uris fetched from Hydra's admin API.
+        - { name: HYDRA_ADMIN_URL, value: "http://127.0.0.1:4445" }
         - { name: SENTRY_DSN, value: "" }
         - { name: SENTRY_ENV, value: "local" }
         - { name: VERSION, value: "stack" }
