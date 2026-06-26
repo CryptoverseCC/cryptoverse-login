@@ -178,12 +178,17 @@ jobs:
           helm dependency update ./charts/login/
       - name: Install Cryptoverse Login
         run: |
+          # login.walletConnectProjectId is set from the WALLETCONNECT_PROJECT_ID
+          # secret. When the secret is absent (e.g. on forks) it expands to empty,
+          # the SPA omits the WalletConnect connector, and the WC e2e step below
+          # self-skips — so this is fork-safe with no `if: secrets...` gymnastics.
           helm upgrade --install --wait --timeout 10m \
             cryptoverse-login \
             ./charts/login/ \
             --namespace cryptoverse-login-${{ github.sha }} \
             -f ./charts/login/values.ci.yaml \
             --set version=${{ github.sha }} \
+            --set login.walletConnectProjectId=${{ secrets.WALLETCONNECT_PROJECT_ID }} \
             --set login.hydraAdminUrl=http://cryptoverse-login-hydra-admin.cryptoverse-login-${{ github.sha }}:4445
       - name: Verify connectivity
         run: |
@@ -274,11 +279,12 @@ jobs:
       #######################
       # Browser/wallet end-to-end via Playwright + dappwright (tests/e2e/), which
       # replaces the retired Selenium + Firefox + MetaMask suite (test_full.py).
-      # The MetaMask and Coinbase projects both run in CI: each drives a real
-      # browser extension under a virtual framebuffer (xvfb) and needs no
-      # projectId. The WalletConnect project is intentionally not wired here — it
-      # needs a Reown projectId secret; see tests/e2e/README.md.
-      # TODO: wire the WalletConnect project once a Reown projectId secret is available.
+      # All three connector projects run here: MetaMask and Coinbase each drive a
+      # real browser extension under a virtual framebuffer (xvfb) and need no
+      # projectId; WalletConnect drives a headless @reown/walletkit test wallet
+      # (no extension, no xvfb) and runs whenever the WALLETCONNECT_PROJECT_ID
+      # secret is set — it self-skips cleanly when the secret is empty (forks),
+      # so the lane is fork-safe. See tests/e2e/README.md.
       - name: Browser e2e (MetaMask, Playwright + dappwright)
         env:
           # Point the suite at the demo RP deployed above (CI uses the
@@ -303,6 +309,23 @@ jobs:
           # deps + chromium are already installed by the MetaMask step; dappwright
           # downloads the Coinbase extension on first run of this project.
           xvfb-run --auto-servernum yarn test:e2e:coinbase
+      - name: Browser e2e (WalletConnect, headless @reown/walletkit test wallet)
+        env:
+          # Same demo RP / IdP as the steps above. The WalletConnect project drives
+          # a HEADLESS test wallet (no browser extension), so it needs no xvfb — but
+          # it DOES need a Reown projectId. WALLETCONNECT_PROJECT_ID is wired through
+          # to the SPA's WC connector by the helm install step above; both must use
+          # the SAME id. When the secret is empty (e.g. forks) the SPA omits the WC
+          # connector and this project SELF-SKIPS cleanly (green) — so this step
+          # always runs with no `if:` guard and stays fork-safe.
+          DEMO_URL: https://${{ env.DOMAIN_DEMO_APP }}
+          LOGIN_URL: https://${{ env.DOMAIN_LOGIN }}
+          WALLETCONNECT_PROJECT_ID: ${{ secrets.WALLETCONNECT_PROJECT_ID }}
+        run: |
+          cd tests/e2e
+          # deps + chromium already installed by the MetaMask step. No extension,
+          # no display needed — runs in plain headless Chromium.
+          yarn test:e2e:walletconnect
       - name: Pods
         if: always()
         run: |

@@ -121,10 +121,21 @@ if [ -n "${ALCHEMY_URL:-}" ]; then
   RPC_FLAGS=(--set-string "ethRpcUrl=$ALCHEMY_URL")
 fi
 
+# Enable the WalletConnect connector when the gitignored root .env supplies a
+# Reown projectId (same handling as ALCHEMY_URL above; the value stays out of
+# git). Empty/unset ⇒ the SPA omits the WC connector and the WalletConnect e2e
+# (yarn test:e2e:walletconnect) self-skips. The test wallet's relay needs the
+# SAME id passed via WALLETCONNECT_PROJECT_ID when running that project.
+WC_FLAGS=()
+if [ -n "${WALLETCONNECT_PROJECT_ID:-}" ]; then
+  say "Using WALLETCONNECT_PROJECT_ID from .env (WalletConnect connector enabled)"
+  WC_FLAGS=(--set-string "login.walletConnectProjectId=$WALLETCONNECT_PROJECT_ID")
+fi
+
 say "Deploying login chart (Postgres-backed Hydra, self-signed TLS)"
 helm dependency update "$REPO/charts/login" >/dev/null
 helm upgrade --install cryptoverse-login "$REPO/charts/login" \
-  -n "$NS_LOGIN" -f "$KIND_DIR/values-kind.yaml" "${RPC_FLAGS[@]}" "${MON_FLAGS[@]}" --wait --timeout 6m
+  -n "$NS_LOGIN" -f "$KIND_DIR/values-kind.yaml" "${RPC_FLAGS[@]}" "${WC_FLAGS[@]}" "${MON_FLAGS[@]}" --wait --timeout 6m
 
 say "Deploying demo chart"
 helm upgrade --install demo "$REPO/tests/cryptoverse-login-demo/charts/demo" \
