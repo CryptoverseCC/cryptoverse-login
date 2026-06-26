@@ -71,6 +71,8 @@ spec:
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 48Mi
+            # HAProxy auto-sizes maxconn from the fd limit (~524k here) and
+            # preallocates accordingly, so it needs headroom — 64Mi OOMKilled it.
             limits:
-              memory: 64Mi
+              memory: 256Mi
