@@ -121,6 +121,45 @@ The cluster must be deployed with the **same** projectId
 WALLETCONNECT_PROJECT_ID=<id> xvfb-run --auto-servernum yarn test:e2e
 ```
 
+## Manual pre-release wallet matrix
+
+CI auto-covers three connector paths: the **injected / EIP-6963** path
+(MetaMask), the **Coinbase SDK** path (Coinbase Wallet extension), and the
+**ERC-1271 smart-account** verification path (the deterministic anvil test
+`login/core/tests/erc1271_anvil.rs`). The cases below **can't** be automated —
+they need real mobile/hardware wallet UIs, physical on-device signing, and real
+smart-account signature formats — so run this checklist by hand **~once per
+release** against a deployed stack (a kind cluster, or staging).
+
+Note the headless WalletConnect e2e (`yarn test:e2e:walletconnect`, needs a Reown
+projectId) exercises the WC **connector path** but not a real wallet's UI or
+signature, so the WalletConnect rows below still matter.
+
+One wallet per row is enough: every wallet on a given connector path shares the
+same dApp-side code, so these spot-check what CI can't reach — they are **not**
+exhaustive per-wallet coverage.
+
+| # | path / case | how to test | expected |
+|---|---|---|---|
+| 1 | **WalletConnect — mobile wallet** | Pick WalletConnect on the login page; scan the QR with a real **Trust Wallet** or **Rainbow** (mobile); approve the SIWE message in-app. | Login completes; ID-token `sub` == the wallet's lowercased address. |
+| 2 | **Hardware wallet (via WalletConnect)** | Connect a physical **Ledger** through Ledger Live + WalletConnect and **sign the SIWE message on-device** (Trezor Suite via WC optional). | On-device approval works; login completes; `sub` == address. |
+| 3 | **Smart-account ERC-1271** | Log in with a **Safe** (multisig) via WalletConnect; confirm/execute the off-chain SIWE signature. | The ERC-1271 contract-signature login succeeds; `sub` == the Safe address. |
+| 4 | **Smart-account ERC-6492 (counterfactual)** | Log in with a **Coinbase Smart Wallet** (passkey) whose account is **not yet deployed** on the configured chain. | The counterfactual ERC-6492 login succeeds; `sub` == the smart-account address. |
+| 5 | **Injected spot-check** _(optional, low priority)_ | With **Rabby** and/or **Phantom (EVM)** installed, open the login page. | Both appear in the EIP-6963 wallet picker and sign in. |
+
+Notes:
+
+- **Items 3-4** confirm that a *real wallet's* smart-account signature format
+  interoperates with our on-chain ERC-1271/6492 verification
+  (`core::eth::verify_signature`). The anvil test covers the code path; this
+  covers wallet-format compatibility. They need the configured `ETH_RPC_URL` /
+  `SIWE_CHAIN_ID` chain (mainnet by default) **reachable**, since
+  contract-signature verification is an on-chain `eth_call`.
+- **Item 2** (and any WalletConnect row) needs a Reown
+  `WALLETCONNECT_PROJECT_ID` with **mainnet (chainId 1)** + **`personal_sign`**
+  enabled in the Reown dashboard (an empty projectId ⇒ no WalletConnect
+  connector, so there's nothing to test).
+
 ## Environment variables
 
 | var | default | meaning |
