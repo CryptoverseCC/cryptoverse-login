@@ -1,0 +1,23 @@
+# Host-based routing for local access via nip.io. Lives in the overlay because
+# the hostname is environment-specific (prod gets its own overlay/host).
+# Reachable at: http://cryptoverse-login.127.0.0.1.nip.io:18080
+#           and https://cryptoverse-login.127.0.0.1.nip.io:18443 (wildcard cert
+#           from the cluster's local CA — no per-app TLS config needed).
+# All paths go to the HAProxy gateway, which fans out to login/wrapper/Hydra.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cryptoverse-login
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: cryptoverse-login.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cryptoverse-login-gateway
+                port:
+                  name: http

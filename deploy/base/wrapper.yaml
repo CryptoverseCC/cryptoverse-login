@@ -1,0 +1,64 @@
+# wrapper — renders the /oauth2/auth (embed) and /oauth2/final iframe shells
+# (Rust/axum). Validates the /oauth2/final redirect target against the relying
+# parties' registered redirect_uris fetched from Hydra (no static allowlist).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cryptoverse-login-wrapper
+  labels:
+    app: cryptoverse-login-wrapper
+    app.kubernetes.io/name: cryptoverse-login
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cryptoverse-login-wrapper
+  template:
+    metadata:
+      labels:
+        app: cryptoverse-login-wrapper
+    spec:
+      containers:
+        - name: wrapper
+          image: localhost/cryptoverse-login/wrapper:test
+          imagePullPolicy: Never
+          env:
+            - name: PORT
+              value: "3000"
+            - name: VERSION
+              value: "test"
+            - name: SENTRY_DSN
+              value: ""
+            - name: SENTRY_ENV
+              value: heavyops
+            - name: HYDRA_ADMIN_URL
+              value: http://cryptoverse-login-hydra-admin.cryptoverse-login:4445
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cryptoverse-login-wrapper
+  labels:
+    app.kubernetes.io/name: cryptoverse-login
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: cryptoverse-login-wrapper

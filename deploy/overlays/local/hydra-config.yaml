@@ -1,0 +1,54 @@
+# Hydra non-secret config for the local (heavyops) environment. Env-specific:
+# the issuer + login/consent/logout/device URLs carry the public host:port the
+# browser reaches this IdP at — here the ingress host on the platform's HTTPS
+# port 18443. Mounted into the Hydra pod at /etc/config/hydra.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cryptoverse-login-hydra
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+data:
+  hydra.yaml: |
+    log:
+      leak_sensitive_values: true
+      level: info
+    oidc:
+      dynamic_client_registration:
+        default_scope:
+        - openid
+        enabled: true
+      subject_identifiers:
+        pairwise:
+          salt: '!!! CHANGE THIS !!!'
+        supported_types:
+        - public
+    serve:
+      admin:
+        port: 4445
+        request_log:
+          disable_for_health: true
+      public:
+        port: 4444
+        request_log:
+          disable_for_health: true
+      tls:
+        # Trust X-Forwarded-Proto from in-cluster sources (pod/loopback CIDRs),
+        # so Hydra treats ingress-terminated HTTPS requests as secure. This is
+        # how the chart's dangerousForceHttp behaviour is achieved (no CLI flag).
+        allow_termination_from:
+        - 10.0.0.0/8
+        - 127.0.0.0/24
+    strategies:
+      access_token: jwt
+    urls:
+      consent: https://cryptoverse-login.127.0.0.1.nip.io:18443/consent
+      device:
+        success: https://cryptoverse-login.127.0.0.1.nip.io:18443/device/success
+        verification: https://cryptoverse-login.127.0.0.1.nip.io:18443/device
+      login: https://cryptoverse-login.127.0.0.1.nip.io:18443/login
+      logout: https://cryptoverse-login.127.0.0.1.nip.io:18443/logout
+      post_logout_redirect: https://cryptoverse-login.127.0.0.1.nip.io:18443/
+      self:
+        issuer: https://cryptoverse-login.127.0.0.1.nip.io:18443/

@@ -1,0 +1,11 @@
+# Managed by bootstrap/25-sops-keys.sh
+# Encrypt only the data/stringData values of Secrets; keep keys/structure readable.
+creation_rules:
+  - path_regex: .*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age16e8e7m7l0u86czevcvg0rd0adhly69uanjr357guahhchxvwafdq8nzjwz
+# When the prod cluster is added, append its recipient (comma-separated) so the
+# same ciphertext decrypts in both clusters:
+#     age: >-
+#       age16e8e7m7l0u86czevcvg0rd0adhly69uanjr357guahhchxvwafdq8nzjwz,age1prodxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

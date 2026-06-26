@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Cryptoverse Login — full stack, environment-agnostic base. Env-specific bits
+# (the Hydra issuer/redirect URLs, the ingress host, and the SOPS secrets) live
+# in overlays/<env>/, not here.
+resources:
+  - postgres.yaml   # Postgres for Hydra (engine parity; ephemeral)
+  - hydra.yaml      # Ory Hydra 2.x token engine (+ SQL automigration init container)
+  - gateway.yaml    # HAProxy single ingress
+  - login.yaml      # login + consent provider + SPA host (Rust/axum)
+  - wrapper.yaml    # /oauth2/auth + /oauth2/final iframe shells (Rust/axum)

@@ -1,0 +1,150 @@
+# login — the Hydra login + consent provider and the SPA host (Rust/axum).
+# Probes hit the RPC-independent /healthz so a mainnet RPC outage never restarts
+# the pod. The public origin (SIWE domain/uri) is derived per-request from
+# forwarded headers, so there is no hardcoded domain here (env-agnostic).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cryptoverse-login-login
+  labels:
+    app.kubernetes.io/name: cryptoverse-login
+data:
+  # Token-gating restrictions, keyed by client_id. Backend reads this via
+  # RESTRICTIONS_FILE (/config/restrictions.json) as a fallback when a client
+  # has no metadata.restrictions.
+  restrictions.json: |
+    {
+      "flynnjamm.cryptoverse.cc": [
+        {
+          "condition": "balanceOf >= 1000",
+          "tokenAddress": "0x56687cf29ac9751ce2a4e764680b6ad7e668942e"
+        }
+      ],
+      "fwb.cryptoverse.cc": [
+        {
+          "condition": "balanceOf >= 100",
+          "tokenAddress": "0x7d91e637589EC3Bb54D8213a9e92Dc6E8D12da91"
+        }
+      ]
+    }
+  # Global login-deny blocklist (case-insensitive addresses). Empty blocks nobody.
+  blocklist.json: |
+    []
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cryptoverse-login-login
+  labels:
+    app: cryptoverse-login-login
+    app.kubernetes.io/name: cryptoverse-login
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cryptoverse-login-login
+  template:
+    metadata:
+      labels:
+        app: cryptoverse-login-login
+    spec:
+      containers:
+        - name: login
+          image: localhost/cryptoverse-login/login:test
+          imagePullPolicy: Never
+          env:
+            - name: HYDRA_ADMIN_URL
+              value: http://cryptoverse-login-hydra-admin.cryptoverse-login:4445
+            - name: MAILSERVER_DOMAIN
+              value: ethmail.cc
+            - name: PROFILE_DOMAIN
+              value: cryptoverse.cc
+            - name: WALLETCONNECT_PROJECT_ID
+              value: ""
+            - name: PORT
+              value: "3000"
+            - name: VERSION
+              value: "test"
+            - name: SENTRY_DSN
+              value: ""
+            - name: SENTRY_ENV
+              value: heavyops
+            - name: INFURA_API_KEY
+              value: ""
+            - name: ALCHEMY_API_KEY
+              value: ""
+            # Public mainnet / Base JSON-RPC endpoints reachable from the cluster.
+            # Real deployments should supply a dedicated keyed RPC instead.
+            - name: ETH_RPC_URL
+              value: "https://ethereum-rpc.publicnode.com"
+            - name: BASE_RPC_URL
+              value: "https://base-rpc.publicnode.com"
+            - name: SIWE_CHAIN_ID
+              value: "1"
+            - name: SIWE_STATEMENT
+              value: "Sign in to Cryptoverse Login"
+            - name: RPC_TIMEOUT_MS
+              value: "3000"
+            - name: EMAIL_VERIFIED_CLAIM
+              value: "false"
+            - name: REMEMBER_FOR
+              value: "3600"
+            - name: BLOCKLIST_FILE
+              value: /config/blocklist.json
+            - name: DEBUG
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /app/secrets
+              name: secrets
+            - mountPath: /config
+              name: config
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: secrets
+          secret:
+            secretName: cryptoverse-login-login
+        - name: config
+          configMap:
+            name: cryptoverse-login-login
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cryptoverse-login-login
+  labels:
+    app: cryptoverse-login-login
+    app.kubernetes.io/name: cryptoverse-login
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: cryptoverse-login-login

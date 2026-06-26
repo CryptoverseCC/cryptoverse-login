@@ -1,0 +1,76 @@
+# HAProxy gateway — the single ingress in front of login / wrapper / Hydra.
+# Routing lives in the image's haproxy.conf; backends are wired via env. The
+# public origin is derived per-request from forwarded headers, so there is no
+# hardcoded domain here (env-agnostic). The Ingress targets this Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: cryptoverse-login-gateway
+  labels:
+    app.kubernetes.io/name: cryptoverse-login
+spec:
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: cryptoverse-login-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cryptoverse-login-gateway
+  labels:
+    app: cryptoverse-login-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cryptoverse-login-gateway
+  template:
+    metadata:
+      labels:
+        app: cryptoverse-login-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: localhost/cryptoverse-login/gateway:test
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: PORT
+              value: "8000"
+            - name: LOGIN_SERVICE
+              value: "cryptoverse-login-login:80"
+            - name: WRAPPER_SERVICE
+              value: "cryptoverse-login-wrapper:80"
+            - name: HYDRA_PUBLIC_SERVICE
+              value: "cryptoverse-login-hydra-public:4444"
+            - name: HYDRA_ADMIN_SERVICE
+              value: "cryptoverse-login-hydra-admin:4445"
+            - name: NAMESPACE
+              value: "cryptoverse-login"
+            - name: INTROSPECT_ACCESS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cryptoverse-login-login
+                  key: introspectUser
+            - name: INTROSPECT_ACCESS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: cryptoverse-login-login
+                  key: introspectPass
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi

@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cryptoverse-login
+resources:
+  - ../../base
+  - ./hydra-config.yaml   # env-specific: Hydra issuer + login/consent/logout/device URLs
+  - ./ingress.yaml        # env-specific: nip.io host
+# KSOPS decrypts the *.sops.yaml Secrets (login app, Hydra, Postgres) at build
+# time using the age key in the Argo CD repo-server.
+generators:
+  - ./secret-generator.yaml

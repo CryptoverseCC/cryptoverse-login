@@ -1,0 +1,191 @@
+# Ory Hydra 2.x (v26.2.0) — the audited OAuth2/OIDC token engine. Translated
+# from the upstream `hydra` Helm subchart (maester + janitor + helm-test omitted;
+# automigration runs as an init container instead of a pre-install hook Job so it
+# fits GitOps sync semantics). Non-secret config (issuer/redirect URLs) is the
+# `cryptoverse-login-hydra` ConfigMap, supplied per-environment by the overlay;
+# DSN + system/cookie secrets come from the SOPS `cryptoverse-login-hydra` Secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cryptoverse-login-hydra
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cryptoverse-login-hydra-admin
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+    app.kubernetes.io/component: admin
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4445
+      targetPort: http-admin
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cryptoverse-login-hydra-public
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4444
+      targetPort: http-public
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cryptoverse-login-hydra
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/instance: cryptoverse-login
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hydra
+      app.kubernetes.io/instance: cryptoverse-login
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hydra
+        app.kubernetes.io/instance: cryptoverse-login
+    spec:
+      volumes:
+        - name: hydra-config-volume
+          configMap:
+            name: cryptoverse-login-hydra
+      serviceAccountName: cryptoverse-login-hydra
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        # `hydra migrate sql` before serving. Retries (pod restartPolicy) until
+        # Postgres is reachable, so ordering vs. the postgres Deployment is safe.
+        - name: hydra-automigrate
+          image: docker.io/oryd/hydra:v26.2.0
+          imagePullPolicy: IfNotPresent
+          command: ["hydra"]
+          args: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/hydra.yaml"]
+          volumeMounts:
+            - name: hydra-config-volume
+              mountPath: /etc/config
+              readOnly: true
+          env:
+            - name: DSN
+              valueFrom:
+                secretKeyRef:
+                  name: cryptoverse-login-hydra
+                  key: dsn
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      containers:
+        - name: hydra
+          image: docker.io/oryd/hydra:v26.2.0
+          imagePullPolicy: IfNotPresent
+          command: ["hydra"]
+          args: ["serve", "all", "--config", "/etc/config/hydra.yaml"]
+          volumeMounts:
+            - name: hydra-config-volume
+              mountPath: /etc/config
+              readOnly: true
+          ports:
+            - name: http-public
+              containerPort: 4444
+              protocol: TCP
+            - name: http-admin
+              containerPort: 4445
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health/alive
+              port: 4445
+              httpHeaders:
+                - name: Host
+                  value: '127.0.0.1'
+            failureThreshold: 5
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: 4445
+              httpHeaders:
+                - name: Host
+                  value: '127.0.0.1'
+            failureThreshold: 30
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 2
+          env:
+            # URLS_SELF_ISSUER intentionally omitted here: the issuer is
+            # env-specific, so it lives in the overlay's hydra ConfigMap
+            # (urls.self.issuer). Keeping it out of base keeps base portable.
+            - name: DSN
+              valueFrom:
+                secretKeyRef:
+                  name: cryptoverse-login-hydra
+                  key: dsn
+            - name: SECRETS_SYSTEM
+              valueFrom:
+                secretKeyRef:
+                  name: cryptoverse-login-hydra
+                  key: secretsSystem
+            - name: SECRETS_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: cryptoverse-login-hydra
+                  key: secretsCookie
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 65534
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+      securityContext:
+        fsGroup: 65534
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
