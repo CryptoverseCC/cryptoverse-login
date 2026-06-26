@@ -59,6 +59,14 @@ spec:
             - name: ETH_RPC_URL_FALLBACK
               value: {{ .Values.login.ethRpcUrlFallback | quote }}
             {{- end }}
+            {{- if .Values.baseRpcUrl }}
+            # Base L2 (chainId 8453) JSON-RPC URL. Enables forward-verified
+            # Basenames (*.base.eth) reverse-name enrichment, resolved natively on
+            # Base. Only rendered when set (mirrors ETH_RPC_URL) so an empty value
+            # never disables it implicitly — absent ⇒ Basenames simply off.
+            - name: BASE_RPC_URL
+              value: {{ .Values.baseRpcUrl | quote }}
+            {{- end }}
             - name: SIWE_CHAIN_ID
               value: {{ .Values.login.chainId | default 1 | quote }}
             - name: SIWE_STATEMENT

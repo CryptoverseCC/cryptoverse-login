@@ -102,6 +102,13 @@ alchemyApiKey: "!!! CHANGE THIS !!!"
 # (balanceOf) then run against that public RPC. Supply a dedicated key in prod.
 ethRpcUrl: ""
 
+# Optional full **Base L2** (chainId 8453) JSON-RPC URL. Enables forward-verified
+# Basenames (`*.base.eth`) reverse-name enrichment, resolved NATIVELY on Base (not
+# via CCIP/mainnet). Empty ⇒ env not rendered (mirrors ethRpcUrl) ⇒ Basenames is
+# simply disabled (every lookup returns None); ENS/UD enrichment is unaffected.
+# → BASE_RPC_URL env. Supply a dedicated Base endpoint in production.
+baseRpcUrl: ""
+
 gateway:
   replicaCount: 1
   deployment:

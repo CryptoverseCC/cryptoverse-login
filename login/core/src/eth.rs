@@ -33,6 +33,13 @@ use tokio::sync::RwLock;
 const ENS_REGISTRY: Address = address!("00000000000C2E074eC69A0dFb2997BA6C7d2e1e");
 const UD_PROXY_READER: Address = address!("049aba7510f45BA5b64ea9E658E342F904DB358D");
 
+// Basenames (`*.base.eth`) on Base L2 (chainId 8453), resolved NATIVELY on Base
+// — not via CCIP/mainnet. The reverse read uses the ENSIP-19 L2ReverseRegistrar
+// singleton (it stores the primary name directly, no reverse-node math needed);
+// forward verification mirrors the ENS path against Base's own ENS registry.
+const BASE_L2_REVERSE_REGISTRAR: Address = address!("0000000000D8e504002cC26E3Ec46D81971C1664");
+const BASE_REGISTRY: Address = address!("B94704422c2a1e396835A571837Aa5AE53285a95");
+
 /// Default per-request timeout (ms) for JSON-RPC calls and the UD metadata HTTP
 /// fetch when `RPC_TIMEOUT_MS` is unset. A hung RPC must never block a login
 /// indefinitely; on timeout a security-relevant call surfaces as
@@ -151,6 +158,16 @@ sol! {
         function reverseOf(address addr) external view returns (uint256);
         function ownerOf(uint256 tokenId) external view returns (address);
     }
+
+    // ENSIP-19 L2ReverseRegistrar (Base): unlike mainnet's two-step
+    // resolver→`name(node)`, this singleton stores the primary name for an
+    // address directly, so a single `nameForAddr(addr)` yields the candidate
+    // name. The forward-verify (Registry.resolver → L2Resolver.addr) reuses the
+    // `ENSRegistry` / `ENSAddrResolver` interfaces above — same shape on Base.
+    #[sol(rpc)]
+    interface IL2ReverseRegistrar {
+        function nameForAddr(address addr) external view returns (string);
+    }
 }
 
 /// The ABI tuple of an ERC-6492 wrapper payload (everything before the magic
@@ -179,6 +196,11 @@ pub struct Eth {
     /// Optional secondary endpoint (`ETH_RPC_URL_FALLBACK`) tried when the
     /// primary times out — a cheap resilience hedge against a single flaky RPC.
     fallback: Option<DynProvider>,
+    /// Optional **Base L2** (chainId 8453) provider, built from `BASE_RPC_URL`.
+    /// `None` when that env var is unset/empty — then Basenames is simply
+    /// disabled and every [`Eth::basename_reverse`] returns `None`. It is a
+    /// distinct chain from the mainnet `provider`, so it gets its own handle.
+    base: Option<DynProvider>,
     http: reqwest::Client,
     /// Per-request timeout for JSON-RPC calls, from `RPC_TIMEOUT_MS`.
     timeout: Duration,
@@ -203,6 +225,14 @@ impl Eth {
             None => None,
         };
 
+        // Base L2 provider for Basenames. Built identically to the mainnet one
+        // but from `BASE_RPC_URL`; absent/empty ⇒ `None` ⇒ Basenames disabled
+        // (never breaks `from_env`, never falls back to mainnet for Base reads).
+        let base = match crate::config::var_opt("BASE_RPC_URL") {
+            Some(u) => Some(RootProvider::new(ClientBuilder::default().http(u.parse()?)).erased()),
+            None => None,
+        };
+
         let timeout_ms = crate::config::var_opt("RPC_TIMEOUT_MS")
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(DEFAULT_RPC_TIMEOUT_MS);
@@ -219,6 +249,7 @@ impl Eth {
         Ok(Self {
             provider,
             fallback,
+            base,
             http,
             timeout,
             decimals: Arc::new(RwLock::new(HashMap::new())),
@@ -583,6 +614,100 @@ impl Eth {
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
     }
+
+    /// Basenames (`*.base.eth`) **verified primary name** for `owner`, resolved
+    /// natively on **Base L2 (chainId 8453)** — not via CCIP/mainnet.
+    ///
+    /// Like ENS, a reverse record is owner-settable free text, so the same
+    /// non-negotiable discipline applies: the candidate name is **only** returned
+    /// if its own forward `addr(namehash(name))` on Base resolves back to `owner`.
+    /// The reverse read uses the ENSIP-19 [`BASE_L2_REVERSE_REGISTRAR`] singleton,
+    /// which stores the name directly (`nameForAddr(addr)` — no manual reverse-node
+    /// math); the forward-verify reads the resolver from the Base [`BASE_REGISTRY`]
+    /// and calls its `addr(node)` (the L2Resolver is *read from the registry*, never
+    /// hardcode-only).
+    ///
+    /// Fails **closed** (`None`) on any of: Basenames disabled (no `BASE_RPC_URL`),
+    /// an empty reverse name, a zero/missing forward resolver, a forward `addr`
+    /// that is zero or ≠ `owner`, or any RPC error. Best-effort, exactly like
+    /// [`Eth::ens_reverse`].
+    pub async fn basename_reverse(&self, owner: Address) -> Option<String> {
+        let name = match self
+            .base_rpc_call("Base L2ReverseRegistrar.nameForAddr", |p| async move {
+                IL2ReverseRegistrar::new(BASE_L2_REVERSE_REGISTRAR, p)
+                    .nameForAddr(owner)
+                    .call()
+                    .await
+            })
+            .await
+        {
+            Ok(name) if !name.is_empty() => name,
+            Ok(_) => return None,
+            Err(e) => {
+                tracing::warn!("Base nameForAddr failed for {owner}: {e}");
+                return None;
+            }
+        };
+
+        // Forward-verify on Base: the reverse record is unauthenticated free text,
+        // so the claimed `name` is only trusted if *it* forward-resolves back to
+        // `owner` against Base's own ENS registry/resolver.
+        if self.basename_forward_matches(&name, owner).await {
+            Some(name)
+        } else {
+            None
+        }
+    }
+
+    /// Does `name`'s standard forward record on **Base** resolve to `owner`?
+    ///
+    /// Mirrors [`Eth::ens_forward_matches`] exactly, but on the Base chain: looks
+    /// up `name`'s resolver via `BASE_REGISTRY.resolver(namehash(name))`, then
+    /// calls that resolver's `addr(node)` and compares to `owner` (full 20-byte
+    /// equality). Returns `false` — never asserts the name — on a zero resolver,
+    /// a zero/different `addr`, or any RPC error. This is the verification that
+    /// turns an arbitrary reverse string into a name the user provably controls.
+    async fn basename_forward_matches(&self, name: &str, owner: Address) -> bool {
+        let node = namehash(name);
+
+        let resolver = match self
+            .base_rpc_call("Base forward registry.resolver", |p| async move {
+                ENSRegistry::new(BASE_REGISTRY, p)
+                    .resolver(node)
+                    .call()
+                    .await
+            })
+            .await
+        {
+            Ok(addr) => addr,
+            Err(e) => {
+                tracing::warn!("Base forward registry.resolver failed for {name}: {e}");
+                return false;
+            }
+        };
+        if resolver.is_zero() {
+            // No forward resolver set ⇒ no standard forward record ⇒
+            // unverifiable. Fail closed.
+            return false;
+        }
+
+        let resolved = match self
+            .base_rpc_call("Base forward resolver.addr", |p| async move {
+                ENSAddrResolver::new(resolver, p).addr(node).call().await
+            })
+            .await
+        {
+            Ok(addr) => addr,
+            Err(e) => {
+                tracing::warn!("Base forward resolver.addr failed for {name}: {e}");
+                return false;
+            }
+        };
+
+        // Checksum is irrelevant: `Address` is the raw 20 bytes, so `==` compares
+        // them exactly. A zero forward address never matches a real `owner`.
+        !resolved.is_zero() && resolved == owner
+    }
 }
 
 impl Eth {
@@ -651,6 +776,52 @@ impl Eth {
                 Err(_) => {
                     crate::telemetry::record_rpc_call(label, "timeout");
                     last = Some(format!("{label} timed out (primary + fallback)"));
+                }
+            }
+        }
+
+        Err(EthError::unavailable(
+            label,
+            last.unwrap_or_else(|| "timed out".to_string()),
+        ))
+    }
+
+    /// The JSON-RPC chokepoint for **Base L2** reads. Same timeout + retry-on-
+    /// timeout + metric treatment as [`Eth::rpc_call`], but against the optional
+    /// [`Eth::base`] provider (there is no Base fallback — `BASE_RPC_URL` is a
+    /// single endpoint). Returns `Err(EthError::Unavailable)` when Base is
+    /// disabled (no `base` provider) or the call could not be answered, so the
+    /// best-effort caller maps either to `None`.
+    async fn base_rpc_call<F, Fut, T, E>(&self, label: &str, make: F) -> Result<T, EthError>
+    where
+        F: Fn(DynProvider) -> Fut,
+        Fut: std::future::IntoFuture<Output = Result<T, E>>,
+        E: std::fmt::Display,
+    {
+        let Some(base) = &self.base else {
+            // Basenames disabled (no BASE_RPC_URL) — treat as unavailable so the
+            // best-effort caller yields `None` without ever touching mainnet.
+            return Err(EthError::unavailable(label, "BASE_RPC_URL not configured"));
+        };
+
+        let mut last: Option<String> = None;
+        let attempts = 2usize; // initial + one retry-on-timeout
+        for attempt in 0..attempts {
+            match tokio::time::timeout(self.timeout, make(base.clone()).into_future()).await {
+                Ok(Ok(v)) => {
+                    crate::telemetry::record_rpc_call(label, "ok");
+                    return Ok(v);
+                }
+                Ok(Err(e)) => {
+                    crate::telemetry::record_rpc_call(label, "error");
+                    return Err(EthError::unavailable(label, e));
+                }
+                Err(_) => {
+                    crate::telemetry::record_rpc_call(label, "timeout");
+                    last = Some(format!("{label} timed out after {:?}", self.timeout));
+                    if attempt + 1 < attempts {
+                        tracing::warn!("{label} timed out (attempt {}), retrying", attempt + 1);
+                    }
                 }
             }
         }
@@ -749,6 +920,7 @@ mod tests {
         let eth = Eth {
             provider,
             fallback: None,
+            base: None,
             http: reqwest::Client::new(),
             timeout: Duration::from_millis(DEFAULT_RPC_TIMEOUT_MS),
             decimals: Arc::new(RwLock::new(HashMap::new())),
@@ -816,6 +988,32 @@ mod tests {
         assert!(
             eth.ud_reverse(owner).await.is_none(),
             "an unreachable RPC must yield no (unverified) UD name"
+        );
+    }
+
+    /// With Basenames **disabled** (no `BASE_RPC_URL` ⇒ no Base provider),
+    /// `basename_reverse` must fail closed to `None` without any network call —
+    /// and it must NOT fall back to the mainnet provider for a Base read.
+    #[tokio::test]
+    async fn basename_reverse_disabled_is_none() {
+        let eth = no_base_eth();
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        assert!(
+            eth.basename_reverse(owner).await.is_none(),
+            "Basenames disabled must yield None (no Base provider, no mainnet fallback)"
+        );
+    }
+
+    /// A Basename reverse lookup against an unreachable Base RPC must **fail
+    /// closed** to `None` — the forward-verify reads can't run, so no name is
+    /// asserted (same best-effort contract as `ens_reverse`).
+    #[tokio::test]
+    async fn basename_reverse_unreachable_rpc_is_none() {
+        let eth = offline_eth(); // Base provider points at a closed port
+        let owner = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        assert!(
+            eth.basename_reverse(owner).await.is_none(),
+            "an unreachable Base RPC must yield no (unverified) Basename"
         );
     }
 
@@ -955,9 +1153,32 @@ mod tests {
         let provider =
             RootProvider::new(ClientBuilder::default().http("http://127.0.0.1:1".parse().unwrap()))
                 .erased();
+        // A Base provider that also points at the closed port, so the Basenames
+        // path is *enabled but unreachable* — exercising its fail-closed branch.
+        let base =
+            RootProvider::new(ClientBuilder::default().http("http://127.0.0.1:1".parse().unwrap()))
+                .erased();
         Eth {
             provider,
             fallback: None,
+            base: Some(base),
+            http: reqwest::Client::new(),
+            timeout: Duration::from_millis(200),
+            decimals: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// An `Eth` with **Basenames disabled** (no Base provider), mirroring an
+    /// environment where `BASE_RPC_URL` is unset/empty. `basename_reverse` must
+    /// short-circuit to `None` without any network call.
+    fn no_base_eth() -> Eth {
+        let provider =
+            RootProvider::new(ClientBuilder::default().http("http://127.0.0.1:1".parse().unwrap()))
+                .erased();
+        Eth {
+            provider,
+            fallback: None,
+            base: None,
             http: reqwest::Client::new(),
             timeout: Duration::from_millis(200),
             decimals: Arc::new(RwLock::new(HashMap::new())),
@@ -1257,5 +1478,38 @@ mod tests {
         //
         // let owner = address!("<address that owns a UD domain set as its reverse>");
         // assert_eq!(eth.ud_reverse(owner).await.as_deref(), Some("<name.crypto>"));
+    }
+
+    /// Live forward-verified **Basenames** (`*.base.eth`) resolution against a
+    /// real **Base** RPC. Ignored by default (needs network + a Base endpoint).
+    /// Run with a Base RPC:
+    ///
+    /// ```bash
+    /// BASE_RPC_URL=https://base-rpc.publicnode.com \
+    ///   cargo test -p cryptoverse-core -- --ignored basename_reverse_forward_verified_live
+    /// ```
+    ///
+    /// Mirrors [`ens_reverse_forward_verified_live`] on Base: it exercises the
+    /// full `nameForAddr` → forward `addr` → equality path live. The positive
+    /// assertion is left for a committed vector (an address whose `*.base.eth`
+    /// primary forward-resolves back to it). The negative branch runs live today:
+    /// a fresh address has no Base primary, so it must verify to `None`.
+    #[tokio::test]
+    #[ignore = "requires a live Base RPC (set BASE_RPC_URL); see doc comment"]
+    async fn basename_reverse_forward_verified_live() {
+        let eth = Eth::from_env().expect("build provider from env");
+
+        // Negative (live): an address with no Base primary name verifies to
+        // nothing (no reverse name, or the forward `addr` won't match).
+        let no_name = address!("000000000000000000000000000000000000dEaD");
+        assert!(
+            eth.basename_reverse(no_name).await.is_none(),
+            "an address with no Basename primary must not produce a verified name"
+        );
+
+        // Positive (commit a real vector to enable):
+        //
+        // let owner = address!("<address whose *.base.eth primary resolves back>");
+        // assert_eq!(eth.basename_reverse(owner).await.as_deref(), Some("<name.base.eth>"));
     }
 }

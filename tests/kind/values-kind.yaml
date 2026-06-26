@@ -52,6 +52,12 @@ infuraApiKey: ""
 alchemyApiKey: ""
 ethRpcUrl: "https://ethereum-rpc.publicnode.com"
 
+# Base L2 (chainId 8453) JSON-RPC for forward-verified Basenames (*.base.eth)
+# enrichment, resolved natively on Base. A public Base endpoint reachable from the
+# kind pod (same reachability story as ethRpcUrl above). Empty ⇒ Basenames off.
+# → BASE_RPC_URL env.
+baseRpcUrl: "https://base-rpc.publicnode.com"
+
 djangoSecrets: "localsecret" # pragma: allowlist secret
 
 introspectAccess:
