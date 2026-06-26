@@ -17,12 +17,18 @@ export const SEED_PHRASE =
   "elephant frog rib donate live collect uniform lamp inch urge dish wash";
 
 /**
- * The wallet-unlock password the old suite set (`pas = "selenium_tests"`).
- * dappwright needs a password (min length varies by extension version); reusing
- * the old one keeps parity. It is NOT security-sensitive — a throwaway local
- * test wallet.
+ * The wallet-unlock password dappwright sets when it onboards the extension.
+ * It is NOT security-sensitive — a throwaway local test wallet.
+ *
+ * The old Selenium suite used `selenium_tests`, but the current Coinbase Wallet
+ * extension (v3.136+) enforces a "8 characters, 1 number" password rule and
+ * leaves its Create-password Submit button disabled otherwise — so the
+ * digit-less `selenium_tests` silently hung the Coinbase bootstrap. We append a
+ * digit (`selenium_tests1`) so the SAME password satisfies BOTH wallets'
+ * onboarding (MetaMask only needs 8+ chars; dappwright's own defaults are
+ * `password1234` / `password1234!!!!`, i.e. also digit-bearing).
  */
-export const WALLET_PASSWORD = "selenium_tests"; // pragma: allowlist secret
+export const WALLET_PASSWORD = "selenium_tests1"; // pragma: allowlist secret
 
 /**
  * The first account derived from {@link SEED_PHRASE} (BIP-44 path

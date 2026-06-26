@@ -274,11 +274,11 @@ jobs:
       #######################
       # Browser/wallet end-to-end via Playwright + dappwright (tests/e2e/), which
       # replaces the retired Selenium + Firefox + MetaMask suite (test_full.py).
-      # Only the MetaMask project runs in CI: it drives a real extension under a
-      # virtual framebuffer (xvfb) and needs no projectId. The Coinbase and
-      # WalletConnect projects are intentionally not wired here — WalletConnect
+      # The MetaMask and Coinbase projects both run in CI: each drives a real
+      # browser extension under a virtual framebuffer (xvfb) and needs no
+      # projectId. The WalletConnect project is intentionally not wired here — it
       # needs a Reown projectId secret; see tests/e2e/README.md.
-      # TODO: wire Coinbase / WalletConnect projects once a projectId secret is available.
+      # TODO: wire the WalletConnect project once a Reown projectId secret is available.
       - name: Browser e2e (MetaMask, Playwright + dappwright)
         env:
           # Point the suite at the demo RP deployed above (CI uses the
@@ -291,6 +291,18 @@ jobs:
           yarn install --frozen-lockfile
           npx playwright install --with-deps chromium
           xvfb-run --auto-servernum yarn test:e2e:metamask
+      - name: Browser e2e (Coinbase Wallet, Playwright + dappwright)
+        env:
+          # Same demo RP / IdP as the MetaMask step above. The Coinbase project
+          # drives the real Coinbase Wallet extension via dappwright's Coinbase
+          # SDK connector — no projectId/secret needed (unlike WalletConnect).
+          DEMO_URL: https://${{ env.DOMAIN_DEMO_APP }}
+          LOGIN_URL: https://${{ env.DOMAIN_LOGIN }}
+        run: |
+          cd tests/e2e
+          # deps + chromium are already installed by the MetaMask step; dappwright
+          # downloads the Coinbase extension on first run of this project.
+          xvfb-run --auto-servernum yarn test:e2e:coinbase
       - name: Pods
         if: always()
         run: |
