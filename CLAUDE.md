@@ -161,7 +161,7 @@ WALLETCONNECT_PROJECT_ID=<id> yarn test:e2e:walletconnect   # WalletConnect (nee
 ```
 
 ### CI/CD (GitHub Actions)
-- **`build.yml`** (PRs / pushes to `master`): builds gateway/login/wrapper/demo images (login & wrapper from the `login/` context) → DO registry tagged with git SHA → microk8s → `helm dependency update` + `helm install` → the `tests/e2e/` Playwright + dappwright **MetaMask** project under xvfb (Coinbase/WalletConnect projects aren't wired into CI — WalletConnect needs a Reown projectId secret).
+- **`build.yml`** (PRs / pushes to `master`): builds gateway/login/wrapper/demo images (login & wrapper from the `login/` context) → DO registry tagged with git SHA → microk8s → `helm dependency update` + `helm install` → the **`tests/harness/`** curl-driven backend suite (the full OAuth2+SIWE flow, device grant, logout, acr/amr, token-gating, introspection, SIWE errors — needs no display; `test_blocklist` is `--ignore`d as it'd restart the Deployment mid-job) → the `tests/e2e/` Playwright + dappwright **MetaMask** project under xvfb. `values.ci.yaml` carries the logout/device Hydra URLs + a public `ethRpcUrl` so the harness's on-chain-dependent cases pass. (Coinbase/WalletConnect e2e projects still aren't wired in — WalletConnect needs a Reown projectId secret.)
 - **`release.yml`** (tags `v[0-9]+.[0-9]+.[0-9]+`): decrypts prod values and `helm upgrade`s production. Release by pushing a semver tag.
 
 ## Hydra

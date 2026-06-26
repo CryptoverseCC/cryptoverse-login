@@ -4,6 +4,14 @@ domain: login.cryptoverse.local
 
 ingressClassName: public
 
+# A reachable public mainnet RPC so the backend harness can exercise the on-chain
+# paths that fail CLOSED on an RPC error (token-gating balanceOf, and the SIWE
+# contract-fallback that must return 401-not-503 for a bad signature). No key in
+# CI — public endpoint is fine for the deterministic test account (holds 0 of
+# everything, no ENS). (Basenames/Passport need baseRpcUrl; left off — not in the
+# harness.)
+ethRpcUrl: "https://ethereum-rpc.publicnode.com"
+
 imagePullSecrets:
   - name: registry-cryptoverse
 
@@ -15,6 +23,11 @@ hydra:
       urls:
         login: https://login.cryptoverse.local/login
         consent: https://login.cryptoverse.local/consent
+        logout: https://login.cryptoverse.local/logout
+        post_logout_redirect: https://login.cryptoverse.local/
+        device:
+          verification: https://login.cryptoverse.local/device
+          success: https://login.cryptoverse.local/device/success
         self:
           issuer: https://login.cryptoverse.local/
       secrets:

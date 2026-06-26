@@ -169,6 +169,40 @@ jobs:
         run: |
           curl https://${DOMAIN_LOGIN}/.well-known/openid-configuration -vk
 
+      #####################
+      # Backend harness   #
+      #####################
+      # Curl-driven backend suite (tests/harness/): the full OAuth2 + SIWE flow,
+      # device grant, RP-initiated logout, acr/amr, token-gating, introspection,
+      # SIWE error cases — no browser/display needed, so it's fast and broad
+      # coverage the MetaMask e2e can't give. Runs against the stack deployed above.
+      - name: Cache Rust (SIWE signer)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: login
+      - name: Backend harness (tests/harness, curl-driven)
+        run: |
+          # The harness signs EIP-4361 messages with the Rust `sign` example.
+          cargo build -p cryptoverse-core --example sign --manifest-path login/Cargo.toml
+          python3 -m venv /tmp/harness-venv
+          /tmp/harness-venv/bin/pip install -q -r tests/harness/requirements.txt
+          # The harness runs on the runner (not in-cluster), so reach Hydra's admin
+          # API via a port-forward.
+          kubectl -n cryptoverse-login-${{ github.sha }} \
+            port-forward svc/cryptoverse-login-hydra-admin 4445:4445 &
+          PF=$!
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:4445/health/ready && break || sleep 1
+          done
+          # test_blocklist is ignored in CI: it mutates the login ConfigMap +
+          # restarts the Deployment, which would disrupt the e2e that runs next in
+          # this same job (it self-skips anyway without the kind kube-context).
+          HARNESS_GATEWAY=https://${DOMAIN_LOGIN} HARNESS_HOST= \
+            HARNESS_HYDRA_ADMIN=http://127.0.0.1:4445 \
+            /tmp/harness-venv/bin/pytest tests/harness/ -v \
+            --ignore=tests/harness/test_blocklist.py
+          kill $PF || true
+
       ########
       # Demo #
       ########
