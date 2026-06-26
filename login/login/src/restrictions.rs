@@ -19,11 +19,12 @@ use cryptoverse_core::hydra::OAuth2Client;
 use evalexpr::{ContextWithMutableVariables, DefaultNumericTypes, HashMapContext, Node, Value};
 use serde::{Deserialize, Serialize};
 
-/// Message shown when a gated balance could not be read on-chain (RPC down,
-/// bad token address, decimals/parse failure). The gate is INDETERMINATE, so we
-/// **fail closed** (deny) — never silently pass a `> 0` check during an outage.
+/// Message shown when a gated on-chain value could not be read (RPC down, bad
+/// token address, decimals/parse failure, or — for a Passport gate — no/expired
+/// passport). The gate is INDETERMINATE, so we **fail closed** (deny) — never
+/// silently pass a `> 0` check during an outage.
 const INDETERMINATE_MSG: &str =
-    "Could not verify your on-chain balances right now. Please try again.";
+    "Could not verify your on-chain requirements right now. Please try again.";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Restriction {
@@ -115,7 +116,19 @@ async fn check_one(eth: &Eth, restriction: &Restriction, owner: Address) -> Chec
         }
     }
 
-    if let Some(token) = &restriction.token_address {
+    if restriction.standard.as_deref() == Some("passport") {
+        // Sybil / attestation gate: read the Gitcoin / Human Passport decoder on
+        // Base and expose `passportScore` (no tokenAddress; e.g. a condition of
+        // `passportScore >= 20`).
+        match passport_for(eth, owner).await {
+            Ok(score) => {
+                let key = "passportScore".to_string();
+                data.insert(key.clone(), score);
+                let _ = context.set_value(key, Value::Float(score));
+            }
+            Err(()) => return indeterminate(restriction, data),
+        }
+    } else if let Some(token) = &restriction.token_address {
         let key = "balanceOf".to_string();
         match balance_for(
             eth,
@@ -258,6 +271,15 @@ async fn balance_for(
     }
 }
 
+/// Resolve the Gitcoin / Human Passport humanity score (exposes the condition
+/// variable `passportScore`). `Err(())` means INDETERMINATE — no/expired passport,
+/// RPC down, or no Base RPC configured — and the caller fails the gate closed.
+async fn passport_for(eth: &Eth, owner: Address) -> Result<f64, ()> {
+    eth.passport_score(owner).await.map_err(|e| {
+        tracing::warn!("passport score unavailable for {owner}: {e}");
+    })
+}
+
 /// Parse a token id (decimal or `0x`-hex) into a `U256`. A bad value is a config
 /// error → `Err(())` (fail closed, like an unreadable balance).
 fn parse_u256(s: &str) -> Result<U256, ()> {
@@ -368,6 +390,41 @@ mod tests {
         };
         let result = check_one(&eth, &restriction, owner).await;
         assert!(!result.passed, "erc1155 without tokenId must fail closed");
+        assert_eq!(result.message.as_deref(), Some(INDETERMINATE_MSG));
+    }
+
+    #[test]
+    fn parses_passport_restriction_shape() {
+        // A sybil gate: no tokenAddress, just a passportScore condition.
+        let p: Restriction = serde_json::from_str(
+            r#"{"standard":"passport","condition":"passportScore >= 20","message":"humans only"}"#,
+        )
+        .unwrap();
+        assert_eq!(p.standard.as_deref(), Some("passport"));
+        assert!(p.token_address.is_none() && p.contract_aliases.is_none());
+        assert_eq!(p.condition, "passportScore >= 20");
+    }
+
+    /// A Passport gate whose score can't be positively read (here: no Base RPC ⇒
+    /// decoder unreachable) fails CLOSED — never passes a `passportScore >= N`
+    /// check on an outage / no-passport.
+    #[tokio::test]
+    async fn passport_gate_fails_closed_when_unverifiable() {
+        std::env::remove_var("BASE_RPC_URL"); // Base provider absent ⇒ unavailable
+        let eth = unreachable_eth();
+        let owner: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        let restriction = Restriction {
+            contract_aliases: None,
+            token_address: None,
+            condition: "passportScore >= 20".to_string(),
+            message: Some("humans only".to_string()),
+            standard: Some("passport".to_string()),
+            token_id: None,
+        };
+        let result = check_one(&eth, &restriction, owner).await;
+        assert!(!result.passed, "an unverifiable passport must fail closed");
         assert_eq!(result.message.as_deref(), Some(INDETERMINATE_MSG));
     }
 

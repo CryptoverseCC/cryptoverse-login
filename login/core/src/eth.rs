@@ -40,6 +40,14 @@ const UD_PROXY_READER: Address = address!("049aba7510f45BA5b64ea9E658E342F904DB3
 const BASE_L2_REVERSE_REGISTRAR: Address = address!("0000000000D8e504002cC26E3Ec46D81971C1664");
 const BASE_REGISTRY: Address = address!("B94704422c2a1e396835A571837Aa5AE53285a95");
 
+// Gitcoin / Human Passport on-chain decoder on **Base** (chainId 8453). Passport
+// "stamps" are EAS attestations; the decoder is the on-chain `address -> score`
+// reader (the one EAS-backed credential that's queryable by recipient without an
+// off-chain indexer). `getScore` is 4-decimal fixed-point (raw 200000 = 20.0); it
+// REVERTS for an address with no / expired passport — which (like any read error
+// here) fails the gate closed. Used for sybil-resistant login gating.
+const GITCOIN_PASSPORT_DECODER_BASE: Address = address!("aa24a127d10C68C8F9Ac06199AA606953cD82eE7");
+
 /// Default per-request timeout (ms) for JSON-RPC calls and the UD metadata HTTP
 /// fetch when `RPC_TIMEOUT_MS` is unset. A hung RPC must never block a login
 /// indefinitely; on timeout a security-relevant call surfaces as
@@ -164,6 +172,11 @@ sol! {
     // address directly, so a single `nameForAddr(addr)` yields the candidate
     // name. The forward-verify (Registry.resolver → L2Resolver.addr) reuses the
     // `ENSRegistry` / `ENSAddrResolver` interfaces above — same shape on Base.
+    #[sol(rpc)]
+    interface IGitcoinPassportDecoder {
+        function getScore(address user) external view returns (uint256);
+    }
+
     #[sol(rpc)]
     interface IL2ReverseRegistrar {
         function nameForAddr(address addr) external view returns (string);
@@ -707,6 +720,34 @@ impl Eth {
         // Checksum is irrelevant: `Address` is the raw 20 bytes, so `==` compares
         // them exactly. A zero forward address never matches a real `owner`.
         !resolved.is_zero() && resolved == owner
+    }
+
+    /// The Gitcoin / Human Passport humanity score for `owner`, read from the
+    /// on-chain decoder on **Base** and scaled from its 4-decimal fixed-point to a
+    /// plain `f64` (raw `200000` → `20.0`) for the token-gating evaluator (the
+    /// variable `passportScore`). Passport stamps are EAS attestations; this
+    /// decoder is the one EAS-backed credential queryable by recipient on-chain.
+    ///
+    /// Fails **closed** (`Err(Unavailable)`) on ANY decoder error — including the
+    /// revert the decoder raises for an address with no / expired passport — so a
+    /// `passportScore >= N` gate denies whenever a score can't be positively read.
+    /// With no `BASE_RPC_URL` the Base provider is absent ⇒ unavailable ⇒ deny.
+    pub async fn passport_score(&self, owner: Address) -> Result<f64, EthError> {
+        let raw: U256 = self
+            .base_rpc_call("Base GitcoinPassportDecoder.getScore", |p| async move {
+                IGitcoinPassportDecoder::new(GITCOIN_PASSPORT_DECODER_BASE, p)
+                    .getScore(owner)
+                    .call()
+                    .await
+            })
+            .await?;
+        // 4-decimal fixed point (raw 200000 = score 20.0).
+        match alloy::primitives::utils::format_units(raw, 4u8) {
+            Ok(s) => s
+                .parse::<f64>()
+                .map_err(|e| EthError::unavailable("passport getScore parse", e)),
+            Err(e) => Err(EthError::unavailable("passport getScore format_units", e)),
+        }
     }
 }
 
