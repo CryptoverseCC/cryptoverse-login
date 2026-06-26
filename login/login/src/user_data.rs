@@ -83,11 +83,22 @@ async fn resolve_enrichment(eth: &Eth, cache: &EnrichmentCache, owner: Address) 
     enrichment
 }
 
-/// Build the `id_token` claims object for `subject`.
+/// Build the `id_token` claims object for `subject`, returning it alongside the
+/// resolved [`Enrichment`] (so the consent handler can build `cv_identities`
+/// without a second on-chain lookup).
 ///
 /// `email_verified` is the value put on the `email_verified` claim — see the
 /// claim's inline comment: it must default to `false` because the generated
 /// `{address}@{MAILSERVER_DOMAIN}` mailbox is synthetic and never delivered to.
+///
+/// `expose_names` gates the **verified ENS / Unstoppable Domains human-readable
+/// names** in the standard OIDC claims (`name`, `names.*`, `emails.*`,
+/// `nickname`): these are real-world-linkable identity and are released only when
+/// the relying party was granted the `profile` scope. The address-derived
+/// synthetic claims always populate — they reveal only the address, which is the
+/// public `sub` anyway. (The `mail`-scope `cv_identities` claim still carries the
+/// verified primary regardless, built by the consent handler from the returned
+/// `Enrichment` — `mail` is its own explicit grant.)
 pub async fn get_data(
     eth: &Eth,
     cache: &EnrichmentCache,
@@ -95,7 +106,8 @@ pub async fn get_data(
     mailserver_domain: &str,
     profile_domain: &str,
     email_verified: bool,
-) -> serde_json::Value {
+    expose_names: bool,
+) -> (serde_json::Value, Enrichment) {
     let user = subject;
     let default_email = format!("{user}@{mailserver_domain}");
 
@@ -111,11 +123,24 @@ pub async fn get_data(
     let mut ud_name_default: Option<String> = None;
     let mut ud_name_all: Vec<String> = vec![];
 
-    if let Ok(owner) = subject.parse::<Address>() {
+    let enrichment = if let Ok(owner) = subject.parse::<Address>() {
         // Per-address enrichment (ENS + UD reverse) is resolved through a TTL
         // cache; on a miss the two lookups run concurrently (see
-        // `resolve_enrichment`).
-        let Enrichment { ens, ud } = resolve_enrichment(eth, cache, owner).await;
+        // `resolve_enrichment`). It is always resolved (and returned, for
+        // `cv_identities`); whether it surfaces in the standard claims below is
+        // gated by `expose_names`.
+        resolve_enrichment(eth, cache, owner).await
+    } else {
+        Enrichment::default()
+    };
+    // `has_primary_name` is a privacy-preserving boolean: it tells a relying party
+    // that a verified primary name exists for this address WITHOUT disclosing it,
+    // so an RP without the `profile` scope can still branch on it.
+    let has_primary_name =
+        primary_identity(enrichment.ens.as_deref(), enrichment.ud.as_deref()).is_some();
+
+    if expose_names {
+        let Enrichment { ens, ud } = enrichment.clone();
 
         if let Some(ens) = ens {
             // Strip only the trailing `.eth` (a `.replace` would also mangle a
@@ -169,7 +194,7 @@ pub async fn get_data(
         .map(|(name, _kind)| name.to_string());
     let name_claim = primary_name.as_deref().unwrap_or(user);
 
-    json!({
+    let id_token = json!({
         "address": { "country": "Cryptoverse", "region": "Ethereum" },
         "birthdate": "",
         // The verified identity is the *Ethereum address*, not the synthetic
@@ -190,6 +215,9 @@ pub async fn get_data(
         "name": name_claim,
         "names": names,
         "nickname": ens_name_default,
+        // Privacy-preserving signal: a verified primary name exists for this
+        // address, without disclosing it (the name itself is `profile`-gated).
+        "has_primary_name": has_primary_name,
         "phone_number_verified": false,
         "phone_number": "",
         "picture": format!("https://{profile_domain}/{user}.png"),
@@ -199,7 +227,8 @@ pub async fn get_data(
         "updated_at": 0,
         "website": format!("https://{user}.{profile_domain}/"),
         "zoneinfo": "",
-    })
+    });
+    (id_token, enrichment)
 }
 
 /// Pick the verified primary identity from the resolved ENS and UD default
@@ -221,15 +250,14 @@ fn primary_identity<'a>(
     }
 }
 
-/// Extract the verified primary `(name, kind)` from an already-built `id_token`
-/// claims object (as produced by [`get_data`]). Lets the consent handler reuse
-/// the enrichment result for `cv_identities` **without triggering a second
-/// on-chain resolution** — it just reads back the `names.{ens,unstoppabledomains}.default`
-/// fields `get_data` already populated. ENS is preferred, else UD, else `None`.
-pub fn primary_from_id_token(id_token: &serde_json::Value) -> Option<(String, &'static str)> {
-    let ens = id_token["names"]["ens"]["default"].as_str();
-    let ud = id_token["names"]["unstoppabledomains"]["default"].as_str();
-    primary_identity(ens, ud).map(|(name, kind)| (name.to_string(), kind))
+/// The verified primary `(name, kind)` from a resolved [`Enrichment`] — ENS
+/// preferred, else Unstoppable Domains, else `None`. Used by the consent handler
+/// to build `cv_identities` from the enrichment [`get_data`] already resolved
+/// (**no second on-chain lookup**), independent of whether the names were exposed
+/// in the standard claims (which is `profile`-gated).
+pub fn primary_of(enrichment: &Enrichment) -> Option<(String, &'static str)> {
+    primary_identity(enrichment.ens.as_deref(), enrichment.ud.as_deref())
+        .map(|(name, kind)| (name.to_string(), kind))
 }
 
 #[cfg(test)]
@@ -314,11 +342,91 @@ mod tests {
         let cache = EnrichmentCache::new();
         let subject = "0x0000000000000000000000000000000000000001";
 
-        let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", false).await;
+        let (claims, _) = get_data(
+            &eth,
+            &cache,
+            subject,
+            "ethmail.cc",
+            "cryptoverse.cc",
+            false,
+            true,
+        )
+        .await;
         assert_eq!(claims["email_verified"], serde_json::json!(false));
 
-        let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", true).await;
+        let (claims, _) = get_data(
+            &eth,
+            &cache,
+            subject,
+            "ethmail.cc",
+            "cryptoverse.cc",
+            true,
+            true,
+        )
+        .await;
         assert_eq!(claims["email_verified"], serde_json::json!(true));
+    }
+
+    /// The verified ENS/UD human-readable name is gated by `expose_names`
+    /// (`profile` scope): when not exposed, the standard claims fall back to the
+    /// address and `names.ens.default` is null — but the `Enrichment` is STILL
+    /// returned (so `cv_identities` under the `mail` scope keeps the name) and the
+    /// `has_primary_name` boolean still signals one exists.
+    #[tokio::test]
+    async fn verified_name_is_profile_gated_but_enrichment_returned() {
+        std::env::set_var("ETH_RPC_URL", "http://127.0.0.1:1");
+        std::env::set_var("RPC_TIMEOUT_MS", "150");
+        let eth = Eth::from_env().expect("eth");
+        let cache = EnrichmentCache::new();
+        let subject = "0x0000000000000000000000000000000000000001";
+        let owner: Address = subject.parse().unwrap();
+        // Seed a verified ENS name so resolve_enrichment serves it from cache.
+        cache
+            .put(
+                format!("{owner:#x}"),
+                Enrichment {
+                    ens: Some("alice.eth".to_string()),
+                    ud: None,
+                },
+            )
+            .await;
+
+        // expose_names = false (no `profile`): name is redacted to the address,
+        // but the enrichment is returned and the boolean still flags a name.
+        let (claims, enrichment) = get_data(
+            &eth,
+            &cache,
+            subject,
+            "ethmail.cc",
+            "cryptoverse.cc",
+            false,
+            false,
+        )
+        .await;
+        assert_eq!(claims["name"], serde_json::json!(subject));
+        assert!(claims["names"]["ens"]["default"].is_null());
+        assert_eq!(claims["has_primary_name"], serde_json::json!(true));
+        assert_eq!(
+            primary_of(&enrichment),
+            Some(("alice.eth".to_string(), "ens"))
+        );
+
+        // expose_names = true (`profile` granted): the verified name surfaces.
+        let (claims, _) = get_data(
+            &eth,
+            &cache,
+            subject,
+            "ethmail.cc",
+            "cryptoverse.cc",
+            false,
+            true,
+        )
+        .await;
+        assert_eq!(claims["name"], serde_json::json!("alice.eth"));
+        assert_eq!(
+            claims["names"]["ens"]["default"],
+            serde_json::json!("alice.eth")
+        );
     }
 
     /// Primary selection: ENS preferred, else UD, else none.
@@ -342,39 +450,25 @@ mod tests {
         assert_eq!(primary_identity(None, None), None, "none when neither");
     }
 
-    /// `primary_from_id_token` reads back the verified default names that
-    /// `get_data` populated (no second resolution), ENS-preferred.
+    /// `primary_of` selects the verified primary from the resolved enrichment
+    /// (ENS preferred, else UD, else none) — what feeds `cv_identities`.
     #[test]
-    fn primary_from_id_token_reads_back_defaults() {
-        let with_ens = json!({
-            "names": {
-                "ens": { "default": "alice.eth" },
-                "unstoppabledomains": { "default": "alice.crypto" },
-            }
-        });
+    fn primary_of_selects_ens_then_ud_then_none() {
         assert_eq!(
-            primary_from_id_token(&with_ens),
+            primary_of(&Enrichment {
+                ens: Some("alice.eth".to_string()),
+                ud: Some("alice.crypto".to_string()),
+            }),
             Some(("alice.eth".to_string(), "ens"))
         );
-
-        let ud_only = json!({
-            "names": {
-                "ens": { "default": serde_json::Value::Null },
-                "unstoppabledomains": { "default": "bob.crypto" },
-            }
-        });
         assert_eq!(
-            primary_from_id_token(&ud_only),
+            primary_of(&Enrichment {
+                ens: None,
+                ud: Some("bob.crypto".to_string()),
+            }),
             Some(("bob.crypto".to_string(), "ud"))
         );
-
-        let none = json!({
-            "names": {
-                "ens": { "default": serde_json::Value::Null },
-                "unstoppabledomains": { "default": serde_json::Value::Null },
-            }
-        });
-        assert_eq!(primary_from_id_token(&none), None);
+        assert_eq!(primary_of(&Enrichment::default()), None);
     }
 
     /// With no resolvable primary (the test-account case), the `name` claim
@@ -387,10 +481,19 @@ mod tests {
         let cache = EnrichmentCache::new();
         let subject = "0x0000000000000000000000000000000000000001";
 
-        let claims = get_data(&eth, &cache, subject, "ethmail.cc", "cryptoverse.cc", false).await;
+        let (claims, enrichment) = get_data(
+            &eth,
+            &cache,
+            subject,
+            "ethmail.cc",
+            "cryptoverse.cc",
+            false,
+            true,
+        )
+        .await;
         assert_eq!(claims["name"], serde_json::json!(subject));
-        // And `primary_from_id_token` agrees there is no primary.
-        assert_eq!(primary_from_id_token(&claims), None);
+        // And the enrichment agrees there is no verified primary.
+        assert_eq!(primary_of(&enrichment), None);
     }
 
     #[tokio::test]

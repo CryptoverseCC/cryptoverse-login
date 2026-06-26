@@ -258,6 +258,18 @@ pub async fn verify(
 
     // 1. EOA fast path — EIP-191 ecrecover, no network. `verify` checks the
     //    recovered address equals the SIWE address, plus nonce/time again.
+    //
+    //    EIP-7702 (mainnet since the Pectra hardfork, 2025): a plain EOA can
+    //    install delegated contract code while keeping its key. This path is
+    //    unaffected — the key still ecrecovers to the same address, so a
+    //    7702-delegated account signing SIWE with `personal_sign` is accepted here
+    //    unchanged. A 7702 account that instead returns an ERC-1271-style signature
+    //    (e.g. a session key) fails ecrecover and falls through to the contract
+    //    path (step 2) — also handled. The ordering (ecrecover BEFORE ERC-1271) is
+    //    deliberate: a "locked" smart-EOA that meant to revoke its raw key would
+    //    still have a raw-key signature accepted here. For an IdP that is the safe
+    //    default (the key holder IS the user); the contract fallback (step 2) is
+    //    kept unconditional so session-key-only 7702 accounts are never locked out.
     let opts = VerificationOpts {
         nonce: Some(expected_nonce),
         timestamp: Some(now),
@@ -287,6 +299,12 @@ pub async fn verify(
     // 2. Contract wallet — ERC-1271 (deployed) / ERC-6492 (counterfactual).
     //    The hash is the EIP-191 personal_sign hash of the SIWE message string,
     //    which siwe computes for us, identical to what the wallet signed over.
+    //    This is ALSO the passkey path: a passkey-secured smart account (a P-256 /
+    //    WebAuthn signer, e.g. Coinbase Smart Wallet) verifies its assertion
+    //    on-chain inside `isValidSignature`, so it authenticates here with no P-256
+    //    handling on our side — the verifier is signature-scheme-agnostic. (It
+    //    requires the configured chain to expose a reachable secp256r1 verifier /
+    //    RIP-7212.) The live ERC-6492 test exercises this counterfactual path.
     let hash = msg
         .eip191_hash()
         .map_err(|e| AuthError::Verify(format!("hashing message failed: {e}")))?;
