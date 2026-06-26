@@ -18,6 +18,26 @@ env:
   ASSETS_PATH: /tmp/assets/
 
 jobs:
+  # Rust workspace unit + integration tests. Runs in PARALLEL with the image
+  # builds and needs no cluster. This is the first place the workspace `cargo
+  # test` runs in CI — and it includes the deterministic ERC-1271 smart-account
+  # signature integration test (tests/erc1271_anvil.rs), which spins up a local
+  # `anvil` (installed by foundry-toolchain). `CV_REQUIRE_ANVIL=1` makes a missing
+  # anvil a hard failure so CI can never silently lose that smart-account coverage.
+  cargo-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: login
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: cargo test (workspace, incl. ERC-1271 anvil)
+        working-directory: login
+        env:
+          CV_REQUIRE_ANVIL: "1"
+        run: cargo test --workspace
   build-gateway:
     runs-on: ubuntu-latest
     environment: CI

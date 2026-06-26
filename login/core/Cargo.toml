@@ -26,4 +26,7 @@ time.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true }
-alloy = { workspace = true, features = ["signer-local", "signers"] }
+# `node-bindings` (dev-only) provides the in-process `Anvil` launcher used by the
+# deterministic ERC-1271 integration test (`tests/erc1271_anvil.rs`). It is never
+# compiled into the shipped binaries.
+alloy = { workspace = true, features = ["signer-local", "signers", "node-bindings"] }

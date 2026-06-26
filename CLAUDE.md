@@ -85,7 +85,7 @@ Replaces the old custom message (`Cryptoverse Login - auth.cryptoverse.cc|csrf|c
 ### Rust workspace (`login/`)
 ```bash
 cargo build --workspace        # build core + login + wrapper
-cargo test --workspace         # unit tests (SIWE round-trip, evalexpr, namehash, ...)
+cargo test --workspace         # unit tests (SIWE round-trip, evalexpr, namehash, ...); also spins up `anvil` for the deterministic ERC-1271 smart-account test (tests/erc1271_anvil.rs) — auto-skips if `anvil` isn't on PATH (CI installs it via foundry, with CV_REQUIRE_ANVIL=1 to make a missing anvil a hard failure)
 cargo clippy --workspace --all-targets
 cargo fmt
 cargo run -p wrapper           # needs env (PORT, HYDRA_ADMIN_URL, SENTRY_*); domain is request-derived
