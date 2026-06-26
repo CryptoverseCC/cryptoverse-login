@@ -108,6 +108,12 @@ pub struct AppState {
     /// re-read per request. A blocked recovered address is denied login before
     /// any on-chain token-gating. Missing/empty ⇒ no-op (nobody blocked).
     pub blocklist_file: std::path::PathBuf,
+    /// Seconds Hydra should remember an authenticated session (`REMEMBER_FOR`,
+    /// default 3600). `> 0` gives SSO across relying parties and — critically —
+    /// makes RP-initiated + back-channel logout work (Hydra skips the logout
+    /// provider for non-remembered sessions). `0` requires a fresh wallet
+    /// signature on every login (no SSO) at the cost of limited logout.
+    pub remember_for: i64,
     pub metrics_handle: PrometheusHandle,
 }
 
@@ -161,6 +167,9 @@ async fn main() {
         wallet_connect_project_id: config::var_or("WALLETCONNECT_PROJECT_ID", ""),
         restrictions_file: config::var_or("RESTRICTIONS_FILE", "/config/restrictions.json"),
         blocklist_file: config::var_or("BLOCKLIST_FILE", "/config/blocklist.json").into(),
+        remember_for: config::var_or("REMEMBER_FOR", "3600")
+            .parse()
+            .unwrap_or(3600),
         metrics_handle,
     });
 
@@ -204,6 +213,7 @@ async fn main() {
         .route("/login", get(routes::login::page))
         .merge(governed_router)
         .route("/consent", get(routes::consent::consent))
+        .route("/logout", get(routes::logout::page))
         .route("/device", get(routes::device::page))
         .route("/device/success", get(routes::device::success))
         .route("/---/metrics", get(metrics))

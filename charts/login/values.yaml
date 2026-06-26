@@ -75,6 +75,11 @@ hydra:
       urls:
         login: https://login.cryptoverse.cc/login
         consent: https://login.cryptoverse.cc/consent
+        # RP-initiated logout provider (login backend `/logout`) + the fallback
+        # post-logout landing (used when the RP supplies no registered
+        # post_logout_redirect_uri).
+        logout: https://login.cryptoverse.cc/logout
+        post_logout_redirect: https://login.cryptoverse.cc/
         device:
           verification: https://login.cryptoverse.cc/device
           success: https://login.cryptoverse.cc/device/success
@@ -133,6 +138,12 @@ login:
   # mailbox is not). Set true only if a real mailserver backs the domain.
   # → EMAIL_VERIFIED_CLAIM env.
   emailVerifiedClaim: false
+  # Seconds Hydra remembers an authenticated session (→ REMEMBER_FOR env). > 0
+  # gives SSO across relying parties AND makes RP-initiated + back-channel logout
+  # work (Hydra skips the logout provider/notifications for non-remembered
+  # sessions). 0 forces a fresh wallet signature on every login (no SSO), at the
+  # cost of limited logout. Default 1h.
+  rememberFor: 3600
   # Per-request timeout (ms) for on-chain JSON-RPC calls (ENS / Unstoppable
   # Domains / balanceOf). Bounds login latency on a slow/unreachable RPC.
   # → RPC_TIMEOUT_MS env.

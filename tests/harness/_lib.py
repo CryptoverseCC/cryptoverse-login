@@ -79,7 +79,8 @@ def to_gateway(abs_url):
 
 # --- Hydra admin (client lifecycle) ------------------------------------------
 def create_client(metadata=None, scope="openid", redirect_uri="http://localhost:9876/callback",
-                  grant_types=None, token_endpoint_auth_method=None, public=False):
+                  grant_types=None, token_endpoint_auth_method=None, public=False,
+                  post_logout_redirect_uris=None):
     """Register an OAuth2 client with Hydra.
 
     Defaults reproduce the historical authorization-code client. Pass
@@ -99,6 +100,8 @@ def create_client(metadata=None, scope="openid", redirect_uri="http://localhost:
     }
     if metadata is not None:
         spec["metadata"] = metadata
+    if post_logout_redirect_uris is not None:
+        spec["post_logout_redirect_uris"] = post_logout_redirect_uris
     out = subprocess.run(
         ["curl", "-sk", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST",
          f"{HYDRA_ADMIN}/admin/clients", "-H", "Content-Type: application/json",

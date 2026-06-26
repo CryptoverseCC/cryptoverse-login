@@ -67,6 +67,10 @@ spec:
               value: {{ .Values.login.rpcTimeoutMs | default 3000 | quote }}
             - name: EMAIL_VERIFIED_CLAIM
               value: {{ .Values.login.emailVerifiedClaim | default false | quote }}
+            # Seconds Hydra remembers an authenticated session (SSO + enables
+            # RP-initiated/back-channel logout). 0 = re-sign every login.
+            - name: REMEMBER_FOR
+              value: {{ .Values.login.rememberFor | default 3600 | quote }}
             # Path to the global login-deny blocklist (blocklist.json, mounted
             # from the login ConfigMap at /config). Set explicitly for clarity;
             # the backend defaults to this same path if unset.

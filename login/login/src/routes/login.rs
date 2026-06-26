@@ -205,6 +205,9 @@ pub async fn process(
         );
     }
 
+    // Whether the client's on-chain token-gating was enforced AND satisfied —
+    // surfaced as a higher `acr` assurance level below.
+    let mut gated = false;
     // Token-gating: `None` (or empty) means unrestricted.
     if let Some(rs) = restrictions::get_restrictions(&login_req.client, &st.restrictions_file).await
     {
@@ -240,12 +243,20 @@ pub async fn process(
                 };
                 return error_response(&form.response, StatusCode::FORBIDDEN, &msg);
             }
+            gated = true;
         }
     }
 
+    // Authentication assurance for relying parties (OIDC `acr`/`amr`). SIWE is a
+    // signature proof-of-possession of the wallet key (RFC 8176 `sig`). When the
+    // client's token-gating was enforced and satisfied, the login additionally
+    // proved on-chain holdings — a higher assurance level an RP can read/require.
+    let amr = ["sig"];
+    let acr = if gated { "wallet-gated" } else { "wallet" };
+
     match st
         .hydra
-        .accept_login_request(&form.challenge, &subject)
+        .accept_login_request(&form.challenge, &subject, acr, &amr, st.remember_for)
         .await
     {
         Ok(resp) => {

@@ -1,6 +1,7 @@
 pub mod consent;
 pub mod device;
 pub mod login;
+pub mod logout;
 
 use axum::http::HeaderMap;
 

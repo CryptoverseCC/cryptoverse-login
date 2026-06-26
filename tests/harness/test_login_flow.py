@@ -23,6 +23,10 @@ def test_full_siwe_login(http, basic_client):
     assert claims["emails"]["ens"]["default"] is None
     assert claims["names"]["unstoppabledomains"]["default"] is None
     assert claims["address"] == {"country": "Cryptoverse", "region": "Ethereum"}
+    # Authentication assurance: SIWE is signature proof-of-possession (`amr` sig);
+    # the unrestricted client is not token-gated, so acr is the base "wallet".
+    assert claims.get("acr") == "wallet", f"acr was {claims.get('acr')!r}"
+    assert "sig" in claims.get("amr", []), f"amr was {claims.get('amr')!r}"
 
 
 def test_userinfo_returns_subject(http, basic_client):

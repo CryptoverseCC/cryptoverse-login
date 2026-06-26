@@ -124,17 +124,50 @@ impl Hydra {
         Ok(resp.json().await?)
     }
 
+    /// Accept a login request, binding the recovered `subject` plus the achieved
+    /// authentication assurance: `acr` (a single context-class string) and `amr`
+    /// (the methods used, RFC 8176). `remember_for > 0` asks Hydra to remember the
+    /// authenticated session for that many seconds (a stable `sid`), which both
+    /// gives the user SSO across relying parties AND is what makes RP-initiated +
+    /// back-channel **logout** actually fire (Hydra skips the logout provider and
+    /// channel notifications for non-remembered sessions). `0` disables it.
     pub async fn accept_login_request(
         &self,
         challenge: &str,
         subject: &str,
+        acr: &str,
+        amr: &[&str],
+        remember_for: i64,
     ) -> anyhow::Result<RedirectResponse> {
         let url = format!("{}/admin/oauth2/auth/requests/login/accept", self.base);
         let resp = self
             .http
             .put(url)
             .query(&[("login_challenge", challenge)])
-            .json(&serde_json::json!({ "subject": subject }))
+            .json(&serde_json::json!({
+                "subject": subject,
+                "acr": acr,
+                "amr": amr,
+                "remember": remember_for > 0,
+                "remember_for": remember_for.max(0),
+            }))
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(resp.json().await?)
+    }
+
+    /// Accept an RP-initiated logout request. Hydra redirects the browser here
+    /// (`urls.logout`) with a one-time `logout_challenge` after it has validated
+    /// the RP's `id_token_hint` at the end-session endpoint. Accepting it returns
+    /// the `redirect_to` that clears the session, fires back-/front-channel logout
+    /// to the clients, and lands on the post-logout redirect.
+    pub async fn accept_logout_request(&self, challenge: &str) -> anyhow::Result<RedirectResponse> {
+        let url = format!("{}/admin/oauth2/auth/requests/logout/accept", self.base);
+        let resp = self
+            .http
+            .put(url)
+            .query(&[("logout_challenge", challenge)])
             .send()
             .await?
             .error_for_status()?;
