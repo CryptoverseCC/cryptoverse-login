@@ -119,6 +119,15 @@ sol! {
         function balanceOf(address owner) external view returns (uint256);
     }
 
+    // ERC-1155 `balanceOf` takes a token id, so it needs its own interface (a
+    // different selector from ERC-20/721's `balanceOf(address)`). ERC-721 reuses
+    // IERC20::balanceOf — the `balanceOf(address)` signature is identical; only
+    // the decimals scaling differs (NFTs are whole units), handled in the caller.
+    #[sol(rpc)]
+    interface IERC1155 {
+        function balanceOf(address account, uint256 id) external view returns (uint256);
+    }
+
     #[sol(rpc)]
     interface ENSRegistry {
         function resolver(bytes32 node) external view returns (address);
@@ -260,6 +269,38 @@ impl Eth {
                 .map_err(|e| EthError::unavailable("balanceOf() parse", e)),
             Err(e) => Err(EthError::unavailable("balanceOf() format_units", e)),
         }
+    }
+
+    /// ERC-721 / NFT count of `owner` for `token`: the RAW `balanceOf(address)`
+    /// with **no decimals scaling** (NFTs are whole units), as `f64` for the
+    /// token-gating evaluator — so `balanceOf > 0` means "owns at least one".
+    /// Gates by NFT collection / DAO membership. Fails closed exactly like
+    /// [`balance_of`](Self::balance_of): any RPC/parse failure → `Unavailable`,
+    /// never a coerced `0.0`.
+    pub async fn nft_balance_of(&self, token: Address, owner: Address) -> Result<f64, EthError> {
+        let raw: U256 = self
+            .rpc_call("nft balanceOf()", |p| async move {
+                IERC20::new(token, p).balanceOf(owner).call().await
+            })
+            .await?;
+        raw_count_to_f64(raw, "nft balanceOf()")
+    }
+
+    /// ERC-1155 balance of `owner` for `(token, id)` — `balanceOf(address,uint256)`,
+    /// raw count (no decimals), fail-closed. Gates by a specific ERC-1155 token id
+    /// (e.g. a membership/edition token).
+    pub async fn erc1155_balance_of(
+        &self,
+        token: Address,
+        owner: Address,
+        id: U256,
+    ) -> Result<f64, EthError> {
+        let raw: U256 = self
+            .rpc_call("erc1155 balanceOf()", |p| async move {
+                IERC1155::new(token, p).balanceOf(owner, id).call().await
+            })
+            .await?;
+        raw_count_to_f64(raw, "erc1155 balanceOf()")
     }
 
     /// Validate a signature for `signer` over the 32-byte `hash`, covering
@@ -626,6 +667,19 @@ impl Eth {
 /// reverted" — distinct from the RPC being unreachable. Tiny testable predicate.
 fn is_revert(cause: &str) -> bool {
     cause.to_ascii_lowercase().contains("revert")
+}
+
+/// Convert a raw whole-unit `U256` count (an ERC-721/1155 balance, no decimals)
+/// to the `f64` the gating evaluator uses. Goes through `format_units(_, 0)` so
+/// an unexpected parse failure surfaces as `Unavailable` (fail closed) rather
+/// than a coerced `0.0`.
+fn raw_count_to_f64(raw: U256, label: &'static str) -> Result<f64, EthError> {
+    match alloy::primitives::utils::format_units(raw, 0u8) {
+        Ok(s) => s
+            .parse::<f64>()
+            .map_err(|e| EthError::unavailable(label, e)),
+        Err(e) => Err(EthError::unavailable(label, e)),
+    }
 }
 
 /// Pick the mainnet JSON-RPC URL from the environment.

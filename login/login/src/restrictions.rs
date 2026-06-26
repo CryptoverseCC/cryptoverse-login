@@ -13,7 +13,7 @@
 
 use std::collections::BTreeMap;
 
-use alloy::primitives::Address;
+use alloy::primitives::{Address, U256};
 use cryptoverse_core::eth::Eth;
 use cryptoverse_core::hydra::OAuth2Client;
 use evalexpr::{ContextWithMutableVariables, DefaultNumericTypes, HashMapContext, Node, Value};
@@ -34,6 +34,17 @@ pub struct Restriction {
     pub condition: String,
     #[serde(default)]
     pub message: Option<String>,
+    /// Token standard for `tokenAddress`: `"erc20"` (default), `"erc721"`, or
+    /// `"erc1155"`. ERC-20 balances are decimals-scaled; ERC-721/1155 are raw
+    /// whole-unit counts, so `balanceOf > 0` means "owns at least one" — gating
+    /// by NFT collection / DAO membership / a specific 1155 id. `contractAliases`
+    /// are always ERC-20 (they sum fungible balances).
+    #[serde(default)]
+    pub standard: Option<String>,
+    /// ERC-1155 token id (required when `standard == "erc1155"`), as a decimal or
+    /// `0x`-hex string.
+    #[serde(rename = "tokenId", default)]
+    pub token_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,7 +104,8 @@ async fn check_one(eth: &Eth, restriction: &Restriction, owner: Address) -> Chec
     if let Some(aliases) = &restriction.contract_aliases {
         for (name, token) in aliases {
             let key = format!("{name}balanceOf");
-            match balance_for(eth, token, owner).await {
+            // Aliases sum fungible balances → always ERC-20.
+            match balance_for(eth, token, None, None, owner).await {
                 Ok(value) => {
                     data.insert(key.clone(), value);
                     let _ = context.set_value(key, Value::Float(value));
@@ -105,7 +117,15 @@ async fn check_one(eth: &Eth, restriction: &Restriction, owner: Address) -> Chec
 
     if let Some(token) = &restriction.token_address {
         let key = "balanceOf".to_string();
-        match balance_for(eth, token, owner).await {
+        match balance_for(
+            eth,
+            token,
+            restriction.standard.as_deref(),
+            restriction.token_id.as_deref(),
+            owner,
+        )
+        .await
+        {
             Ok(value) => {
                 data.insert(key.clone(), value);
                 let _ = context.set_value(key, Value::Float(value));
@@ -199,15 +219,55 @@ fn missing_identifier(
         .map(|id| id.to_string())
 }
 
-/// Resolve a single token balance. `Err(())` means INDETERMINATE (bad address
-/// or RPC/decimals/parse failure) — the caller fails the whole restriction
-/// closed; it never substitutes 0.0.
-async fn balance_for(eth: &Eth, token: &str, owner: Address) -> Result<f64, ()> {
-    let token = token.parse::<Address>().map_err(|e| {
+/// Resolve a single token balance for `standard` (`erc20` default / `erc721` /
+/// `erc1155`). `Err(())` means INDETERMINATE (bad address/standard/tokenId or
+/// RPC/decimals/parse failure) — the caller fails the whole restriction closed;
+/// it never substitutes 0.0. ERC-20 is decimals-scaled; ERC-721/1155 are raw
+/// whole-unit counts.
+async fn balance_for(
+    eth: &Eth,
+    token: &str,
+    standard: Option<&str>,
+    token_id: Option<&str>,
+    owner: Address,
+) -> Result<f64, ()> {
+    let addr = token.parse::<Address>().map_err(|e| {
         tracing::error!("invalid token address `{token}`: {e}");
     })?;
-    eth.balance_of(token, owner).await.map_err(|e| {
-        tracing::warn!("balanceOf unavailable for {token}/{owner}: {e}");
+    match standard.unwrap_or("erc20").to_ascii_lowercase().as_str() {
+        "erc20" => eth.balance_of(addr, owner).await.map_err(|e| {
+            tracing::warn!("erc20 balanceOf unavailable for {addr}/{owner}: {e}");
+        }),
+        "erc721" => eth.nft_balance_of(addr, owner).await.map_err(|e| {
+            tracing::warn!("erc721 balanceOf unavailable for {addr}/{owner}: {e}");
+        }),
+        "erc1155" => {
+            let Some(id) = token_id else {
+                tracing::error!("erc1155 restriction for {addr} is missing tokenId");
+                return Err(());
+            };
+            let id = parse_u256(id)?;
+            eth.erc1155_balance_of(addr, owner, id).await.map_err(|e| {
+                tracing::warn!("erc1155 balanceOf unavailable for {addr}/{owner}#{id}: {e}");
+            })
+        }
+        other => {
+            tracing::error!("unknown token standard `{other}` for {addr}");
+            Err(())
+        }
+    }
+}
+
+/// Parse a token id (decimal or `0x`-hex) into a `U256`. A bad value is a config
+/// error → `Err(())` (fail closed, like an unreadable balance).
+fn parse_u256(s: &str) -> Result<U256, ()> {
+    let s = s.trim();
+    let parsed = match s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+        Some(hex) => U256::from_str_radix(hex, 16),
+        None => U256::from_str_radix(s, 10),
+    };
+    parsed.map_err(|e| {
+        tracing::error!("invalid erc1155 tokenId `{s}`: {e}");
     })
 }
 
@@ -256,6 +316,86 @@ mod tests {
         assert_eq!(aliased.message.as_deref(), Some("hi"));
     }
 
+    #[test]
+    fn parses_nft_restriction_shapes() {
+        // ERC-721 collection gate: own at least one of the collection.
+        let erc721: Restriction = serde_json::from_str(
+            r#"{"tokenAddress":"0xabc","standard":"erc721","condition":"balanceOf > 0"}"#,
+        )
+        .unwrap();
+        assert_eq!(erc721.standard.as_deref(), Some("erc721"));
+        assert!(erc721.token_id.is_none());
+
+        // ERC-1155 specific-id gate.
+        let erc1155: Restriction = serde_json::from_str(
+            r#"{"tokenAddress":"0xabc","standard":"erc1155","tokenId":"42","condition":"balanceOf >= 1"}"#,
+        )
+        .unwrap();
+        assert_eq!(erc1155.standard.as_deref(), Some("erc1155"));
+        assert_eq!(erc1155.token_id.as_deref(), Some("42"));
+
+        // Omitting `standard` still parses (defaults to ERC-20 at read time).
+        let erc20: Restriction =
+            serde_json::from_str(r#"{"tokenAddress":"0xabc","condition":"balanceOf > 0"}"#)
+                .unwrap();
+        assert!(erc20.standard.is_none() && erc20.token_id.is_none());
+    }
+
+    #[test]
+    fn parse_u256_decimal_hex_and_bad() {
+        assert_eq!(parse_u256("42").unwrap(), U256::from(42u64));
+        assert_eq!(parse_u256("0x2a").unwrap(), U256::from(42u64));
+        assert_eq!(parse_u256("  0X10 ").unwrap(), U256::from(16u64));
+        assert!(parse_u256("not-a-number").is_err());
+        assert!(parse_u256("0xzz").is_err());
+    }
+
+    /// An ERC-1155 restriction missing its `tokenId` is a config error → fail
+    /// closed (deny), never silently pass.
+    #[tokio::test]
+    async fn erc1155_without_token_id_fails_closed() {
+        let eth = unreachable_eth();
+        let owner: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        let restriction = Restriction {
+            contract_aliases: None,
+            token_address: Some("0x495f947276749Ce646f68AC8c248420045cb7b5e".to_string()),
+            condition: "balanceOf > 0".to_string(),
+            message: None,
+            standard: Some("erc1155".to_string()),
+            token_id: None,
+        };
+        let result = check_one(&eth, &restriction, owner).await;
+        assert!(!result.passed, "erc1155 without tokenId must fail closed");
+        assert_eq!(result.message.as_deref(), Some(INDETERMINATE_MSG));
+    }
+
+    /// An ERC-721 balance that can't be read (RPC down) fails the restriction
+    /// closed — same contract as ERC-20, no coerced 0.0.
+    #[tokio::test]
+    async fn erc721_unreachable_rpc_fails_closed() {
+        let eth = unreachable_eth();
+        let owner: Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        let restriction = Restriction {
+            contract_aliases: None,
+            // BAYC mainnet; the read still fails because the RPC is down.
+            token_address: Some("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D".to_string()),
+            condition: "balanceOf > 0".to_string(),
+            message: Some("holders only".to_string()),
+            standard: Some("erc721".to_string()),
+            token_id: None,
+        };
+        let result = check_one(&eth, &restriction, owner).await;
+        assert!(
+            !result.passed,
+            "an unreadable erc721 balance must fail closed"
+        );
+        assert_eq!(result.message.as_deref(), Some(INDETERMINATE_MSG));
+    }
+
     /// `decimals` scaling: a 6-decimal token (USDC-like) raw balance is divided
     /// by 1e6 before the condition sees it. Here we assert the *gate semantics*
     /// against the already-scaled value: a threshold of "at least 100 tokens"
@@ -293,6 +433,8 @@ mod tests {
             token_address: Some("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string()),
             condition: "balanceOf > 0".to_string(),
             message: Some("members only".to_string()),
+            standard: None,
+            token_id: None,
         };
         let result = check_one(&eth, &restriction, owner).await;
         assert!(!result.passed, "an indeterminate balance must fail closed");
@@ -313,6 +455,8 @@ mod tests {
             // Note: would *pass* if we coerced the failed read to 0.0.
             condition: "balanceOf == 0".to_string(),
             message: None,
+            standard: None,
+            token_id: None,
         };
         let result = check_one(&eth, &restriction, owner).await;
         assert!(
