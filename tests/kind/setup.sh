@@ -166,6 +166,34 @@ curl -fsS -o /dev/null -X POST http://127.0.0.1:4455/admin/clients \
 JSON
 kill "$HPF" 2>/dev/null || true
 
+say "Registering the ETHMail device OAuth2 client (RFC 8628, public)"
+# Native IMAP/SMTP mail clients (Thunderbird, mobile, the ETHMail Tester) can't run a
+# browser authorization-code redirect per connection, so they obtain tokens via the OAuth
+# 2.0 Device Authorization Grant (RFC 8628) — the path that lets ETHMail retire its bespoke
+# K/LK wallet-key auth. PUBLIC client: no secret, auth method "none", device_code +
+# refresh_token grants, same `mail` scope + `ethmail` audience as the webclient, and NO
+# redirect_uris (device flow polls the token endpoint). Fixed id so the mail-client docs can
+# reference it. Idempotent; skips gracefully if the admin API isn't reachable.
+# PREREQUISITE: Hydra must have the device grant enabled (oauth2.grant.device_authorization)
+# and a device user-verification URL wired into the login UI for the full round-trip to work.
+kubectl -n "$NS_LOGIN" port-forward svc/cryptoverse-login-hydra-admin 4455:4445 >/dev/null 2>&1 &
+HPF=$!
+for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:4455/health/ready 2>/dev/null && break || sleep 0.5; done
+curl -fsS -o /dev/null -X DELETE http://127.0.0.1:4455/admin/clients/ethmail-device 2>/dev/null || true
+curl -fsS -o /dev/null -X POST http://127.0.0.1:4455/admin/clients \
+  -H 'Content-Type: application/json' --data @- <<JSON && echo "  registered client_id=ethmail-device" || echo "  (ethmail-device registration skipped — admin API not reachable)"
+{
+  "client_id": "ethmail-device",
+  "client_name": "ETHMail Mail Client (device flow)",
+  "grant_types": ["urn:ietf:params:oauth:grant-type:device_code", "refresh_token"],
+  "response_types": [],
+  "scope": "openid email profile offline_access mail",
+  "audience": ["ethmail"],
+  "token_endpoint_auth_method": "none"
+}
+JSON
+kill "$HPF" 2>/dev/null || true
+
 say "Verifying OIDC discovery through the ingress"
 curl -fsSk "$LOGIN_URL/.well-known/openid-configuration" | head -c 160 || \
   echo "(discovery not ready yet — give Hydra a few more seconds)"
