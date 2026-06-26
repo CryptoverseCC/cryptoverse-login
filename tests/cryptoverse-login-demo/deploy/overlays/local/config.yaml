@@ -1,0 +1,18 @@
+# Env-specific OIDC wiring for the demo on the heavyops cluster.
+#   - The BROWSER-facing authorize endpoint uses the public IdP host:port
+#     (the user's browser is redirected there).
+#   - The SERVER-side calls (jwks/token/userinfo) use in-cluster Hydra service
+#     DNS, because the demo pod can't resolve the public nip.io name.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-config
+  labels:
+    app.kubernetes.io/name: demo
+data:
+  DOMAIN: cryptoverse-login-demo.127.0.0.1.nip.io
+  PORT: "3000"
+  OIDC_OP_AUTHORIZATION_ENDPOINT: https://cryptoverse-login.127.0.0.1.nip.io:18443/oauth2/auth
+  OIDC_OP_JWKS_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/.well-known/jwks.json
+  OIDC_OP_TOKEN_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/oauth2/token
+  OIDC_OP_USER_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/userinfo

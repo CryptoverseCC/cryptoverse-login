@@ -1,0 +1,21 @@
+# Host-based routing for the demo via nip.io (overlay — env-specific host).
+# Reachable at: http://cryptoverse-login-demo.127.0.0.1.nip.io:18080
+#           and https://cryptoverse-login-demo.127.0.0.1.nip.io:18443 (wildcard
+#           cert from the cluster's local CA — no per-app TLS config needed).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: cryptoverse-login-demo.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo
+                port:
+                  number: 80

@@ -1,0 +1,73 @@
+# Demo relying party (Django, gunicorn). run.sh runs `manage.py migrate`
+# (ephemeral SQLite at /tmp/demo.db) then serves on $PORT, so the chart's
+# redundant migrate initContainer is dropped. OIDC endpoints come from the
+# `demo-config` ConfigMap (overlay); the OAuth2 client_id/secret and the Django
+# secret are mounted from the SOPS Secrets at /app/secrets/{oidc,demo}.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  labels:
+    app: demo
+    app.kubernetes.io/name: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo
+  template:
+    metadata:
+      labels:
+        app: demo
+    spec:
+      containers:
+        - name: demo
+          image: localhost/cryptoverse-login/demo-python-django:test
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: demo-config
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: secrets
+              mountPath: /app/secrets/demo
+              readOnly: true
+            - name: oidc
+              mountPath: /app/secrets/oidc
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: secrets
+          secret:
+            secretName: demo            # key: django (Django SECRET_KEY)
+        - name: oidc
+          secret:
+            secretName: demo-oauth2client   # keys: CLIENT_ID, CLIENT_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+  labels:
+    app: demo
+    app.kubernetes.io/name: demo
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: demo

@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cryptoverse-login-demo
+resources:
+  - ../../base
+  - ./config.yaml            # env-specific OIDC endpoints (demo-config ConfigMap)
+  - ./ingress.yaml           # env-specific nip.io host
+  - ./register-client.yaml   # PostSync hook: register the OAuth2 client in Hydra
+# KSOPS decrypts the demo's Secrets (Django key + OAuth2 client_id/secret).
+generators:
+  - ./secret-generator.yaml
