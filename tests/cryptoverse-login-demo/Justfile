@@ -143,13 +143,19 @@ prune:
     echo "✓ pruned"
 
 # ── acceptance ────────────────────────────────────────────────────────────────
-# `just deploy` runs this after Argo reports Healthy (step 5/6): a FULL headless
-# Sign-In-with-Ethereum login through the demo RP with a programmatic signer (no
-# wallet/xvfb), asserting the demo's success page shows the correct ID-token
-# claims. (Shared script at the repo root; needs python3 + requests + eth_account.)
+# `just deploy` runs `just e2e` after Argo reports Healthy (step 5/6):
+#   e2e      — REAL browser + wallet (Playwright MetaMask under the container Xvfb):
+#              exercises the actual frontend (wagmi connect, Comlink iframe,
+#              in-browser SIWE, wallet popup). This is the deploy gate.
+#   e2e-api  — fast headless backend flow (curl + eth_account, no browser).
+# Both shared from the repo root.
 
-# Full headless SIWE login through the demo RP; gates `just deploy` (and standalone).
+# REAL browser + wallet SIWE login through the demo RP; gates `just deploy`.
 e2e demo_url=e2e_demo login_url=e2e_login:
+    DEMO_URL="{{demo_url}}" LOGIN_URL="{{login_url}}" ../../tests/e2e/run-e2e.sh
+
+# Fast headless backend SIWE login through the demo RP (no browser/display).
+e2e-api demo_url=e2e_demo login_url=e2e_login:
     python3 ../../tests/acceptance/demo_login.py "{{demo_url}}" "{{login_url}}"
 
 # ── helpers ───────────────────────────────────────────────────────────────────

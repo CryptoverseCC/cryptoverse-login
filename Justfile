@@ -208,14 +208,22 @@ hooks-uninstall:
     rm -f "$(git rev-parse --git-dir)/hooks/post-commit" && echo "removed post-commit hook"
 
 # ── acceptance ────────────────────────────────────────────────────────────────
-# `just deploy` runs this after Argo reports Healthy (step 5/6): a FULL headless
-# Sign-In-with-Ethereum login driven through the demo RP with a programmatic
-# signer (no wallet/xvfb), asserting the demo's success page shows the correct
-# ID-token claims. Proves the just-rolled version really works with the demo —
-# not just that the pods are up. Needs python3 + requests + eth_account.
+# `just deploy` runs `just e2e` after Argo reports Healthy (step 5/6) to prove the
+# just-rolled version REALLY works with the demo — not just that the pods are up.
+# Two flavours:
+#   e2e      — REAL browser + wallet (Playwright MetaMask extension under the
+#              container Xvfb): exercises the actual frontend a user hits — wagmi
+#              connect, the Comlink iframe<->parent handshake, in-browser EIP-4361
+#              building, the wallet popup. This is the deploy gate.
+#   e2e-api  — fast headless backend flow (curl + eth_account signer, no browser):
+#              the full SIWE login through the demo asserting the ID-token claims.
 
-# Full headless SIWE login through the demo RP; gates `just deploy` (and standalone).
+# REAL browser + wallet SIWE login through the demo RP; gates `just deploy`.
 e2e demo_url=e2e_demo login_url=e2e_login:
+    DEMO_URL="{{demo_url}}" LOGIN_URL="{{login_url}}" tests/e2e/run-e2e.sh
+
+# Fast headless backend SIWE login through the demo RP (no browser/display).
+e2e-api demo_url=e2e_demo login_url=e2e_login:
     python3 tests/acceptance/demo_login.py "{{demo_url}}" "{{login_url}}"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
