@@ -50,8 +50,10 @@ spec:
     spec:
       containers:
         - name: login
-          image: localhost/cryptoverse-login/login:test
-          imagePullPolicy: Never
+          # Repository only — the immutable tag is pinned in overlays/local
+          # (kustomization.yaml `images:`), set per-deploy by `just deploy`.
+          image: localhost:5000/cryptoverse-login/login
+          imagePullPolicy: IfNotPresent
           env:
             - name: HYDRA_ADMIN_URL
               value: http://cryptoverse-login-hydra-admin.cryptoverse-login:4445

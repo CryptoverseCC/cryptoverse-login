@@ -5,6 +5,17 @@ resources:
   - ../../base
   - ./hydra-config.yaml   # env-specific: Hydra issuer + login/consent/logout/device URLs
   - ./ingress.yaml        # env-specific: nip.io host
+# The deployed image tags live here, not in base — this is a multi-image stack,
+# so `just deploy` runs `kustomize edit set image` once per custom component to
+# pin a fresh, immutable <commit-time>-<sha> tag on every deploy. (postgres/hydra
+# are upstream public images and stay pinned in base.)
+images:
+  - name: localhost:5000/cryptoverse-login/login
+    newTag: dev     # placeholder; replaced by `just deploy` with <commit-time>-<sha>
+  - name: localhost:5000/cryptoverse-login/wrapper
+    newTag: dev     # placeholder; replaced by `just deploy`
+  - name: localhost:5000/cryptoverse-login/gateway
+    newTag: dev     # placeholder; replaced by `just deploy`
 # KSOPS decrypts the *.sops.yaml Secrets (login app, Hydra, Postgres) at build
 # time using the age key in the Argo CD repo-server.
 generators:

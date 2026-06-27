@@ -35,8 +35,10 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: localhost/cryptoverse-login/gateway:test
-          imagePullPolicy: Never
+          # Repository only — the immutable tag is pinned in overlays/local
+          # (kustomization.yaml `images:`), set per-deploy by `just deploy`.
+          image: localhost:5000/cryptoverse-login/gateway
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8000

@@ -20,8 +20,10 @@ spec:
     spec:
       containers:
         - name: wrapper
-          image: localhost/cryptoverse-login/wrapper:test
-          imagePullPolicy: Never
+          # Repository only — the immutable tag is pinned in overlays/local
+          # (kustomization.yaml `images:`), set per-deploy by `just deploy`.
+          image: localhost:5000/cryptoverse-login/wrapper
+          imagePullPolicy: IfNotPresent
           env:
             - name: PORT
               value: "3000"
