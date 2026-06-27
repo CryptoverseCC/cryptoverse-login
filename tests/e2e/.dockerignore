@@ -1,0 +1,8 @@
+# Keep the build context small + deterministic: deps are installed in-image, and
+# host node_modules (possibly built with a different node) must not leak in.
+node_modules
+test-results
+playwright-report
+blob-report
+*.log
+.git

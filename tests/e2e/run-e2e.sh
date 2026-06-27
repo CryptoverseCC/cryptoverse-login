@@ -1,71 +1,56 @@
 #!/usr/bin/env bash
-# Run the REAL browser + wallet Playwright e2e (a wallet extension via dappwright)
-# under a virtual display — the `just deploy` acceptance gate. Unlike the curl/
-# eth_account backend flow (tests/acceptance/demo_login.py), this drives a real
-# Chromium with a real MetaMask extension, so it exercises the actual frontend:
-# wagmi connect, the Comlink iframe<->parent handshake, in-browser EIP-4361
-# building, and the wallet popup — i.e. it gates what a real user actually hits.
+# Run the real browser + wallet e2e (a real MetaMask extension via dappwright)
+# in a SELF-CONTAINED container. The host needs ONLY a container runtime
+# (podman/docker) and a reachable deployed stack — Node, the browsers, xvfb and
+# all deps live in the image (tests/e2e/Dockerfile). This is the `just deploy`
+# acceptance gate, and it is portable to CI unchanged.
 #
-# Display: Chromium can't load extensions headless, and there is no host xvfb /
-# sudo here, so we reuse the `Xvfb` binary that ships inside podman's container-
-# overlay storage (its libs resolve on the host) — the pattern from
-# tests/e2e/perf/run-connect-perf.sh. On a host with a real display, set DISPLAY
-# and this still works (it prefers an Xvfb already on PATH).
+# Unlike the curl/eth_account backend flow (`just e2e-api`), this drives the REAL
+# frontend a user hits: wagmi connect, the Comlink iframe<->parent handshake,
+# in-browser EIP-4361 building, and the wallet popup.
 #
-# Env: DEMO_URL / LOGIN_URL (the deployed stack, passed by `just e2e`),
-#      E2E_PROJECT (default "metamask"; "coinbase" also works), E2E_TIMEOUT.
+# Env: DEMO_URL / LOGIN_URL (deployed stack; passed by `just e2e`),
+#      E2E_PROJECT (default "metamask"; "coinbase" also works),
+#      E2E_IMAGE (built tag), E2E_RUNTIME (podman|docker).
 set -uo pipefail
-# A NON-snap node is required. Snap-confined node (/snap/bin/node) SWALLOWS stdout
-# and fails to drive an external browser in a detached/no-TTY context — i.e.
-# exactly how `just deploy` (and the background commit hook) runs this gate. Prefer
-# a real node under ~/.local/nodejs; keep /snap/bin late only for yarn etc.
-export PATH="${HOME}/.local/nodejs/bin:${HOME}/.local/bin:/snap/bin:${PATH}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # tests/e2e
+IMAGE="${E2E_IMAGE:-cryptoverse-login-e2e:local}"
 PROJECT="${E2E_PROJECT:-metamask}"
-RUN_TIMEOUT="${E2E_TIMEOUT:-300}"
+DEMO_URL="${DEMO_URL:-https://cryptoverse-login-demo.127.0.0.1.nip.io:18443}"
+LOGIN_URL="${LOGIN_URL:-https://cryptoverse-login.127.0.0.1.nip.io:18443}"
 
-if [ ! -x "${HERE}/node_modules/.bin/playwright" ]; then
-  echo "FATAL: tests/e2e deps not installed — run 'yarn install' in tests/e2e" >&2
-  exit 2
-fi
-NODE_BIN="$(command -v node 2>/dev/null || true)"
-[ -n "${NODE_BIN}" ] || { echo "FATAL: node not on PATH" >&2; exit 2; }
-case "${NODE_BIN}" in
-  /snap/*)
-    echo "FATAL: resolved node is the snap (${NODE_BIN}) — it swallows stdout and fails" >&2
-    echo "       to drive the browser detached. Install a non-snap node, e.g.:" >&2
-    echo "       mkdir -p ~/.local/nodejs && curl -fsSL https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz | tar -xJ -C ~/.local/nodejs --strip-components=1" >&2
-    exit 2;;
-esac
+RT="${E2E_RUNTIME:-}"
+[ -n "${RT}" ] || RT="$(command -v podman 2>/dev/null || command -v docker 2>/dev/null || true)"
+[ -n "${RT}" ] || { echo "FATAL: need podman or docker on PATH" >&2; exit 2; }
+echo "e2e: runtime=${RT} image=${IMAGE} project=${PROJECT}"
+echo "e2e: demo=${DEMO_URL} login=${LOGIN_URL}"
 
-# Locate Xvfb: prefer one on PATH (real display / CI xvfb), else the binary inside
-# podman's container-overlay storage (a pulled image carries it; no apt/sudo).
-XVFB="$(command -v Xvfb 2>/dev/null || true)"
-[ -n "${XVFB}" ] || XVFB="$(find "${HOME}/.local/share/containers/storage/overlay" -name Xvfb -type f 2>/dev/null | head -n1)"
-if [ -z "${XVFB}" ] || [ ! -x "${XVFB}" ]; then
-  echo "FATAL: no Xvfb binary found (need a host display, or a pulled image carrying Xvfb)" >&2
-  exit 2
-fi
-echo "e2e: node=${NODE_BIN} ($(node --version)) Xvfb=${XVFB} project=${PROJECT}"
-echo "e2e: demo=${DEMO_URL:-<default>} login=${LOGIN_URL:-<default>}"
+echo "e2e: building image (cached after the first build)…"
+"${RT}" build -t "${IMAGE}" "${HERE}" || { echo "FATAL: e2e image build failed" >&2; exit 2; }
 
-DNUM="${DISPLAY_NUM:-99}"
-"${XVFB}" ":${DNUM}" -screen 0 1920x1080x24 -nolisten tcp >/tmp/xvfb-e2e.log 2>&1 &
-XVFB_PID=$!
-trap 'kill "${XVFB_PID}" 2>/dev/null' EXIT
-sleep 2
-if ! kill -0 "${XVFB_PID}" 2>/dev/null; then
-  echo "FATAL: Xvfb failed to start:" >&2; cat /tmp/xvfb-e2e.log >&2; exit 3
-fi
-export DISPLAY=":${DNUM}"
+# Map loopback (nip.io/local) hostnames to 127.0.0.1 so the host-networked
+# container reaches the ingress with NO DNS dependency. Real CI hostnames (a
+# routable stack) resolve via normal DNS, so they get no override.
+add_hosts=()
+for u in "${DEMO_URL}" "${LOGIN_URL}"; do
+  h="$(printf '%s' "${u}" | sed -E 's#^[a-z]+://([^/:]+).*#\1#')"
+  case "${h}" in
+    *.nip.io|*.sslip.io|*.local|localhost) add_hosts+=(--add-host "${h}:127.0.0.1");;
+  esac
+done
 
-cd "${HERE}"
-run() { timeout "${RUN_TIMEOUT}" node_modules/.bin/playwright test --project="${PROJECT}" --reporter=list; }
+run() {
+  # -t: allocate a pseudo-TTY. dappwright's MetaMask bootstrap/download HANGS
+  #     without one; podman creates the pty itself, so this works even when the
+  #     host has no TTY (the detached deploy-gate / commit-hook context).
+  # --network=host: 127.0.0.1:18443 in the container == the host's ingress.
+  "${RT}" run --rm -t --network=host ${add_hosts[@]+"${add_hosts[@]}"} \
+    -e DEMO_URL="${DEMO_URL}" -e LOGIN_URL="${LOGIN_URL}" -e E2E_PROJECT="${PROJECT}" \
+    "${IMAGE}"
+}
 
-# dappwright DOWNLOADS the wallet extension on first use, which can race and fail
-# the very first time on a cold cache; retry once (the cached run is deterministic).
-if run; then
-  exit 0
-fi
-echo "e2e: first attempt failed (cold extension download?) — retrying once…" >&2
+# The wallet extension is pre-baked into the image (Dockerfile), so there is no
+# runtime download; retry once only to absorb transient browser/render flakiness.
+if run; then exit 0; fi
+echo "e2e: first attempt failed — retrying once…" >&2
 run
