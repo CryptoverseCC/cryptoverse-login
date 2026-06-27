@@ -36,6 +36,10 @@ wait_timeout  := "600"                 # seconds `just deploy` waits for Argo CD
 # context because they share the `core` crate; gateway builds from login/gateway/).
 components := "login|login/login/Dockerfile|login wrapper|login/wrapper/Dockerfile|login gateway||login/gateway"
 
+# Acceptance-test targets (the locally-deployed demo RP + IdP); overridable as `just e2e` args.
+e2e_demo  := "https://cryptoverse-login-demo.127.0.0.1.nip.io:18443"
+e2e_login := "https://cryptoverse-login.127.0.0.1.nip.io:18443"
+
 # List the available commands.
 default:
     @just --list --unsorted
@@ -85,10 +89,10 @@ deploy:
     set -euo pipefail
     tag="$(just tag)"
 
-    echo "==> [1/5] build"
+    echo "==> [1/6] build"
     just build
 
-    echo "==> [2/5] pin all 3 component tags (${tag}) in {{overlay}}"
+    echo "==> [2/6] pin all 3 component tags (${tag}) in {{overlay}}"
     ( cd "{{overlay}}"
       comp_specs="{{components}}"   # quote first: '|' is literal data here, not a shell pipe
       for spec in ${comp_specs}; do
@@ -99,17 +103,20 @@ deploy:
     if git diff --quiet -- "{{overlay}}/kustomization.yaml"; then
       echo "    image tags unchanged (already ${tag})"
     else
-      echo "==> [3/5] commit deploy change"
+      echo "==> [3/6] commit deploy change"
       git add "{{overlay}}/kustomization.yaml"
       git commit -q -m "deploy({{app}}): ${tag} [skip-deploy]"
     fi
     echo "    push HEAD -> {{gitops_remote}}/main"
     git push -q "{{gitops_remote}}" HEAD:main
 
-    echo "==> [4/5] wait for Argo CD (timeout {{wait_timeout}}s)"
+    echo "==> [4/6] wait for Argo CD (timeout {{wait_timeout}}s)"
     just _wait "$(git rev-parse HEAD)"
 
-    echo "==> [5/5] prune"
+    echo "==> [5/6] e2e acceptance — full SIWE login through the demo RP"
+    just e2e
+
+    echo "==> [6/6] prune"
     just prune
     echo "✓ deployed {{app}} ${tag}"
 
@@ -199,6 +206,17 @@ hooks-install:
 # Remove the auto-deploy hook.
 hooks-uninstall:
     rm -f "$(git rev-parse --git-dir)/hooks/post-commit" && echo "removed post-commit hook"
+
+# ── acceptance ────────────────────────────────────────────────────────────────
+# `just deploy` runs this after Argo reports Healthy (step 5/6): a FULL headless
+# Sign-In-with-Ethereum login driven through the demo RP with a programmatic
+# signer (no wallet/xvfb), asserting the demo's success page shows the correct
+# ID-token claims. Proves the just-rolled version really works with the demo —
+# not just that the pods are up. Needs python3 + requests + eth_account.
+
+# Full headless SIWE login through the demo RP; gates `just deploy` (and standalone).
+e2e demo_url=e2e_demo login_url=e2e_login:
+    python3 tests/acceptance/demo_login.py "{{demo_url}}" "{{login_url}}"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
