@@ -22,8 +22,10 @@ spec:
     spec:
       containers:
         - name: demo
-          image: localhost/cryptoverse-login/demo-python-django:test
-          imagePullPolicy: Never
+          # Repository only — the immutable tag is pinned in overlays/local
+          # (kustomization.yaml `images:`), set per-deploy by `just deploy`.
+          image: localhost:5000/cryptoverse-login-demo
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: demo-config

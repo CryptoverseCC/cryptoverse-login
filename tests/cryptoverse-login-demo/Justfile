@@ -1,0 +1,145 @@
+# HeavyOperations — per-app deploy contract (demo relying party).
+#
+# The demo RP is a SEPARATE Argo CD app (cryptoverse-login-demo, its own
+# namespace) that happens to live under tests/ in the IdP's monorepo and is
+# served from the SAME bare gitops repo at a different path
+# (tests/cryptoverse-login-demo/deploy/overlays/local). It is a single custom
+# image, so it uses the stock single-image contract — RUN THESE FROM THIS
+# DIRECTORY (tests/cryptoverse-login-demo/). The shared `gitops` git remote
+# (defined at the repo root) is reused; one `git push` propagates both apps'
+# trees since they share the repo. Full reference: docs/CI.md in HeavyOperations.
+#
+#   just build    build the image from the current commit -> local registry   (standalone)
+#   just deploy   build, pin the tag in deploy/, commit, push, wait for Argo CD, prune
+#   just prune    keep only the newest <keep> image tags in the registry        (standalone)
+
+set shell := ["bash", "-uc"]
+
+# ── Config ────────────────────────────────────────────────────────────────────
+app           := "cryptoverse-login-demo"   # app == k8s namespace == Argo CD app == image repo
+registry      := "localhost:5000"
+image         := registry / app             # localhost:5000/cryptoverse-login-demo
+build_context := "demo"                      # Dockerfile context (relative to this dir): tests/cryptoverse-login-demo/demo
+overlay       := "deploy/overlays/local"     # relative to this dir
+gitops_remote := "gitops"                    # shared git remote -> gitops-repos/cryptoverse-login.git
+kube_context  := "kind-heavyops"
+argocd_ns     := "argocd"
+registry_ctr  := "kind-registry"             # podman container backing localhost:5000 (used for GC)
+keep          := "2"                         # how many image tags `just prune` keeps
+# wait_timeout is 600 not 300: Argo sync latency on this shared box can exceed
+# 300s before the rollout even starts, which false-times-out a good deploy.
+wait_timeout  := "600"                       # seconds `just deploy` waits for Argo CD to sync + heal
+
+# List the available commands.
+default:
+    @just --list --unsorted
+
+# ── build ─────────────────────────────────────────────────────────────────────
+# Tag = "<UTC commit time>-<short sha>": sortable (newest sorts last) and
+# deterministic per commit (the shared monorepo commit). A dirty tree appends
+# "-dirty"; the hook path runs post-commit so it's clean.
+
+# Build the image from the current commit -> local registry (standalone).
+build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="$(just tag)"
+    ref="{{image}}:${tag}"
+    echo "==> build ${ref}  (context {{build_context}})"
+    podman build -t "${ref}" "{{build_context}}"
+    echo "==> push ${ref}"
+    podman push --tls-verify=false "${ref}"
+    echo "${ref}"
+
+# Print the deterministic image tag for the current commit.
+tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sha="$(git rev-parse --short=7 HEAD)"
+    ts="$(TZ=UTC0 git show -s --date=format-local:%Y%m%dT%H%M%SZ --format=%cd HEAD)"
+    dirty=""; git diff --quiet && git diff --cached --quiet || dirty="-dirty"
+    [[ -z "${dirty}" ]] || echo "warning: working tree dirty — tagging ${ts}-${sha}${dirty}" >&2
+    echo "${ts}-${sha}${dirty}"
+
+# ── deploy ────────────────────────────────────────────────────────────────────
+# Build -> pin tag in deploy/ -> commit -> push -> wait for Argo CD -> prune.
+deploy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="$(just tag)"
+
+    echo "==> [1/5] build"
+    just build
+
+    echo "==> [2/5] pin {{image}}:${tag} in {{overlay}}"
+    ( cd "{{overlay}}" && kustomize edit set image "{{image}}={{image}}:${tag}" )
+
+    if git diff --quiet -- "{{overlay}}/kustomization.yaml"; then
+      echo "    image tag unchanged (already ${tag})"
+    else
+      echo "==> [3/5] commit deploy change"
+      git add "{{overlay}}/kustomization.yaml"
+      git commit -q -m "deploy({{app}}): ${tag} [skip-deploy]"
+    fi
+    echo "    push HEAD -> {{gitops_remote}}/main"
+    git push -q "{{gitops_remote}}" HEAD:main
+
+    echo "==> [4/5] wait for Argo CD (timeout {{wait_timeout}}s)"
+    just _wait "$(git rev-parse HEAD)"
+
+    echo "==> [5/5] prune"
+    just prune
+    echo "✓ deployed {{app}} ${tag}"
+
+# Wait until Argo CD has synced the given revision AND the app is Healthy. Reads
+# Application status via kubectl (no `argocd login` needed); non-zero on timeout.
+_wait revision:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    kc() { kubectl --context "{{kube_context}}" -n "{{argocd_ns}}" "$@"; }
+    kc annotate application "{{app}}" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+    deadline=$(( $(date +%s) + {{wait_timeout}} ))
+    while :; do
+      read -r sync health rev < <(kc get application "{{app}}" \
+        -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}' 2>/dev/null || echo "  ")
+      echo "    sync=${sync:-?} health=${health:-?} rev=${rev:0:7}"
+      if [[ "${sync}" == Synced && "${health}" == Healthy && "${rev}" == "{{revision}}" ]]; then
+        echo "    ✓ ${rev:0:7} synced & healthy"; break
+      fi
+      if (( $(date +%s) >= deadline )); then
+        echo "    ✗ timeout: {{app}} did not sync {{revision}} within {{wait_timeout}}s" >&2
+        kc get application "{{app}}" -o jsonpath='{range .status.conditions[*]}{.type}: {.message}{"\n"}{end}' >&2 || true
+        exit 1
+      fi
+      sleep 5
+    done
+
+# ── prune ─────────────────────────────────────────────────────────────────────
+# Keep only the newest <keep> tags in the registry; GC the rest (standalone).
+prune:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mapfile -t tags < <(crane ls --insecure "{{image}}" 2>/dev/null | sort || true)
+    n=${#tags[@]}
+    if (( n <= {{keep}} )); then echo "==> {{image}}: ${n} tag(s); nothing to prune (keep {{keep}})"; exit 0; fi
+    old=("${tags[@]:0:$((n - {{keep}}))}")
+    echo "==> prune ${#old[@]}/${n} tags from {{image}} (keeping newest {{keep}})"
+    for t in "${old[@]}"; do
+      echo "    delete {{image}}:${t}"
+      crane delete --insecure "{{image}}:${t}" || true
+    done
+    echo "==> garbage-collect registry blobs"
+    podman exec "{{registry_ctr}}" registry garbage-collect --delete-untagged /etc/docker/registry/config.yml >/dev/null 2>&1 \
+      || echo "    (GC skipped — registry not on this host / deletes disabled; tags were untagged regardless)"
+    echo "✓ pruned"
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+# Render the overlay locally (exactly what Argo CD will apply).
+validate:
+    kustomize build --enable-alpha-plugins --enable-exec {{overlay}}
+
+# Show this app's Argo CD + pod status.
+status:
+    -kubectl --context {{kube_context}} -n {{argocd_ns}} get application {{app}}
+    -kubectl --context {{kube_context}} -n {{app}} get pods

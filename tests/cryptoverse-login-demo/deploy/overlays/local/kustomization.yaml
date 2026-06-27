@@ -6,6 +6,11 @@ resources:
   - ./config.yaml            # env-specific OIDC endpoints (demo-config ConfigMap)
   - ./ingress.yaml           # env-specific nip.io host
   - ./register-client.yaml   # PostSync hook: register the OAuth2 client in Hydra
+# The deployed image tag lives here, not in base — `just deploy` runs
+# `kustomize edit set image` to pin a fresh, immutable <commit-time>-<sha> tag.
+images:
+  - name: localhost:5000/cryptoverse-login-demo
+    newTag: dev   # placeholder; replaced by `just deploy` with <commit-time>-<sha>
 # KSOPS decrypts the demo's Secrets (Django key + OAuth2 client_id/secret).
 generators:
   - ./secret-generator.yaml

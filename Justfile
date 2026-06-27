@@ -26,7 +26,10 @@ kube_context  := "kind-heavyops"
 argocd_ns     := "argocd"
 registry_ctr  := "kind-registry"       # podman container backing localhost:5000 (used for GC)
 keep          := "2"                   # how many image tags `just prune` keeps PER component
-wait_timeout  := "300"                 # seconds `just deploy` waits for Argo CD to sync + heal
+# wait_timeout is 600 not 300: on this shared box Argo's repo-server fetch +
+# KSOPS render + reconcile can lag >300s before the rollout even starts, which
+# false-times-out an otherwise-successful deploy.
+wait_timeout  := "600"                 # seconds `just deploy` waits for Argo CD to sync + heal
 
 # The three custom images, as "<component>|<dockerfile-or-empty>|<build-context>"
 # (contexts mirror tests/kind/setup.sh: login+wrapper share the login/ workspace
