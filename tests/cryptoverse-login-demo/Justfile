@@ -100,8 +100,12 @@ _wait revision:
     kc annotate application "{{app}}" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
     deadline=$(( $(date +%s) + {{wait_timeout}} ))
     while :; do
+      # NB: the trailing {"\n"} is load-bearing — without it kubectl emits no final
+      # newline, so `read` hits EOF and returns non-zero, which `set -e` turns into
+      # an immediate recipe abort (before the loop ever polls). The platform template
+      # omits it; keep it here.
       read -r sync health rev < <(kc get application "{{app}}" \
-        -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}' 2>/dev/null || echo "  ")
+        -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}{"\n"}' 2>/dev/null || echo "  ")
       echo "    sync=${sync:-?} health=${health:-?} rev=${rev:0:7}"
       if [[ "${sync}" == Synced && "${health}" == Healthy && "${rev}" == "{{revision}}" ]]; then
         echo "    ✓ ${rev:0:7} synced & healthy"; break
