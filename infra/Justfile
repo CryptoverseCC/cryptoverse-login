@@ -1,0 +1,88 @@
+# cryptoverse-login — infra (OpenTofu) contract, copied from the platform's
+# infra/base/Justfile (HeavyOperations). Same idea: the logic lives HERE; the
+# Gitea workflows stay thin.
+#
+#   just fmt       tofu fmt -check
+#   just validate  tofu validate            (no backend, no network, no creds)
+#   just plan      tofu plan -> tfplan.bin  (+ plan-metadata.json)   [PR job: RO creds]
+#   just policy    conftest/tflint over the saved plan               (agnosticism + destroy guard)
+#   just apply     tofu apply tfplan.bin    (the SAVED plan)         [merge job: RW creds]
+#   just drift     tofu plan -detailed-exitcode                      (cron)
+#   just check     fmt + validate + plan + policy                    (local pre-merge gate)
+#
+# On the platform, Gitea Actions runs these on a DEDICATED isolated infra runner:
+#   .gitea/workflows/tf-dns-plan.yml   PR:    RO Cloudflare/S3 creds — a poisoned plan cannot mutate
+#   .gitea/workflows/tf-dns-apply.yml  merge: RW creds behind a manual-dispatch approval gate
+# The reviewed (saved) plan is the one applied. Engine: OpenTofu >= 1.10 (native
+# S3 use_lockfile). See HeavyOperations docs/INFRA_CICD.md.
+
+set shell := ["bash", "-uc"]
+
+tofu       := env_var_or_default("TOFU", "tofu")
+plan_file  := "tfplan.bin"
+meta_file  := "plan-metadata.json"
+policy_dir := env_var_or_default("POLICY_DIR", "./policy")
+# Plan/drift lock flag. Local default takes the state lock; the CI PLAN + DRIFT jobs
+# (RO S3 creds that CANNOT write the state lock object) override with PLAN_LOCK="-lock=false".
+lock_arg   := env_var_or_default("PLAN_LOCK", "-lock-timeout=120s")
+
+# List the available commands.
+default:
+    @just --list --unsorted
+
+# Initialise backend + providers (needs the S3 keypair in AWS_* env).
+init:
+    {{tofu}} init -input=false
+
+# Format check — fails on drift (CI-safe).
+fmt:
+    {{tofu}} fmt -check -recursive -diff
+
+# Validate configuration only — no backend, no network, no credentials.
+validate:
+    {{tofu}} init -backend=false -input=false >/dev/null
+    {{tofu}} validate
+
+# Plan -> a SAVED binary plan + metadata. The saved plan is exactly what `apply`
+# consumes, so "the reviewed plan == the applied plan". CI augments the metadata
+# with the contract etag + state serial (which need S3 access).
+plan:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{tofu}} init -input=false >/dev/null
+    {{tofu}} plan -input=false {{lock_arg}} -out="{{plan_file}}"
+    tree_sha="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+    jq -n --arg tree "$tree_sha" '{tree_sha: $tree}' > "{{meta_file}}"
+    echo "wrote {{plan_file}} + {{meta_file}} (tree ${tree_sha:0:7})"
+
+# Policy gate over the SAVED plan: project-agnosticism denylist + destroy/replace
+# guard. Skips with a warning if the tools are absent (the runner image installs
+# them — they are a documented runner requirement, not present on the dev host).
+policy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f "{{plan_file}}" ]]; then echo "no {{plan_file}} — run 'just plan' first" >&2; exit 1; fi
+    if command -v conftest >/dev/null 2>&1; then
+      {{tofu}} show -json "{{plan_file}}" | conftest test --policy "{{policy_dir}}" -
+    else
+      echo "WARN: conftest not installed — policy gate SKIPPED (required on the infra runner image)" >&2
+    fi
+    if command -v tflint >/dev/null 2>&1; then tflint --chdir=. || true; fi
+
+# Apply the SAVED plan (never a fresh plan). Manual-dispatch job / RW creds only.
+# init first: the apply job runs in a FRESH container with no .terraform/ — the
+# saved plan needs the providers + backend initialized before it can be applied.
+apply:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f "{{plan_file}}" ]]; then echo "no {{plan_file}} — apply must run the reviewed plan" >&2; exit 1; fi
+    {{tofu}} init -input=false >/dev/null
+    {{tofu}} apply -input=false "{{plan_file}}"
+
+# Drift check (cron): exit 0 = clean, 2 = drift, 1 = error.
+drift:
+    {{tofu}} init -input=false >/dev/null
+    {{tofu}} plan -input=false {{lock_arg}} -detailed-exitcode
+
+# Local pre-merge gate.
+check: fmt validate plan policy

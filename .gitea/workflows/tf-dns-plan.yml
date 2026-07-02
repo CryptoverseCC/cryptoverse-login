@@ -1,0 +1,90 @@
+# infra (Cloudflare DNS layer) — PLAN. Copied + adapted from the HeavyOperations
+# control repo's tf-base-plan.yml; Gitea reads workflows ONLY from repo-root
+# /.gitea/workflows/.
+#
+# Runs on the ISOLATED container runner (runs-on: infra-isolated) with READ-ONLY
+# creds. A poisoned PR cannot mutate anything: CLOUDFLARE_API_TOKEN carries the
+# read-only zone/DNS token here (the DNS:Edit token exists only in the manual
+# apply job) and the RO S3 key can READ state but only WRITE the plans bucket.
+# The saved binary plan is encrypted and stashed keyed by commit SHA; the manual
+# apply (tf-dns-apply.yml) fetches it, asserts reviewed==applied, and applies
+# THAT exact plan. See HeavyOperations docs/INFRA_CICD.md.
+name: tf-dns-plan
+on:
+  # workflow_dispatch: RECOVERY re-plan — re-stash a fresh plan for the current
+  # main HEAD after out-of-band state changes (partial apply + import, manual
+  # state surgery). The apply's serial assert refuses stale stashes; this is how
+  # you mint a current one without a dummy commit.
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "infra/**"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+concurrency:
+  group: tf-dns-plan-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  AWS_REGION: eu-west-par
+  S3_ENDPOINT: https://s3.eu-west-par.io.cloud.ovh.net/
+  STATE_BUCKET: heavyops-tfstate-cryptoverse-login
+  PLANS_BUCKET: heavyops-tfplans-cryptoverse-login
+jobs:
+  plan:
+    runs-on: infra-isolated
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      # READ-ONLY credential sets (this job runs PR-author-controlled code).
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_RO_API_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_RO_ACCESS }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_RO_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fmt + validate
+        run: just fmt validate
+
+      - name: plan (read-only creds — no state lock)
+        env:
+          PLAN_LOCK: "-lock=false" # RO cred cannot write the state lock object
+        run: just plan
+
+      - name: policy gate (agnosticism + destroy/replace guard)
+        run: just policy
+
+      - name: augment plan metadata with the live state serial
+        run: |
+          set -euo pipefail
+          serial="$(aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$STATE_BUCKET/terraform.tfstate" - 2>/dev/null | jq -r '.serial // 0' || echo 0)"
+          jq --argjson s "${serial:-0}" '. + {state_serial: $s, layer: "cryptoverse-login"}' plan-metadata.json > .m && mv .m plan-metadata.json
+          echo "state_serial=${serial:-0}"
+
+      - name: stash the encrypted plan (keyed by commit SHA)
+        env:
+          PLAN_PASSPHRASE: ${{ secrets.PLAN_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # The saved plan embeds PLAINTEXT values — encrypt before it leaves the runner.
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in tfplan.bin -out tfplan.enc -pass "env:PLAN_PASSPHRASE"
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp tfplan.enc         "s3://$PLANS_BUCKET/cryptoverse-login/${GITHUB_SHA}.tfplan.enc"
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp plan-metadata.json "s3://$PLANS_BUCKET/cryptoverse-login/${GITHUB_SHA}.plan-metadata.json"
+          echo "stashed cryptoverse-login/${GITHUB_SHA}.tfplan.enc"
+
+      - name: post a redacted plan summary to the PR
+        if: github.event_name == 'pull_request'
+        env:
+          INFRA_BOT_PAT: ${{ secrets.INFRA_BOT_PAT }}
+        run: |
+          set -euo pipefail
+          # ONLY a resource-change summary + the Plan: line — never the full plan (it carries values).
+          tofu show -no-color tfplan.bin | grep -E '^([[:space:]]*# |Plan:)' > plan-summary.txt || true
+          body="$(printf '### tf-dns plan for `%s`\n\n```\n%s\n```\n\nApply with the **tf-dns-apply** workflow (manual dispatch) once merged.' "${GITHUB_SHA:0:7}" "$(cat plan-summary.txt)")"
+          api="http://gitea.127.0.0.1.nip.io:18080/api/v1"
+          jq -n --arg b "$body" '{body:$b}' | \
+            curl -fsS -X POST "$api/repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" \
+              -H "Authorization: token ${INFRA_BOT_PAT}" -H "Content-Type: application/json" -d @- >/dev/null
+          echo "posted plan summary to PR #${{ github.event.pull_request.number }}"

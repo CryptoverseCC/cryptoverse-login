@@ -1,0 +1,85 @@
+# infra (Cloudflare DNS layer) — APPLY (MANUAL). Copied + adapted from the
+# HeavyOperations control repo's tf-base-apply.yml. You trigger this from the
+# Gitea Actions UI (workflow_dispatch) after reviewing the plan; the manual
+# dispatch IS the approval.
+#
+# It applies the EXACT reviewed plan for the CURRENT commit (the encrypted binary
+# stashed by tf-dns-plan.yml), never a fresh one — and asserts reviewed==applied
+# (tree SHA + state serial) before touching anything. WRITE creds (the DNS:Edit
+# Cloudflare token + the RW S3 keypair) are used only here. A failed apply or
+# detected drift sets a FREEZE marker that blocks the next apply until an
+# operator clears it. See HeavyOperations docs/INFRA_CICD.md.
+name: tf-dns-apply
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "apply" to confirm applying the reviewed plan for the current commit'
+        required: true
+        default: ""
+concurrency:
+  group: tf-dns-apply
+  cancel-in-progress: false # never cancel an in-flight apply
+env:
+  AWS_REGION: eu-west-par
+  S3_ENDPOINT: https://s3.eu-west-par.io.cloud.ovh.net/
+  STATE_BUCKET: heavyops-tfstate-cryptoverse-login
+  PLANS_BUCKET: heavyops-tfplans-cryptoverse-login
+jobs:
+  apply:
+    runs-on: infra-isolated
+    if: ${{ github.event.inputs.confirm == 'apply' }}
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      # READ-WRITE credential sets — used ONLY in this manually-triggered job.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_RW_ACCESS }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_RW_SECRET }}
+      PLAN_PASSPHRASE: ${{ secrets.PLAN_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: refuse if a FREEZE marker is set
+        run: |
+          set -euo pipefail
+          if aws --endpoint-url "$S3_ENDPOINT" s3 ls "s3://$PLANS_BUCKET/cryptoverse-login/FREEZE" >/dev/null 2>&1; then
+            echo "APPLY FROZEN: s3://$PLANS_BUCKET/cryptoverse-login/FREEZE exists — a prior apply failed or drift was detected." >&2
+            echo "Investigate, then clear it: aws --endpoint-url $S3_ENDPOINT s3 rm s3://$PLANS_BUCKET/cryptoverse-login/FREEZE" >&2
+            exit 1
+          fi
+
+      - name: fetch + decrypt the reviewed plan for this commit
+        run: |
+          set -euo pipefail
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$PLANS_BUCKET/cryptoverse-login/${GITHUB_SHA}.tfplan.enc"         tfplan.enc
+          aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$PLANS_BUCKET/cryptoverse-login/${GITHUB_SHA}.plan-metadata.json" plan-metadata.json
+          openssl enc -d -aes-256-cbc -pbkdf2 -in tfplan.enc -out tfplan.bin -pass "env:PLAN_PASSPHRASE"
+
+      - name: assert reviewed == applied (fail closed)
+        run: |
+          set -euo pipefail
+          meta_tree="$(jq -r '.tree_sha' plan-metadata.json)"
+          meta_serial="$(jq -r '.state_serial // 0' plan-metadata.json)"
+          if [ "$meta_tree" != "$GITHUB_SHA" ]; then
+            echo "TREE MISMATCH: plan was for ${meta_tree}, applying at ${GITHUB_SHA} — re-plan on this commit first." >&2
+            exit 1
+          fi
+          live_serial="$(aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$STATE_BUCKET/terraform.tfstate" - 2>/dev/null | jq -r '.serial // 0' || echo 0)"
+          if [ "$live_serial" != "$meta_serial" ]; then
+            echo "STATE MOVED: serial ${meta_serial} at plan, ${live_serial} now — state changed since the plan; re-plan." >&2
+            exit 1
+          fi
+          echo "lineage OK: tree=${GITHUB_SHA} serial=${live_serial}"
+
+      - name: apply the SAVED plan (RW creds) — FREEZE on failure
+        run: |
+          set -euo pipefail
+          if ! just apply; then
+            echo "::error::apply FAILED — DNS may be half-applied; setting FREEZE marker."
+            printf 'apply failed for %s\n' "$GITHUB_SHA" \
+              | aws --endpoint-url "$S3_ENDPOINT" s3 cp - "s3://$PLANS_BUCKET/cryptoverse-login/FREEZE" || true
+            exit 1
+          fi
+          echo "apply complete for ${GITHUB_SHA}"

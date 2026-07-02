@@ -5,3 +5,12 @@
 # Local environment / secrets
 .env
 .envrc
+
+# OpenTofu (infra/) — provider cache + local plan/state artifacts.
+# .terraform.lock.hcl and terraform.tfvars ARE committed (non-secret).
+infra/.terraform/
+infra/tfplan.*
+infra/plan-metadata.json
+infra/plan-summary.txt
+*.tfstate
+*.tfstate.*

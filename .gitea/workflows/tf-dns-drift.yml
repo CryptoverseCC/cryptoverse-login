@@ -1,0 +1,50 @@
+# infra (Cloudflare DNS layer) — scheduled DRIFT check (read-only). Copied +
+# adapted from the HeavyOperations control repo's tf-base-drift.yml.
+#
+# `tofu plan -detailed-exitcode` on a cron with RO creds. Exit 2 = drift: set the
+# FREEZE marker (so a pre-drift saved plan can't be applied over a drifted
+# reality) and open a Gitea issue. See HeavyOperations docs/INFRA_CICD.md.
+name: tf-dns-drift
+on:
+  schedule:
+    - cron: "37 6 * * *" # 06:37 UTC daily — staggered after the platform's 06:17 base check
+concurrency:
+  group: tf-dns-drift
+  cancel-in-progress: true
+env:
+  AWS_REGION: eu-west-par
+  S3_ENDPOINT: https://s3.eu-west-par.io.cloud.ovh.net/
+  PLANS_BUCKET: heavyops-tfplans-cryptoverse-login
+jobs:
+  drift:
+    runs-on: infra-isolated
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      # READ-ONLY credential sets — drift never mutates.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_RO_API_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_RO_ACCESS }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_RO_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: drift check (read-only) — FREEZE + issue on drift
+        env:
+          PLAN_LOCK: "-lock=false" # RO cred cannot write the state lock object
+          INFRA_BOT_PAT: ${{ secrets.INFRA_BOT_PAT }}
+        run: |
+          set +e
+          just drift
+          code=$?
+          set -e
+          if [ "$code" = "2" ]; then
+            echo "DRIFT detected — setting FREEZE + opening an issue"
+            printf 'drift detected for cryptoverse-login dns\n' \
+              | aws --endpoint-url "$S3_ENDPOINT" s3 cp - "s3://$PLANS_BUCKET/cryptoverse-login/FREEZE" || true
+            api="http://gitea.127.0.0.1.nip.io:18080/api/v1"
+            jq -n '{title:"tf-dns: drift detected", body:"`just drift` returned exit 2 — the DNS layer has drifted from its state. A pre-drift saved plan must NOT be applied. Investigate, reconcile, then clear the FREEZE marker (s3://heavyops-tfplans-cryptoverse-login/cryptoverse-login/FREEZE)."}' \
+              | curl -fsS -X POST "$api/repos/${GITHUB_REPOSITORY}/issues" \
+                  -H "Authorization: token ${INFRA_BOT_PAT}" -H "Content-Type: application/json" -d @- >/dev/null || true
+            exit 0
+          fi
+          exit "$code"
