@@ -12,6 +12,11 @@
 #   just build    build the image from the current commit -> local registry   (standalone)
 #   just deploy   build, pin the tag in deploy/, commit, push, wait for Argo CD, prune
 #   just prune    keep only the newest <keep> image tags in the registry        (standalone)
+#
+# There is NO `promote` here: prod promotion is driven from the REPO-ROOT
+# Justfile (`just promote`), which copies this demo's image to Harbor
+# (<harbor>/cryptoverse-login/demo) and pins deploy/overlays/prod below,
+# together with the IdP components — one release ships a verifiable pair.
 
 set shell := ["bash", "-uc"]
 
@@ -21,7 +26,9 @@ registry      := "localhost:5000"
 image         := registry / app             # localhost:5000/cryptoverse-login-demo
 build_context := "demo"                      # Dockerfile context (relative to this dir): tests/cryptoverse-login-demo/demo
 overlay       := "deploy/overlays/local"     # relative to this dir
-gitops_remote := "gitops"                    # shared git remote -> gitops-repos/cryptoverse-login.git
+# CI overrides the push remote: Gitea Actions checks the repo out as `origin`, so
+# the workflows export GITOPS_REMOTE=origin. By hand / via the hook it stays "gitops".
+gitops_remote := env_var_or_default("GITOPS_REMOTE", "gitops")
 kube_context  := "kind-heavyops"
 argocd_ns     := "argocd"
 registry_ctr  := "kind-registry"             # podman container backing localhost:5000 (used for GC)
@@ -81,7 +88,7 @@ deploy:
     else
       echo "==> [3/6] commit deploy change"
       git add "{{overlay}}/kustomization.yaml"
-      git commit -q -m "deploy({{app}}): ${tag} [skip-deploy]"
+      git commit -q -m "deploy({{app}}): ${tag} [skip ci]"
     fi
     echo "    push HEAD -> {{gitops_remote}}/main"
     git push -q "{{gitops_remote}}" HEAD:main

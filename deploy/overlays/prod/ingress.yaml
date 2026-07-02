@@ -1,0 +1,31 @@
+# Host-based routing for PROD. Lives in the overlay because the hostname is
+# environment-specific (local uses *.127.0.0.1.nip.io; prod uses a real domain).
+# <<LOGIN_PROD_HOST>> is a placeholder — the prod hostname is not decided yet;
+# the operator fills it in when it is (it must match hydra-config.yaml's URLs).
+#
+# Per-app TLS (the prod pattern, per HeavyOperations docs/ARCHITECTURE.md): once
+# an ACME (Let's Encrypt) ClusterIssuer exists on the prod cluster, annotate
+# this Ingress with `cert-manager.io/cluster-issuer: <acme-issuer>` and add a
+# matching `tls:` block for host <<LOGIN_PROD_HOST>> — cert-manager then mints a
+# publicly-trusted, auto-renewed cert. Left out here so a build before the ACME
+# issuer exists doesn't request a cert. (An OIDC IdP MUST be served over HTTPS —
+# Hydra's issuer URL below is https — so wire TLS before go-live.)
+#
+# All paths go to the HAProxy gateway, which fans out to login/wrapper/Hydra.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cryptoverse-login
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: <<LOGIN_PROD_HOST>>
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cryptoverse-login-gateway
+                port:
+                  name: http

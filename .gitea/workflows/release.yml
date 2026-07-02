@@ -1,0 +1,16 @@
+name: release
+on:
+  push:
+    tags: ['*']
+concurrency:
+  group: promote-${{ github.ref }}
+jobs:
+  promote:
+    runs-on: host
+    env:
+      GITOPS_REMOTE: origin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: just promote

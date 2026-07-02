@@ -1,0 +1,26 @@
+# Host-based routing for the demo in PROD (overlay — env-specific host).
+# <<DEMO_PROD_HOST>> is a placeholder — the prod hostname is not decided yet;
+# the operator fills it in when it is (it must match config.yaml's DOMAIN and
+# the register-client.yaml redirect URIs).
+#
+# Per-app TLS: once an ACME (Let's Encrypt) ClusterIssuer exists on the prod
+# cluster, annotate this Ingress with `cert-manager.io/cluster-issuer:
+# <acme-issuer>` and add a matching `tls:` block for host <<DEMO_PROD_HOST>>.
+# Left out here so a build before the ACME issuer exists doesn't request a cert.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: <<DEMO_PROD_HOST>>
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo
+                port:
+                  number: 80

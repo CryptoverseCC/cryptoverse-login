@@ -1,0 +1,23 @@
+# Env-specific OIDC wiring for the demo in PROD.
+#   - The BROWSER-facing authorize endpoint uses the public IdP host (the
+#     user's browser is redirected there): the IdP prod overlay's
+#     <<LOGIN_PROD_HOST>> placeholder, filled in by the operator (no port —
+#     prod serves on standard 443).
+#   - The SERVER-side calls (jwks/token/userinfo) use in-cluster Hydra service
+#     DNS — the IdP's prod overlay deploys the same Services into the
+#     cryptoverse-login namespace of the same prod cluster.
+#   - <<DEMO_PROD_HOST>> is the demo's own prod hostname (also undecided); it
+#     must match ingress.yaml and the register-client.yaml redirect URIs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-config
+  labels:
+    app.kubernetes.io/name: demo
+data:
+  DOMAIN: <<DEMO_PROD_HOST>>
+  PORT: "3000"
+  OIDC_OP_AUTHORIZATION_ENDPOINT: https://<<LOGIN_PROD_HOST>>/oauth2/auth
+  OIDC_OP_JWKS_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/.well-known/jwks.json
+  OIDC_OP_TOKEN_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/oauth2/token
+  OIDC_OP_USER_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/userinfo

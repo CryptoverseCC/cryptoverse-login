@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cryptoverse-login-demo
+resources:
+- ../../base
+- ./config.yaml
+- ./ingress.yaml
+- ./register-client.yaml
+# Prod kubelets pull the demo image from Harbor with the pull-only robot: the
+# `harbor-pull` dockerconfigjson Secret, referenced on the workload's pod spec.
+# (The register-client Job runs a public curl image — no pull secret needed.)
+# The Secret's CONTENTS are deferred — see the note on the generator below.
+patches:
+- target:
+    kind: Deployment
+  patch: |-
+    - op: add
+      path: /spec/template/spec/imagePullSecrets
+      value:
+      - name: harbor-pull
+# The deployed image tag lives here, not in base — `just promote` (repo root)
+# runs `kustomize edit set image` to pin the blessed, immutable
+# <commit-time>-<sha> tag on a release/tag, together with the IdP components.
+# `name` matches the bare repo ref in base/demo.yaml; `newName` retargets it at
+# this project's OWN Harbor project (86id.../cryptoverse-login/demo — the demo is
+# a component of the cryptoverse-login Harbor project, not its own).
+images:
+- name: localhost:5000/cryptoverse-login-demo
+  newName: 86id9433.gra7.container-registry.ovh.net/cryptoverse-login/demo
+  newTag: prod # placeholder; replaced by `just promote` with <commit-time>-<sha>
+# DEFERRED — prod secrets. The prod SOPS age key does not exist yet; once the
+# operator adds the prod age recipient to .sops.yaml, create the prod
+# *.sops.yaml Secrets (Django key, OAuth2 client, harbor-pull) encrypted to it
+# (NEVER the local key, NEVER plaintext) and uncomment:
+# generators:
+# - ./secret-generator.yaml

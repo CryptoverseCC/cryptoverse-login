@@ -1,0 +1,61 @@
+# Registers the demo's OAuth2 client in the deployed PROD Hydra. Same shape as
+# the local overlay's Job (Argo CD PostSync hook, idempotent delete-then-create
+# upsert; client_id/secret from the SOPS `demo-oauth2client` Secret — deferred
+# until the prod age key exists), with the env-specific bits swapped:
+#   - redirect/post-logout URIs use https://<<DEMO_PROD_HOST>> (no port variant:
+#     prod serves on standard 443, so the request Host never carries a port).
+#   - HYDRA_ADMIN_URL stays in-cluster service DNS (the IdP's prod overlay
+#     deploys the same Services in the same prod cluster).
+# <<DEMO_PROD_HOST>> must match config.yaml's DOMAIN and ingress.yaml's host.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-register-oauth2-client
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 20
+  template:
+    metadata:
+      labels:
+        app: demo-register-oauth2-client
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: register
+          image: docker.io/curlimages/curl:8.11.1
+          env:
+            - name: HYDRA_ADMIN_URL
+              value: http://cryptoverse-login-hydra-admin.cryptoverse-login:4445
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: demo-oauth2client
+                  key: CLIENT_ID
+            - name: CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: demo-oauth2client
+                  key: CLIENT_SECRET
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              echo "waiting for Hydra admin at $HYDRA_ADMIN_URL ..."
+              until curl -sf -o /dev/null "$HYDRA_ADMIN_URL/health/ready"; do sleep 2; done
+              cat >/tmp/body.json <<EOF
+              {"client_id":"$CLIENT_ID","client_secret":"$CLIENT_SECRET","grant_types":["authorization_code","refresh_token"],"response_types":["id_token","code","token"],"scope":"openid email profile","redirect_uris":["https://<<DEMO_PROD_HOST>>/oidc/callback/"],"post_logout_redirect_uris":["https://<<DEMO_PROD_HOST>>/"],"audience":["audience-a"],"token_endpoint_auth_method":"client_secret_post","metadata":{"app":"<<DEMO_PROD_HOST>>","restrictions":[]}}
+              EOF
+              echo "removing any existing client $CLIENT_ID (ignored if absent)"
+              curl -s -o /dev/null -X DELETE "$HYDRA_ADMIN_URL/admin/clients/$CLIENT_ID" || true
+              code=$(curl -s -o /tmp/resp -w '%{http_code}' -X POST "$HYDRA_ADMIN_URL/admin/clients" -H 'Content-Type: application/json' --data @/tmp/body.json)
+              echo "POST /admin/clients -> $code"; cat /tmp/resp; echo
+              [ "$code" = "201" ] || { echo "registration FAILED"; exit 1; }
+              echo "OAuth2 client '$CLIENT_ID' registered"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
