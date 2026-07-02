@@ -4,8 +4,4 @@ creation_rules:
   - path_regex: .*\.sops\.ya?ml$
     encrypted_regex: ^(data|stringData)$
     age: >-
-      age16e8e7m7l0u86czevcvg0rd0adhly69uanjr357guahhchxvwafdq8nzjwz
-# When the prod cluster is added, append its recipient (comma-separated) so the
-# same ciphertext decrypts in both clusters:
-#     age: >-
-#       age16e8e7m7l0u86czevcvg0rd0adhly69uanjr357guahhchxvwafdq8nzjwz,age1prodxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      age16e8e7m7l0u86czevcvg0rd0adhly69uanjr357guahhchxvwafdq8nzjwz,age1q28tkvt3g7n4hdpwu3esafsd2yqu6828agn0ynchp89ax6dpxf3qpg8qz3

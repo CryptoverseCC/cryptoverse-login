@@ -6,7 +6,7 @@
 #   - The SERVER-side calls (jwks/token/userinfo) use in-cluster Hydra service
 #     DNS — the IdP's prod overlay deploys the same Services into the
 #     cryptoverse-login namespace of the same prod cluster.
-#   - <<DEMO_PROD_HOST>> is the demo's own prod hostname (also undecided); it
+#   - login-demo.cryptoverse.cc is the demo's own prod hostname (also undecided); it
 #     must match ingress.yaml and the register-client.yaml redirect URIs.
 apiVersion: v1
 kind: ConfigMap
@@ -15,9 +15,9 @@ metadata:
   labels:
     app.kubernetes.io/name: demo
 data:
-  DOMAIN: <<DEMO_PROD_HOST>>
+  DOMAIN: login-demo.cryptoverse.cc
   PORT: "3000"
-  OIDC_OP_AUTHORIZATION_ENDPOINT: https://<<LOGIN_PROD_HOST>>/oauth2/auth
+  OIDC_OP_AUTHORIZATION_ENDPOINT: https://login.cryptoverse.cc/oauth2/auth
   OIDC_OP_JWKS_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/.well-known/jwks.json
   OIDC_OP_TOKEN_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/oauth2/token
   OIDC_OP_USER_ENDPOINT: http://cryptoverse-login-hydra-public.cryptoverse-login:4444/userinfo

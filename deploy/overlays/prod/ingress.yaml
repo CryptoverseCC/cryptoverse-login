@@ -19,7 +19,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: <<LOGIN_PROD_HOST>>
+    - host: login.cryptoverse.cc
       http:
         paths:
           - path: /

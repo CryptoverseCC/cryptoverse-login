@@ -24,10 +24,6 @@ data:
         - openid
         enabled: true
       subject_identifiers:
-        pairwise:
-          # Inert while only 'public' subjects are enabled; set a real secret
-          # salt (via config, not git) before ever enabling pairwise subjects.
-          salt: '!!! CHANGE THIS !!!'
         supported_types:
         - public
     serve:
@@ -48,12 +44,12 @@ data:
     strategies:
       access_token: jwt
     urls:
-      consent: https://<<LOGIN_PROD_HOST>>/consent
+      consent: https://login.cryptoverse.cc/consent
       device:
-        success: https://<<LOGIN_PROD_HOST>>/device/success
-        verification: https://<<LOGIN_PROD_HOST>>/device
-      login: https://<<LOGIN_PROD_HOST>>/login
-      logout: https://<<LOGIN_PROD_HOST>>/logout
-      post_logout_redirect: https://<<LOGIN_PROD_HOST>>/
+        success: https://login.cryptoverse.cc/device/success
+        verification: https://login.cryptoverse.cc/device
+      login: https://login.cryptoverse.cc/login
+      logout: https://login.cryptoverse.cc/logout
+      post_logout_redirect: https://login.cryptoverse.cc/
       self:
-        issuer: https://<<LOGIN_PROD_HOST>>/
+        issuer: https://login.cryptoverse.cc/

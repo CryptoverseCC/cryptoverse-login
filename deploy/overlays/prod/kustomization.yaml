@@ -35,9 +35,5 @@ images:
 - name: localhost:5000/cryptoverse-login/wrapper
   newName: 86id9433.gra7.container-registry.ovh.net/cryptoverse-login/wrapper
   newTag: prod # placeholder; replaced by `just promote` with <commit-time>-<sha>
-# DEFERRED — prod secrets. The prod SOPS age key does not exist yet; once the
-# operator adds the prod age recipient to .sops.yaml, create the prod
-# *.sops.yaml Secrets (login app, Hydra, Postgres, harbor-pull) encrypted to it
-# (NEVER the local key, NEVER plaintext) and uncomment:
-# generators:
-# - ./secret-generator.yaml
+generators:
+- ./secret-generator.yaml

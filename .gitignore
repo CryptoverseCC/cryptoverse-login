@@ -4,3 +4,4 @@
 
 # Local environment / secrets
 .env
+.envrc
