@@ -12,13 +12,13 @@ resources:
 images:
 - name: localhost:5000/cryptoverse-login/gateway
   newName: localhost:5000/cryptoverse-login/gateway
-  newTag: 20260627T213118Z-20221e8
+  newTag: 20260702T193638Z-91a02bd
 - name: localhost:5000/cryptoverse-login/login
   newName: localhost:5000/cryptoverse-login/login
-  newTag: 20260627T213118Z-20221e8
+  newTag: 20260702T193638Z-91a02bd
 - name: localhost:5000/cryptoverse-login/wrapper
   newName: localhost:5000/cryptoverse-login/wrapper
-  newTag: 20260627T213118Z-20221e8
+  newTag: 20260702T193638Z-91a02bd
 # KSOPS decrypts the *.sops.yaml Secrets (login app, Hydra, Postgres) at build
 # time using the age key in the Argo CD repo-server.
 generators:
