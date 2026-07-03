@@ -1,7 +1,11 @@
 name: release
 on:
-  push:
-    tags: ['*']
+  # Fires only when a RELEASE is published (created non-draft, or a draft
+  # published) via the Gitea releases UI/API — a bare `git push --tags` no
+  # longer promotes. The release's tag is what gets checked out; `just tag`
+  # derives the image tag from that commit, so promote behaviour is unchanged.
+  release:
+    types: [published]
 concurrency:
   group: promote-${{ github.ref }}
 jobs:

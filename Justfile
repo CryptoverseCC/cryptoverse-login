@@ -9,13 +9,14 @@
 #
 #   just build    build+push all 3 custom images from the current commit -> local registry
 #   just deploy   build, pin all 3 tags in deploy/, commit, push, wait for Argo CD, prune
-#   just promote  on a release/tag: copy images -> Harbor, pin overlays/prod (IdP + demo), push, wait for prod
+#   just promote  on a published release: copy images -> Harbor, pin overlays/prod (IdP + demo), push, wait for prod
 #   just prune    keep only the newest <keep> tags PER component in the registry
 #
 # `just deploy` is the local pipeline; `just promote` is the prod pipeline. On the
 # platform Gitea Actions runs them — `.gitea/workflows/deploy.yml` runs `just
-# deploy` on push to main/master, `release.yml` runs `just promote` on a tag — but
-# the contract is identical by hand. The post-commit hook (`just hooks-install`)
+# deploy` on push to main/master, `release.yml` runs `just promote` when a release
+# is PUBLISHED via the Gitea releases UI/API (a bare tag push does NOT promote) —
+# but the contract is identical by hand. The post-commit hook (`just hooks-install`)
 # is the server-less fallback for the local loop.
 
 set shell := ["bash", "-uc"]
